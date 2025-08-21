@@ -1,0 +1,124 @@
+%\part{ --- BASIC CONFIGURATIONS AND PRE-TEXT ELEMENTS --- }
+
+% Class options:
+\documentclass[
+    % --- memoir class options ---
+	12pt,
+	a4paper,
+	%openright, % chapters starting in odd pages
+	twoside, % two-sided printing
+	% --- opções da classe abntex2 ---
+	%chapter=TITLE, % titles in uppercase
+	%section=TITLE,
+	%subsection=TITLE,
+	%subsubsection=TITLE,
+	% -- babel package options ---
+    english
+	]{abntex2}
+
+% Basic packages:
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+% Other configurations:
+\input{configs/preamble.tex}
+
+% Bibliography file:
+\addbibresource{configs/references.bib}
+
+% Author and document information:
+\titulo{Regime Switching Identification and Prediction Performance}
+\autor{Ricardo Semião e Castro}
+\local{Brasil}
+\data{2025}
+\orientador{Marcelo Fernandes}
+%\coorientador{}
+\instituicao{%
+    Fundação Getúlio Vargas
+    \par
+    Escola de Economia de São Paulo
+    \par
+    Programa de Pós-Graduação em Economia de Empresas}
+\tipotrabalho{Tese (Doutorado)}
+\preambulo{...}
+
+% Compile index:
+\makeindex
+
+% Begin document:
+\begin{document}
+
+
+% Extra configurations: 
+\selectlanguage{english} % language (via babel), else `brazil`
+\frenchspacing  % no extra space between sentences
+
+\iffalse
+% Cover and 'folha de rosto'
+\imprimircapa
+\imprimirfolhaderosto* %`*` as there will be ficha bibliográfica
+
+% Fichas etc.:
+\input{partials/pre_text.tex}
+
+% Abstracts:
+\input{partials/abstract.tex}
+
+% List of figures etc., and TOC:
+\input{partials/lists.tex}
+\fi
+
+
+
+%\part{ --- TEXT ELEMENTS --- }
+
+\textual
+
+\chapter{Introdução}
+
+...
+
+\part{Preparação da pesquisa}
+
+\chapter{Introdução2}
+
+...
+
+\phantompart % add vspace in TOC before conclusion
+\chapter{Conclusão}
+
+...
+
+
+
+%\part{ --- POST-TEXT ELEMENTS --- }
+
+\postextual
+
+% Bibliography and glossary:
+\bibliography{references}
+%\glossary
+
+
+% Appendix:
+\begin{apendicesenv}
+
+\partapendices % part title for appendices
+
+\end{apendicesenv}
+
+
+% Annexes:
+%\begin{anexosenv}
+%
+%\partanexos
+%
+%\end{anexosenv}
+
+
+% Índice remissivo:
+%\phantompart
+%\printindex
+
+
+\end{document}

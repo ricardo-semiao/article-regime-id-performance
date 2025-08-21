@@ -1,0 +1,137 @@
+%\part{ --- BASIC CONFIGURATIONS --- }
+
+% Typing:
+\usepackage{lmodern} % Latin Modern font
+\usepackage{microtype} % Micro-typography for better justification
+
+
+% Layout:
+\usepackage[left=3cm,right=2cm,bottom=2cm,top=3cm]{geometry} % margins
+
+% Par sizes
+\setlength{\parindent}{1.3cm}
+\setlength{\parskip}{0.2cm}  % else \onelineskip or \baselineskip
+
+% Set figure at the top of the page when added alone:
+\makeatletter
+\setlength{\@fptop}{5pt}
+\makeatother
+
+
+% Footnotes:
+\usepackage[bottom]{footmisc} % fix footnotes at the bottom of the page 
+
+% Avoid footnotes restart numbering:
+\usepackage{remreset}
+\makeatletter
+\@removefromreset{footnote}{chapter}
+\newcommand\footnoteref[1]{\protected@xdef\@thefnmark{\ref{#1}}\@footnotemark}
+\makeatother
+
+
+% Colors:
+\input{configs/rspalette.tex}
+\hypersetup{
+    colorlinks=true,
+    citecolor=green,
+    linkcolor=orange,
+    urlcolor=lightblue
+}
+
+
+% Figures:
+\usepackage{graphicx}
+
+
+% Math:
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+
+% Set vspace before and after equations:
+\makeatletter 
+\counterwithout{equation}{chapter}
+\g@addto@macro\normalsize{%
+    \setlength\abovedisplayskip{-10pt}
+    \setlength\belowdisplayskip{0pt}
+    \setlength\abovedisplayshortskip{-10pt}
+    \setlength\belowdisplayshortskip{0pt}}
+\makeatother
+\setlist[itemize]{topsep = -0.5cm, noitemsep}
+
+
+
+%\part{ --- SECTION SPACINGS --- }
+
+\chapterstyle{section}
+
+\renewcommand*{\chapnumfont}{\normalfont\LARGE\bfseries}
+\renewcommand*{\chaptitlefont}{\normalfont\LARGE\bfseries}
+
+\setlength{\afterchapskip}{0.5\baselineskip}
+\setlength{\beforechapskip}{2\baselineskip}
+
+
+
+%\part{ --- OTHERS --- }
+
+% PDF metadata:
+\makeatletter
+\hypersetup{%pagebackref=true,
+    pdftitle={\@title}, 
+    pdfauthor={\@author},
+    pdfsubject={\imprimirpreambulo},
+    bookmarksdepth=4
+}
+\makeatother
+
+
+
+%\part{ --- CITATIONS --- }
+\usepackage[brazilian, hyperpageref]{backref}
+\usepackage[alf]{abntex2cite} % ABNT style
+
+\renewcommand{\backrefpagesname}{Citado na(s) página(s):~}
+\renewcommand{\backref}{}
+\renewcommand*{\backrefalt}[4]{
+	\ifcase #1 %
+		Nenhuma citação no texto.%
+	\or
+		Citado na página #2.%
+	\else
+		Citado #1 vezes nas páginas #2.%
+	\fi}%
+
+%\DeclareFieldFormat{citehyperref}{%
+%    \DeclareFieldAlias{bibhyperref}{noformat}% Avoid nested links
+%    \bibhyperref{#1}}
+%
+%\DeclareFieldFormat{textcitehyperref}{%
+%    \DeclareFieldAlias{bibhyperref}{noformat}% Avoid nested links
+%    \bibhyperref{%
+%    #1%
+%    \ifbool{cbx:parens}
+%        {\bibcloseparen\global\boolfalse{cbx:parens}}
+%        {}}}
+%
+%\savebibmacro{cite}
+%\savebibmacro{textcite}
+%
+%\renewbibmacro*{cite}{%
+%    \printtext[citehyperref]{%
+%        \restorebibmacro{cite}%
+%        \usebibmacro{cite}}}
+%
+%\renewbibmacro*{textcite}{%
+%    \ifboolexpr{
+%    ( not test {\iffieldundef{prenote}} and
+%        test {\ifnumequal{\value{citecount}}{1}} )
+%    or
+%    ( not test {\iffieldundef{postnote}} and
+%        test {\ifnumequal{\value{citecount}}{\value{citetotal}}} )
+%    }
+%    {\DeclareFieldAlias{textcitehyperref}{noformat}}
+%    {}%
+%    \printtext[textcitehyperref]{%
+%    \restorebibmacro{textcite}%
+%    \usebibmacro{textcite}}}
