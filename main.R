@@ -4,61 +4,55 @@
 library(mirai)
 
 source("utils.R")
-source("codes/sgp.R")
-source("codes/rgp.R")
+source("codes/creators_sgp.R")
+source("codes/creators_rgp.R")
 
 
 
-# ------------------------------------------------------------------------------
+# Parameters -------------------------------------------------------------------
 
-n_r <- 2
-n_t <- 1000
+# Number of time periods
+n_t <- 100L
 
-
-sgp_opts <- list(
-  rw_half = list(
-    funs = list(
-      rw = serie_ar(mu = 0, rho1 = 1.5),
-      half = serie_ar(mu = 0, rho1 = 0.5)
-    ),
-    n_rho = 1
-  )
-)
+# Number of periods to predict
+n_h <- 1L
 
 
-rgp_opts <- list(
-  binom = regime_binom(n_r, rep(1 / n_r, n_r)),
-  markov = regime_markov(n_r, markov_simmat(0.9, n_r))
-)
+# DGP options:
+source("codes/options_sgp.R")
+source("codes/options_rgp.R")
+
+map(list(options_sgp, options_rgp), names)
 
 
-dgp_opts <- tidyr::expand_grid(sgp = names(sgp_opts), rgp = names(rgp_opts))
-dgp_opts <- set_names(
-  pmap(dgp_opts, ~ list(...)),
-  pmap(dgp_opts, ~ paste0(c(...), collapse = "."))
-)
 
+# Drafts -----------------------------------------------------------------------
 
 errors <- map(dgp_opts, \(x) rnorm(n_t, 0, 1))
 
 
-# Loop -------------------------------------------------------------------------
-
-# dgp_id <- names(dgp_opts)[[1]]
+# Ex: `dgp_id = names(dgp_opts)[[1]]`
 main_loop <- function(dgp_id) {
   dgp <- dgp_opts[[dgp_id]]
   sgp <- sgp_opts[[dgp$sgp]]
   rgp <- rgp_opts[[dgp$rgp]]
 
-  r <- rgp(n_t)
+  sfun <- sgp$funs
+  rfun <- rgp$fun
+
+  r <- matrix(0, nrow = n_t, ncol = rgp$n_r)
+  r[1, sample(1:rgp$n_r, 1)] <- 1
+
   y <- errors[[dgp_id]]
 
-  for (t in sgp$n_rho:n_t) {
-    y[t] <- sgp$funs[[r[t]]](y, t)
+  for (t in (sgp$n_t_cut + 1):n_t) {
+    r[t] <- rfun(y, r, t)
+    y[t] <- sfun(y, r, t)
   }
 
-  cbind(r = r, y = y)
+  list(r = r, y = y) # Summarize r into vector?
 }
+
 
 results <- map(names(dgp_opts), safely(main_loop))
 results <- map(results, "result")
@@ -67,15 +61,9 @@ ggplot(as.data.frame(results[[2]]), aes(x = 1:n_t, y = y)) +
   geom_line(aes(color = r, group = NA))
 
 
-
-
 cl <- makeClusterPSOCK(2)
 print(cl)
 
 results <- parLapply(cl, X = names(dgp_opts), fun = safely(main_loop))
 
 parallel::stopCluster(cl)
-
-
-# Theta in Theta_opts is a n_r sized list with Theta_r being the params of the current regime
-# A more general version would consider different dgps in each regime
