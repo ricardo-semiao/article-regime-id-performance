@@ -24,10 +24,10 @@ create_rgp$markov <- function(probs) {
   new_function(
     args = pairlist2(y = , r = , t = ),
     body = expr({
-      r[t, sample(1:!!n_r, 1, prob = (!!probs)[r[t - 1], ])] <- 1
+      r[t, sample(1:!!n_r, 1, prob = (!!probs)[r[t - 1, ] == 1, ])] <- 1
       r[t, ]
     }),
-    env = env_parent(global_env())
+    env = pkg_env("stats")
   )
 }
 # Todo: test n_r
@@ -52,10 +52,10 @@ create_rgp$sbreak <- function(breaks) {
   new_function(
     args = pairlist2(y = , r = , t = ),
     body = expr({
-      r[t, .Internal(which(t < c(breaks, Inf)))[1]] <- 1
+      r[t, .Internal(which(t < c(!!breaks, Inf)))[1]] <- 1
       r[t, ]
     }),
-    env = env_parent(global_env())
+    env = pkg_env("stats")
   )
 }
 # Todo: test consistency with n_t and n_r
@@ -80,10 +80,10 @@ create_rgp$threshold <- function(breaks, g = \(x) x) {
   new_function(
     args = pairlist2(y = , r = , t = ),
     body = expr({
-      r[t, .Internal(which(g(y[t]) < c(breaks, Inf)))[1]] <- 1
+      r[t, .Internal(which(g(y[t]) < c(!!breaks, Inf)))[1]] <- 1
       r[t, ]
     }),
-    env = env_parent(global_env())
+    env = new_environment(list(g = g), pkg_env("stats"))
   )
 }
 # Todo: implement left_closed argument
@@ -112,6 +112,6 @@ create_rgp$smooth_threshold <- function(breaks, g) {
       r[t, ] <- 1 - r[t, 1]
       r[t, ]
     }),
-    env = new_environment(list(g = g), env_parent(global_env()))
+    env = new_environment(list(g = g), pkg_env("stats"))
   )
 }

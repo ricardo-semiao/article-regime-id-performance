@@ -81,7 +81,7 @@ options_rgp <- list()
 # 2 regimes, multinomial (equal probs)
 options_rgp$multinomial_equal <- list3(
   n_r = 2,
-  fun = create_rgp$markov(transmat_diag(1 / 2, n_r))
+  fun = create_rgp$markov(transmat_diag(0.5, n_r))
 )
 
 # 2 regimes, multinomial (more likely to be in regime 1)
@@ -92,15 +92,28 @@ options_rgp$multinomial_reg1 <- list3(
 
 
 # 2 regimes, markov, symmetric, high persistence
-options_rgp$markov_high <- list3(
+options_rgp$markov_symm_high <- list3(
   n_r = 2,
   fun = create_rgp$markov(transmat_diag(0.9, n_r))
 )
 
 # 2 regimes, markov, symmetric, low persistence
-options_rgp$markov_low <- list3(
+options_rgp$markov_symm_low <- list3(
   n_r = 2,
   fun = create_rgp$markov(transmat_diag(0.6, n_r))
+)
+
+
+# 2 regimes, markov, asymmetric, high persistence
+options_rgp$markov_asymm_high <- list3(
+  n_r = 2,
+  fun = create_rgp$markov(transmat_main_col(c(0.9, 0.7), n_r))
+)
+
+# 2 regimes, markov, asymmetric, low persistence
+options_rgp$markov_asymm_low <- list3(
+  n_r = 2,
+  fun = create_rgp$markov(transmat_main_col(c(0.8, 0.6), n_r))
 )
 
 
@@ -146,24 +159,24 @@ options_rgp$threshold_abs_05 <- list3(
 # 2 regimes, star, lstar, at 0
 options_rgp$lstar_0 <- list3(
   n_r = 2,
-  fun = create_rgp$threshold(c(0), g = logistic_cdf)
+  fun = create_rgp$smooth_threshold(c(0), g = logistic_cdf)
 )
 
 # 2 regimes, star, estar, at 0.5
 options_rgp$lstar_05 <- list3(
   n_r = 2,
-  fun = create_rgp$threshold(c(0.5), g = logistic_cdf)
+  fun = create_rgp$smooth_threshold(c(0.5), g = logistic_cdf)
 )
 
 
 # 2 regimes, star, lstar, at 0
 options_rgp$estar_0 <- list3(
   n_r = 2,
-  fun = create_rgp$threshold(c(0), g = exponential_cdf)
+  fun = create_rgp$smooth_threshold(c(0), g = exponential_cdf)
 )
 
 # 2 regimes, star, estar, at 0.5
 options_rgp$estar_05 <- list3(
   n_r = 2,
-  fun = create_rgp$threshold(c(0.5), g = exponential_cdf)
+  fun = create_rgp$smooth_threshold(c(0.5), g = exponential_cdf)
 )

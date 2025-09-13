@@ -4,18 +4,19 @@
 library(mirai)
 
 source("utils.R")
+source("codes/diagnostics.R")
 source("codes/creators_sgp.R")
 source("codes/creators_rgp.R")
 
 
 
-# Parameters -------------------------------------------------------------------
+# Parameters and DGPs ----------------------------------------------------------
 
-# Number of time periods
-n_t <- 100L
-
-# Number of periods to predict
-n_h <- 1L
+# Simulation parameters:
+n_s <- 30L # Number of simulations
+n_t <- 100L # Number of time periods
+n_burn <- 20L # Burn-in periods
+n_h <- 1L # Number of periods to predict
 
 
 # DGP options:
@@ -25,28 +26,58 @@ source("codes/options_rgp.R")
 map(list(options_sgp, options_rgp), names)
 
 
+# Used combinations:
+dgp_names <- expand_grid(
+  sgp = c("r2_ar1_mu1", "r2_ar1_mu2"),
+  rgp = names(options_rgp)
+) |>
+  mutate(dgp = str_c(sgp, "-", rgp))
 
-# Drafts -----------------------------------------------------------------------
+n_p <- nrow(dgp_names)
 
-errors <- map(dgp_opts, \(x) rnorm(n_t, 0, 1))
+sim_names <- expand_grid(dgp = dgp_names$dgp, sim = 1:n_s) |>
+  pmap_chr(~ str_c(..1, "-", ..2))
 
 
-# Ex: `dgp_id = names(dgp_opts)[[1]]`
-main_loop <- function(dgp_id) {
-  dgp <- dgp_opts[[dgp_id]]
-  sgp <- sgp_opts[[dgp$sgp]]
-  rgp <- rgp_opts[[dgp$rgp]]
 
-  sfun <- sgp$funs
-  rfun <- rgp$fun
+# Series Simulation ------------------------------------------------------------
 
-  r <- matrix(0, nrow = n_t, ncol = rgp$n_r)
-  r[1, sample(1:rgp$n_r, 1)] <- 1
+# Error generation:
+errors <- rTRNG::rnorm_trng(n_t * n_p * n_s, parallelGrain = 100) |>
+  matrix(nrow = n_t, ncol = n_p * n_s) |>
+  `colnames<-`(sim_names)
 
-  y <- errors[[dgp_id]]
+diagnose_errors(errors)
+#if (FALSE) ggsave2("figures/diag_errors.png", 20, 15)
 
-  for (t in (sgp$n_t_cut + 1):n_t) {
-    r[t] <- rfun(y, r, t)
+
+# Simulation data:
+# Each iteration must receive all data (for better parallelization)
+sim_data <- map(set_names(sim_names), \(opts) {
+  opts_split <- str_split_1(opts, "-")
+  list(
+    sgp = options_sgp[[opts_split[1]]],
+    rgp = options_rgp[[opts_split[2]]],
+    errors = errors[, opts]
+  )
+})
+
+
+# Simulation function:
+simulate_serie <- function(data) {
+  sfun <- data$sgp$fun
+  rfun <- data$rgp$fun
+
+  n_r <- data$rgp$n_r
+  t_start <- data$sgp$t_cut + 1
+
+  r <- matrix(0, nrow = n_t, ncol = n_r)
+  r[t_start - 1, sample(1:n_r, 1)] <- 1
+
+  y <- data$errors
+
+  for (t in t_start:n_t) {
+    r[t, ] <- rfun(y, r, t)
     y[t] <- sfun(y, r, t)
   }
 
@@ -54,16 +85,46 @@ main_loop <- function(dgp_id) {
 }
 
 
-results <- map(names(dgp_opts), safely(main_loop))
-results <- map(results, "result")
+# Running and collecting results:
+results <- get_results(
+  sim_data, simulate_serie,
+  n_t = n_t,
+  parallel = FALSE, safely = TRUE
+)
 
-ggplot(as.data.frame(results[[2]]), aes(x = 1:n_t, y = y)) +
-  geom_line(aes(color = r, group = NA))
+#keep(results, ~ inherits_any(.x, "try-error")) |> names()
+map(results, "error") |> compact() |> names()
+map(results, "result") |> keep(~ inherits_any(.x, "try-error")) |> names()
+
+results_pass <- map(results, "result")
 
 
-cl <- makeClusterPSOCK(2)
-print(cl)
+# Diagnostics:
+results_data <- imap(results_pass, \(res, sim_name) {
+  sim_opts <- str_split_1(sim_name, "-")
+  tibble(
+    group = sim_name, sgp = sim_opts[1], rgp = sim_opts[2], sim = sim_opts[3],
+    t = 1:n_t, y = res$y, r = max.col(res$r)
+  )
+}) |>
+  bind_rows()
 
-results <- parLapply(cl, X = names(dgp_opts), fun = safely(main_loop))
 
-parallel::stopCluster(cl)
+gdata <- results_data %>%
+  filter(
+    sgp %in% c("r2_ar1_mu1", "r2_ar1_mu2") &
+      rgp %in% c("markov_symm_high", "markov_asymm_high") &
+      sim %in% c(1, sample(2:n_s, 6))
+  )
+
+diagnose_series(gdata, only_one = TRUE)
+if (FALSE) ggsave2("figures/diag_series_one.png", 20, 15)
+
+diagnose_series(gdata)
+if (FALSE) ggsave2("figures/diag_series_mult.png", 20, 15)
+
+diagnose_paths(gdata, n_t)
+if (FALSE) ggsave2("figures/diag_paths.png", 20, 15)
+
+diagnose_regimes(gdata)
+if (FALSE) ggsave2("figures/diag_regimes.png", 20, 15)

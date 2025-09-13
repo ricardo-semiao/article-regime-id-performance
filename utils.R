@@ -3,8 +3,63 @@
 
 library(cli)
 library(glue)
+library(patchwork)
+
 library(tidyverse)
 library(rlang)
+
+
+
+# Theme ----------------------------------------------------------
+
+pal <- list(
+  main = c(
+    orange = "#cc5500",
+    green = "#007f5b",
+    yellow = "#e5b300",
+    blue = "#008c99",
+    red = "#cc0022"
+  ),
+  dark = c(
+    orange = "#7f3500",
+    green = "#004c36",
+    yellow = "#997700",
+    blue = "#00464c",
+    red = "#990019"
+  ),
+  light = c(
+    orange = "#e08d51",
+    green = "#22c395",
+    yellow = "#f7d96d",
+    blue = "#32bfcc",
+    red = "#e05169"
+  ),
+  aqua = c(
+    orange = "#f7d3ba",
+    green = "#a5f2dc",
+    yellow = "#f9ebb8",
+    blue = "#a5ebf2",
+    red = "#f5bcc5"
+  ),
+  grays = c(
+    gray = "#f2f2f2",
+    darkgray = "#cccccc",
+    blackgray = "#666666",
+    fontblack = "#22262a"
+  )
+)
+
+
+theme_set(
+  theme_bw() +
+    theme(
+      strip.background = element_rect(
+        fill = pal$greys["darkgray"], color = "black"
+      )
+    )
+)
+
+arrow1 <- arrow(length = unit(0.02, "npc"), type = "closed")
 
 
 
@@ -68,36 +123,51 @@ list3 <- function(...) {
 }
 
 
+#' Internal wrapper for ggsave with default units
+#'
+#' @param filename [`character(1)`] Output file path.
+#' @param width [`numeric(1)`] Plot width.
+#' @param height [`numeric(1)`] Plot height.
+#' @param ... Additional arguments passed to [ggplot::ggsave()].
+#' @param units [`character(1)`] Units for width and height.
+#'
+#' @return [`invisible(NULL)`].
+ggsave2 <- function(filename, width, height, ..., units = "cm") {
+  ggsave(filename, width = width, height = height, ..., units = units)
+}
+
+
 
 # Specific Helpers -------------------------------------------------------------
 
-#' Create a regime function from lists of functions and arguments
+#' Apply with parallelism and/or safety
 #'
-#' @param funs [`function` or `list(function)`] Functions to apply.
-#' @param args [`list(list())`] List of argument lists for each function.
+#' @param x [`list()`-like] Input data to process.
+#' @param f [`function()`] Function to apply to each element of `x`.
+#' @param ... Additional arguments passed to `f`.
+#' @param parallel [`logical(1)`] Whether to use parallel processing.
+#' @param safely [`logical(1)`] Whether to wrap `f` with error handling.
 #'
-#' @return [`function`] A new function combining the regimes.
-create_regimes <- function(funs, args) {
-  if (!is_list(args) || !all(map_lgl(args, is_list))) {
-    cli_abort("{.arg args} must be a list of lists.)")
+#' @return [`list()`] Results of applying `f` to `x`.
+get_results <- function(x, f, ..., parallel, safely) {
+  if (safely) f <- safely(f)
+
+  if (parallel) {
+    daemons(8)
+    partial <- mirai_map(x, f, ...)
+    results <- collect_mirai(partial, options = c(".progress")) #, ".flat"
+    daemons(0)
+
+    results <- map(results, \(x) {
+      if (inherits_any(x, "try-error")) {
+        list(result = NULL, error = x)
+      } else {
+        x
+      }
+    })
+  } else {
+    results <- lapply(x, f)
   }
 
-  n_r <- length(args)
-
-  if (is_function(funs)) {
-    funs <- map(seq_len(n_r), ~ funs)
-  } else if (!is_list(funs) || length(funs) != n_r) {
-    cli_abort("
-    {.arg funs} must be a function or a list with {.code length(args)} \\
-    ({n_r}) functions.
-    ")
-  }
-
-  ys_expr <- map2(funs, args, \(f, arg) inject(f(!!!arg)))
-
-  new_function(
-    args = pairlist2(y = , t = ),
-    body = expr(c(!!!ys_expr) * r[t]),
-    env = global_env()
-  )
+  results
 }

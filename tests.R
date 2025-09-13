@@ -14,6 +14,7 @@ library(rTRNG)
 library(dqrng)
 
 
+
 # Parallel Tests ---------------------------------------------------------------
 
 # Test functions
@@ -22,14 +23,17 @@ test_parallel <- function(
   type = "PSOCK", # "MIRAI"
   static_scheduling = TRUE, chunk_size = NULL, ...
 ) {
-  if (static_scheduling) {
-    expr <- expr(parLapply(cl, x, f, ..., chunk.size = chunk_size))
+  expr <- if (static_scheduling) {
+    expr(parLapply(cl, x, f, ..., chunk.size = chunk_size))
   } else {
-    expr <- expr(parLapplyLB(cl, x, f, ..., chunk.size = chunk_size))
+    expr(parLapplyLB(cl, x, f, ..., chunk.size = chunk_size))
   }
 
   cl <- makeCluster(ncl, type = type)
-  results <- bench::mark(eval(expr), max_iterations = 100, min_iterations = 3, check = FALSE)
+  results <- bench::mark(
+    eval(expr),
+    max_iterations = 100, min_iterations = 3, check = FALSE
+  )
   stopCluster(cl)
 
   results$expression <- label
@@ -50,9 +54,7 @@ test_future <- function(
       future.label = FALSE,
       ...
     ),
-    max_iterations = 100,
-    min_iterations = 3,
-    check = FALSE
+    max_iterations = 100, min_iterations = 3, check = FALSE
   )
 
   results$expression <- label
@@ -65,7 +67,10 @@ test_mirai <- function(
   ...
 ) {
   daemons(ncl, dispatcher = dispatcher)
-  results <- bench::mark(mirai = collect_mirai(mirai_map(x, f)), max_iterations = 100, min_iterations = 3, check = FALSE)
+  results <- bench::mark(
+    mirai = collect_mirai(mirai_map(x, f, ...)),
+    max_iterations = 100, min_iterations = 3, check = FALSE
+  )
   daemons(0)
 
   results$expression <- label
@@ -105,13 +110,18 @@ dgps <- list(cumsum, cummax, cummin)
 x1 <- errors
 f1 <- cumsum
 x2 <- seq_along(errors)
-f2 <- \(ind) cumsum(errors[[ind]])
+f2 <- \(ind, ...) {
+  if (! exists("errors")) errors <- list(...)$errors
+  cumsum(errors[[ind]])
+}
 
 print_tests(
   test_parallel(x1, f1, "1par_psock_dyn", ncl, static_scheduling = FALSE),
+  test_parallel(x2, f2, "1par_psock_dyn", ncl, static_scheduling = FALSE, errors = errors),
   test_mirai(x1, f1, "1mirai_dyn", ncl, dispatcher = TRUE),
+  test_mirai(x2, f2, "1mirai_dyn", ncl, dispatcher = TRUE, errors = errors),
   test_future(x1, f1, "1fut_par_dyn", ncl, future.packages = "base"),
-  test_future(x2, f2, "2fut_par_dyn", ncl, future.packages = "base"),
+  #test_future(x2, f2, "2fut_par_dyn", ncl, future.packages = "base"),
   test_future(x2, f2, "2fut_par_dyn_globals", ncl, future.packages = "base", future.globals = list(errors = errors))
 )
 
@@ -280,3 +290,42 @@ bench::mark(
 )
 
 stopCluster(cl1); stopCluster(cl2); daemons(0)
+
+
+
+# Mirai Behavior ---------------------------------------------------------------
+
+g <- new_function(
+  args = pairlist2(x = , y = ),
+  body = expr({
+    Sys.sleep(0.1)
+    x + y
+  }),
+  env = pkg_env("graphics")
+)
+
+mirai::daemons(0)
+mirai_map(
+  1:2,
+  function(x) {
+    g(x, 10)
+    stats::lm(rnorm(100) ~ rnorm(100))
+  },
+  g = g
+) |>
+  collect_mirai()
+
+
+
+# Matrix indexing --------------------------------------------------------------
+
+m <- matrix(1:3^4, 9, 9)
+
+ind <- c(0, 1, 0)
+
+bench::mark(
+  m[as.logical(ind), ],
+  m[ind == 1, ],
+  m[ind > 0, ],
+  m[ind != 0, ]
+)
