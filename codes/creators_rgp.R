@@ -89,7 +89,9 @@ create_rgp$threshold <- function(breaks, g = \(x) x) {
 # Todo: implement left_closed argument
 
 
-#' Smooth Threshold Function Constructor (internal)
+#' SRP: Smooth Transition.
+#'
+#' Only suitable for 2 regimes.
 #'
 #' @param breaks [`numeric()`] Strictly increasing vector of thresholds. Breaks
 #' are closed on left.
@@ -109,7 +111,7 @@ create_rgp$smooth_threshold <- function(breaks, g) {
     args = pairlist2(y = , r = , t = ),
     body = expr({
       r[t, 1] <- g(y[t], !!breaks)
-      r[t, ] <- 1 - r[t, 1]
+      r[t, 2] <- 1 - r[t, 1]
       r[t, ]
     }),
     env = new_environment(list(g = g), pkg_env("stats"))

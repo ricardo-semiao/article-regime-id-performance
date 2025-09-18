@@ -329,3 +329,19 @@ bench::mark(
   m[ind > 0, ],
   m[ind != 0, ]
 )
+
+
+
+# Multiplication ---------------------------------------------------------------
+
+a <- 1:10
+b <- matrix(a, 10, 1)
+c <- matrix(a, 1, 10)
+
+bench::mark(
+  check = FALSE,
+  c %*% b,
+  as.numeric(c %*% b),
+  t(b) %*% b,
+  sum(a * a)
+)

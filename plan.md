@@ -142,6 +142,7 @@ Actually, lets define the paralleization strategy with the true data later.
 General practices to follow:
 
 - Not write final sentences until the final results are set, focus on writing the core/objective of each paragraph.
+- We or I? And similar questions about voice.
 - ...
 
 The sketch of methodology is being done in [sketch_text.md](docs_extra\sketch_text.md).

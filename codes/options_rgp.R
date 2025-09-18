@@ -72,6 +72,27 @@ exponential_cdf <- function(x, location = 0, scale = 1) {
 }
 
 
+# Names dictionary
+options_rgp_names <- c(
+  multinomial_equal      = "Multinomial (Equal Probabilities)",
+  multinomial_reg1       = "Multinomial (Regime 1 Favored)",
+  markov_symm_high       = "Markov (Symmetric, High Persistence)",
+  markov_symm_low        = "Markov (Symmetric, Low Persistence)",
+  markov_asymm_high      = "Markov (Asymmetric, High Persistence)",
+  markov_asymm_low       = "Markov (Asymmetric, Low Persistence)",
+  sbreak_mid             = "Structural Break (Middle)",
+  sbreak_end             = "Structural Break (2/3)",
+  threshold_0            = "Threshold at 0",
+  threshold_05           = "Threshold at 0.5",
+  threshold_abs_05       = "Threshold |x| at 0.5",
+  threshold_abs_2        = "Threshold |x| at 2",
+  lstar_0                = "LSTAR at 0",
+  lstar_05               = "LSTAR at 0.5",
+  estar_0                = "ESTAR at 0",
+  estar_05               = "ESTAR at 0.5"
+)
+
+
 
 # Options ----------------------------------------------------------------------
 
@@ -144,13 +165,13 @@ options_rgp$threshold_05 <- list3(
 
 
 # 2 regimes, threshold, g = abs, at 0.5
-options_rgp$threshold_abs_0 <- list3(
+options_rgp$threshold_abs_05 <- list3(
   n_r = 2,
   fun = create_rgp$threshold(c(0.5), g = abs)
 )
 
 # 2 regimes, threshold, g = abs, at 2
-options_rgp$threshold_abs_05 <- list3(
+options_rgp$threshold_abs_2 <- list3(
   n_r = 2,
   fun = create_rgp$threshold(c(2), g = abs)
 )
