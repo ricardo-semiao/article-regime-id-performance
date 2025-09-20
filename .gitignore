@@ -1,3 +1,6 @@
 personal/
-.Rproj.user
+
 latex_build/
+
+.Rproj.user
+.RdataTmp
