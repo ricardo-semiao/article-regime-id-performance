@@ -106,21 +106,33 @@ annotate_regimes <- function(axis = "x") {
 #' @returns [`ggplot`] A heatmap plot visualizing the correlation between error
 #'   segments.
 #' @export
-error_dependence <- function(errors, grain = 100) {
+error_dependence <- function(
+  errors, grain = 100,
+  simmetric = TRUE, triangular = TRUE
+) {
+  if (simmetric) {
+    get_cor <- function(matrix) abs(cor(matrix))
+    limits <- c(0, 1)
+  } else {
+    get_cor <- function(matrix) cor(matrix)
+    limits <- c(-1, 1)
+  }
+
   error_cor <- errors %>%
     matrix(nrow = length(.) / grain, ncol = grain) |>
-    cor() |>
+    get_cor() |>
     `dim<-`(NULL) |>
     tibble(x = rep(1:grain, each = grain), y = rep(1:grain, grain), cor = _) |>
-    filter(x != y)
+    filter(if(triangular) y > x else x != y)
 
   ggplot(error_cor, aes(x, y, fill = cor)) +
     geom_tile() +
-    scale_fill_viridis_c(option = "plasma") +
+    scale_fill_viridis_c(option = "plasma", limits = limits) +
     coord_equal() +
     labs(
       #title = "Error correlation (100-sample segments)",
-      x = "Parallel task N°", y = "Parallel task N°", fill = "Correlation"
+      x = "Parallel task N°", y = "Parallel task N°",
+      fill = "Absolute Correlation"
     )
 }
 
@@ -179,6 +191,7 @@ series_values <- function(data, sims = 1, n_burn) {
       aes(color = as.factor(r), group = sim),
       alpha = 0.6, linewidth = 1.25
     ) +
+    if (length(sims) == 1) annotate_regimes("x")
     facet_grid(vars(sgp), vars(rgp)) +
     scale_color_manual(values = unname(pal$main)) +
     labs(

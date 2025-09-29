@@ -85,22 +85,24 @@ exponential_cdf <- function(x, location = 0, scale = 1) {
 #' Names dictionary
 #' @export
 options_names <- c(
-  multinomial_equal      = "Multinomial (Equal Probabilities)",
-  multinomial_reg1       = "Multinomial (Regime 1 Favored)",
-  markov_symm_high       = "Markov (Symmetric, High Persistence)",
-  markov_symm_low        = "Markov (Symmetric, Low Persistence)",
-  markov_asymm_high      = "Markov (Asymmetric, High Persistence)",
-  markov_asymm_low       = "Markov (Asymmetric, Low Persistence)",
-  sbreak_mid             = "Structural Break (Middle)",
-  sbreak_end             = "Structural Break (2/3)",
-  threshold_0            = "Threshold at 0",
-  threshold_05           = "Threshold at 0.5",
-  threshold_abs_05       = "Threshold |x| at 0.5",
-  threshold_abs_2        = "Threshold |x| at 2",
-  lstar_0                = "LSTAR at 0",
-  lstar_05               = "LSTAR at 0.5",
-  estar_0                = "ESTAR at 0",
-  estar_05               = "ESTAR at 0.5"
+  r2_multinomial_equal      = "Multinomial (Equal Probabilities)",
+  r2_multinomial_reg1       = "Multinomial (Regime 1 Favored)",
+  r2_markov_symm_high       = "Markov (Symmetric, High Persistence)",
+  r2_markov_symm_low        = "Markov (Symmetric, Low Persistence)",
+  r2_markov_asymm_high      = "Markov (Asymmetric, High Persistence)",
+  r2_markov_asymm_low       = "Markov (Asymmetric, Low Persistence)",
+  r2_sbreak_mid             = "Structural Break (Middle)",
+  r2_sbreak_end             = "Structural Break (2/3)",
+  r2_threshold_x_0          = "Threshold at 0",
+  r2_threshold_x_05         = "Threshold at 0.5",
+  r2_threshold_abs_05       = "Threshold |x| at 0.5",
+  r2_threshold_abs_2        = "Threshold |x| at 2",
+  r2_threshold_diff_05      = "Threshold Dx at 0.5",
+  r2_threshold_diff_2       = "Threshold Dx at 2",
+  r2_lstar_0                = "LSTAR at 0",
+  r2_lstar_05               = "LSTAR at 0.5",
+  r2_estar_0                = "ESTAR at 0",
+  r2_estar_05               = "ESTAR at 0.5"
 )
 
 
@@ -113,14 +115,14 @@ options <- list()
 
 
 # 2 regimes, multinomial (equal probs)
-options$multinomial_equal <- list3(
+options$r2_multinomial_equal <- list3(
   n_r = 2,
   fun = create_rgp$markov(transmat_diag(0.5, n_r)),
   r_start = sample(1:n_r, 1)
 )
 
 # 2 regimes, multinomial (more likely to be in regime 1)
-options$multinomial_reg1 <- list3(
+options$r2_multinomial_reg1 <- list3(
   n_r = 2,
   fun = create_rgp$markov(transmat_main_col(0.7, n_r)),
   r_start = sample(1:n_r, 1)
@@ -128,14 +130,14 @@ options$multinomial_reg1 <- list3(
 
 
 # 2 regimes, markov, symmetric, high persistence
-options$markov_symm_high <- list3(
+options$r2_markov_symm_high <- list3(
   n_r = 2,
   fun = create_rgp$markov(transmat_diag(0.9, n_r)),
   r_start = sample(1:n_r, 1)
 )
 
 # 2 regimes, markov, symmetric, low persistence
-options$markov_symm_low <- list3(
+options$r2_markov_symm_low <- list3(
   n_r = 2,
   fun = create_rgp$markov(transmat_diag(0.6, n_r)),
   r_start = sample(1:n_r, 1)
@@ -143,14 +145,14 @@ options$markov_symm_low <- list3(
 
 
 # 2 regimes, markov, asymmetric, high persistence
-options$markov_asymm_high <- list3(
+options$r2_markov_asymm_high <- list3(
   n_r = 2,
   fun = create_rgp$markov(transmat_main_col(c(0.9, 0.7), n_r)),
   r_start = sample(1:n_r, 1)
 )
 
 # 2 regimes, markov, asymmetric, low persistence
-options$markov_asymm_low <- list3(
+options$r2_markov_asymm_low <- list3(
   n_r = 2,
   fun = create_rgp$markov(transmat_main_col(c(0.8, 0.6), n_r)),
   r_start = sample(1:n_r, 1)
@@ -159,14 +161,14 @@ options$markov_asymm_low <- list3(
 
 # 2 regimes, sbreak, at the middle
 n_t <- 100L # Todo: correct this temporary fix
-options$sbreak_mid <- list3(
+options$r2_sbreak_mid <- list3(
   n_r = 2,
   fun = create_rgp$sbreak(c(as.integer(n_t / 2))),
   r_start = 1
 )
 
 # 2 regimes, sbreak, at 2/3 of the way
-options$sbreak_end <- list3(
+options$r2_sbreak_end <- list3(
   n_r = 2,
   fun = create_rgp$sbreak(c(as.integer(n_t * 2 / 3))),
   r_start = 1
@@ -174,60 +176,83 @@ options$sbreak_end <- list3(
 
 
 # 2 regimes, threshold at 0
-options$threshold_0 <- list3(
+options$r2_threshold_x_0 <- list3(
   n_r = 2,
   fun = create_rgp$threshold(c(0)),
-  r_start = quo(fun(y, r, t_start - 1))
+  r_start = expr(fun(y, r, t_start))
 )
 
 # 2 regimes, threshold at 0.5
-options$threshold_05 <- list3(
+options$r2_threshold_x_05 <- list3(
   n_r = 2,
   fun = create_rgp$threshold(c(0.5)),
-  r_start = quo(fun(y, r, t_start - 1))
+  r_start = expr(fun(y, r, t_start))
 )
 
 
 # 2 regimes, threshold, g = abs, at 0.5
-options$threshold_abs_05 <- list3(
+options$r2_threshold_abs_05 <- list3(
   n_r = 2,
-  fun = create_rgp$threshold(c(0.5), g = abs),
-  r_start = quo(fun(y, r, t_start - 1))
+  fun = create_rgp$threshold(c(0.5), g = \(y, t) abs(y[t - 1])),
+  r_start = expr(fun(y, r, t_start))
 )
 
 # 2 regimes, threshold, g = abs, at 2
-options$threshold_abs_2 <- list3(
+options$r2_threshold_abs_2 <- list3(
   n_r = 2,
-  fun = create_rgp$threshold(c(2), g = abs),
-  r_start = quo(fun(y, r, t_start - 1))
+  fun = create_rgp$threshold(c(2), g = \(y, t) abs(y[t - 1])),
+  r_start = expr(fun(y, r, t_start))
+)
+
+
+# 2 regimes, threshold, g = diff, at 0
+options$r2_threshold_diff_05 <- list3(
+  n_r = 2,
+  fun = create_rgp$threshold(c(0.5), g = \(y, t) diff(y[(t-2):(t-1)])),
+  r_start = expr(fun(y, r, t_start))
+)
+
+# 2 regimes, threshold, g = diff, at 0.5
+options$r2_threshold_diff_2 <- list3(
+  n_r = 2,
+  fun = create_rgp$threshold(c(2), g = \(y, t) diff(y[(t-2):(t-1)])),
+  r_start = expr(fun(y, r, t_start))
 )
 
 
 # 2 regimes, star, lstar, at 0
-options$lstar_0 <- list3(
+options$r2_lstar_0 <- list3(
   n_r = 2,
-  fun = create_rgp$smooth_threshold(c(0), g = logistic_cdf),
-  r_start = quo(fun(y, r, t_start - 1))
+  fun = create_rgp$smooth_threshold(
+    c(0), g = \(y, t, breaks) logistic_cdf(y[t-1], location = breaks, scale = 1)
+  ),
+  r_start = expr(fun(y, r, t_start))
 )
 
 # 2 regimes, star, estar, at 0.5
-options$lstar_05 <- list3(
+options$r2_lstar_05 <- list3(
   n_r = 2,
-  fun = create_rgp$smooth_threshold(c(0.5), g = logistic_cdf),
-  r_start = quo(fun(y, r, t_start - 1))
+  fun = create_rgp$smooth_threshold(
+    c(0.5), g = \(y, t, breaks) logistic_cdf(y[t-1], location = breaks, scale = 1)
+  ),
+  r_start = expr(fun(y, r, t_start))
 )
 
 
 # 2 regimes, star, lstar, at 0
-options$estar_0 <- list3(
+options$r2_estar_0 <- list3(
   n_r = 2,
-  fun = create_rgp$smooth_threshold(c(0), g = exponential_cdf),
-  r_start = quo(fun(y, r, t_start - 1))
+  fun = create_rgp$smooth_threshold(
+    c(0), g = \(y, t, breaks) exponential_cdf(y[t-1], location = breaks, scale = 1)
+  ),
+  r_start = expr(fun(y, r, t_start))
 )
 
 # 2 regimes, star, estar, at 0.5
-options$estar_05 <- list3(
+options$r2_estar_05 <- list3(
   n_r = 2,
-  fun = create_rgp$smooth_threshold(c(0.5), g = exponential_cdf),
-  r_start = quo(fun(y, r, t_start - 1))
+  fun = create_rgp$smooth_threshold(
+    c(0.5), g = \(y, t, breaks) exponential_cdf(y[t-1], location = breaks, scale = 1)
+  ),
+  r_start = expr(fun(y, r, t_start))
 )

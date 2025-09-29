@@ -26,6 +26,11 @@ box::use(
   rlang[...]
 )
 
+#' Parallel processing
+box::use(
+  mirai[mirai_map, mirai_collect = collect_mirai, mirai_daemons = daemons]
+)
+
 
 
 # Theme ----------------------------------------------------------
@@ -178,13 +183,14 @@ ggsave2 <- function(filename, width, height, ..., units = "cm") {
 #' @returns [`list()`] Results of applying `f` to `x`.
 #' @export
 get_results <- function(x, f, ..., parallel, safely) {
+  fn_env(f) <- new_environment(list2(...), pkg_env("base"))
   if (safely) f <- safely(f)
 
   if (parallel) {
-    daemons(8)
-    partial <- mirai_map(x, f, ...)
-    results <- collect_mirai(partial, options = c(".progress")) #, ".flat"
-    daemons(0)
+    on.exit(mirai_daemons(0), add = TRUE)
+
+    mirai_daemons(4)
+    results <- mirai_collect(mirai_map(x, f, ...), options = c(".progress")) #, ".flat"
 
     results <- map(results, \(x) {
       if (inherits_any(x, "try-error")) {
@@ -198,4 +204,11 @@ get_results <- function(x, f, ..., parallel, safely) {
   }
 
   results
+}
+
+
+#' Lag:
+#' @export
+lag <- function(x, n = 1L, default = NA) {
+  c(rep(default, n), x[-(length(x) - seq_len(n) + 1)])
 }
