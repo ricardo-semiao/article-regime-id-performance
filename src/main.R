@@ -5,19 +5,24 @@
 box::use(
   src/utils[...],
   src/options[...],
-  diagnose = src/diagnostics
+  diagnose = src/diagnostics,
+  rTRNG[rnorm_trng]
 )
 
 
 # Simulation parameters:
-n_s <- 40L # Number of simulations
-n_t <- 200L # Number of time periods
+n_s <- 30L # Number of simulations
+n_t <- 100L # Number of time periods
 n_burn <- 20L # Burn-in periods
 n_h <- 1L # Number of periods to predict
 
 
+# Debug:
+#load("personal/workspace.RData")
 
-# Simulation: DGP options ------------------------------------------------------
+
+
+# Setup: DGP options -----------------------------------------------------------
 
 # Used combinations:
 walk(list(sgps$options, rgps$options), ~ dput(names(.x)))
@@ -55,12 +60,12 @@ sim_names <- expand_grid(dgp_names, sim = 1:n_s) |>
 # Simulation: Errors -----------------------------------------------------------
 
 # Error generation:
-errors_raw <- rTRNG::rnorm_trng(n_t * n_p * n_s, parallelGrain = 100)
+errors_raw <- rnorm_trng(n_t * n_p * n_s, parallelGrain = 100)
 
-diagnose$error_dependence(errors_raw) # Todo: triangular matrix
+diagnose$errors_dependence(errors_raw) # Todo: triangular matrix
 if (FALSE) ggsave2("figures/diag_errors_dependence.png", 20, 15)
 
-diagnose$error_distribution(errors_raw)
+diagnose$errors_distribution(errors_raw)
 if (FALSE) ggsave2("figures/diag_errors_distribution.png", 20, 15)
 
 errors <- errors_raw |>
@@ -72,7 +77,6 @@ errors <- errors_raw |>
 # Simulation: Series -----------------------------------------------------------
 
 # Simulation input:
-# Each iteration must receive all inputs (for better parallelization)
 sim_inputs <- pmap(sim_names, \(sgp, rgp, dgp, sim, dgp_sim) {
   list(
     sgp = sgps$options[[sgp]],
@@ -81,7 +85,6 @@ sim_inputs <- pmap(sim_names, \(sgp, rgp, dgp, sim, dgp_sim) {
   )
 }) |>
   set_names(sim_names$dgp_sim)
-
 
 # Simulation function:
 # Example: `input <- sim_inputs[["r2_ar1_vol2-r2_lstar_05-14"]]`
@@ -137,42 +140,97 @@ simulations_data <- imap(map(simulations, "result"), \(res, sim_name) {
 }) |>
   bind_rows() # Todo: do.call(rbind, args = _) for speed?
 
-simulations_gdata <- diagnose$subset_simulations(
+simulations_gdata <- subset_simulations(
   simulations_data,
-  sgps = c("r2_ar1_rho1", "r2_ar1_rho2"),
-  rgps = c("r2_sbreak_mid", "r2_threshold_0")
+  sgps = c("r2_ar1_mu1", "r2_ar1_mu2"),
+  rgps = c("r2_threshold_x_0", "r2_threshold_x_05")
 )
 
+sims_sample <- sample(n_s, 10)
 
+
+# Series value and distribution plots:
 diagnose$series_values(simulations_gdata, sims = 1, n_burn = n_burn)
 if (FALSE) ggsave2("figures/diag_series_one.png", 20, 15)
 
-diagnose$series_values(simulations_gdata, sims = sample(n_s, 7), n_burn = n_burn)
+diagnose$series_values(simulations_gdata, sims = sims_sample[1:7], n_burn = n_burn)
 if (FALSE) ggsave2("figures/diag_series_mult.png", 20, 15)
 
-diagnose$series_paths(simulations_gdata, t_max = 50, n_burn = n_burn)
-if (FALSE) ggsave2("figures/diag_series_paths.png", 20, 15)
-
-diagnose$series_distribution(simulations_gdata)
+diagnose$series_distribution(simulations_gdata, n_burn = n_burn)
 if (FALSE) ggsave2("figures/diag_series_distribution.png", 20, 15)
 
-diagnose$regimes_values(simulations_gdata, n_burn = n_burn)
-if (FALSE) ggsave2("figures/diag_regimes.png", 20, 15)
 
-diagnose$series_stats(simulations_gdata, n_burn = n_burn, \(x) {
-  c("mean" = mean(x), "vol" = sd(x))
-})
+# Series and regimes stats plots:
+diagnose$series_stats(
+  simulations_gdata, mean, "Conditional mean",
+  sims = sims_sample, multiple = TRUE, n_burn = n_burn
+)
 if (FALSE) ggsave2("figures/diag_stat_mean.png", 20, 15)
 
-diagnose$regimes_stats(simulations_gdata, n_burn = n_burn, \(x) {
-  estimate_transmat(x, 2)[rbind(c(1, 1), c(2, 2))] |> `names<-`(c("P11", "P22"))
-}) # Todo: ver como exportar estimate_transmat
+diagnose$regimes_stats(
+  simulations_gdata, stat_name = "Probability",
+  sims = sims_sample, multiple = TRUE, n_burn = n_burn,
+  stat = \(y, r) {
+    diagnose$estimate_transmat(y = y, r = r) |>
+      _[rbind(c(1, 1), c(2, 2))] |>
+      `names<-`(c("P11", "P22"))
+  }
+)
 if (FALSE) ggsave2("figures/diag_stat_transmat.png", 20, 15)
 
-diagnose$regimes_stats(simulations_gdata, n_burn = n_burn, \(x) {
-  table(x) %>% `names<-`(glue("N° R{names(.)}"))
-})
+diagnose$regimes_stats(
+  simulations_gdata, stat_name = "Threshold",
+  sims = sims_sample, multiple = FALSE, n_burn = n_burn,
+  stat = \(y, r) {
+    diagnose$estimate_thresholds(y = y, r = r) |>
+      `names<-`(c("avg. threshold"))
+  }
+)
+if (FALSE) ggsave2("figures/diag_stat_transmat.png", 20, 15)
+
+diagnose$regimes_stats(
+  simulations_gdata, stat_name = "Average duration",
+  sims = sims_sample, multiple = TRUE, n_burn = n_burn,
+  stat = \(y, r) {
+    diagnose$estimate_duration(y = y, r = r) %>%
+      `names<-`(glue("Regime {names(.)}"))
+  }
+) +
+  ylim(0, 10)
 if (FALSE) ggsave2("figures/diag_stat_nobs.png", 20, 15)
+
+
+# Panel plot:
+panel_simulations(
+  data = simulations_data,
+  sgp = c("r2_ar1_mu1"),
+  rgp = c("r2_threshold_x_0"),
+  sims = sample(n_s, 15), multiple = TRUE, n_burn = n_burn,
+  y_stat = mean, y_stat_name = "Conditional mean",
+  r_stats = \(y, r) {
+    diagnose$estimate_thresholds(y = y, r = r) |>
+      `names<-`(c("avg. threshold"))
+  },
+  r_stat_name = "Average threshold",
+  title = "Simulation diagnostics",
+  theme = theme(legend.position = "bottom")
+)
+if (FALSE) ggsave2("figures/diag_panel.png", 23, 23)
+
+# Table of statistics:
+diagnose$table_simulations(simulations_data)
+
+
+# Unused:
+if (FALSE) {
+  diagnose$series_paths(simulations_gdata, t_max = 50, n_burn = n_burn)
+  if (FALSE) ggsave2("figures/diag_series_paths.png", 20, 15)
+
+  diagnose$regimes_values(simulations_gdata, n_burn = n_burn)
+  if (FALSE) ggsave2("figures/diag_regimes.png", 20, 15)
+}
+
+
 
 
 

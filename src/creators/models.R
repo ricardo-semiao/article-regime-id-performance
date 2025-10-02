@@ -3,19 +3,32 @@
 
 # Loading dependencies
 box::use(
-  ../utils[...],
+  src/utils[...],
   mbreaks[sbreak_mbreaks = dofix],
-  tsDyn[threshold_tsdyn = setar, smooth_threshold_tsdyn = lstar],
+  tsDyn[threshold_tsdyn = setar, stransition_tsdyn = lstar],
   MSwM[markov_mswm = msmFit]
 )
+
+# Temporary example:
+if (FALSE) {
+  data <- tibble(
+    y = c(rnorm(30, 2), rnorm(40, 0), rnorm(30, 1)),
+    y_l1 = lag(y, 1L, default = NA)
+  ) |> as.data.frame()
+
+  n_p <- 1; n_t <- 100; n_h <- 1
+  n_r_hat <- 3; min_r_size <- 0.1; tol <- 1e-5; max_iter <- 10
+  g <- \(x) x; gamma <- NULL
+}
 
 
 
 # Helpers ----------------------------------------------------------------------
 
-# Get regimes from model info
+#' Internal: Get regimes from model info
 get_r <- list()
 
+#' Similar to cut(1:n_t, mod$dates). Prediction is straightforward
 get_r$mbreaks <- function(data, mod, n_t, n_r_hat) {
   date1 <- c(1, mod$date)
   date2 <- c(mod$date - 1, n_t)
@@ -28,6 +41,8 @@ get_r$mbreaks <- function(data, mod, n_t, n_r_hat) {
   r
 }
 
+#' 1 initial NA and in-sample regimes are given. Predictions are the number of
+#'  thresholds that the threshold variable exceeds plus 1
 get_r$tsdyn <- function(data, mod, thresholds, g, n_t, n_h) {
   r <- integer(n_t)
 
@@ -41,6 +56,8 @@ get_r$tsdyn <- function(data, mod, thresholds, g, n_t, n_h) {
   r
 }
 
+#' 2 initial NAs. In-sample regimes' probabilities are the filtered ones.
+#'  Predictions are given by the transitioned filtered probabilities.
 get_r$mswm <- function(data, mod, n_h, n_t) {
   r <- rbind(NA, NA, mod@Fit@filtProb, NA)
 
@@ -51,10 +68,10 @@ get_r$mswm <- function(data, mod, n_h, n_t) {
   r
 }
 
-
-# Predictions
+#' Internal: Get regimes from model info
 get_pred <- list()
 
+#' Predictions are given using the last regime's coefficients
 get_pred$mbreaks <- function(data, mod, n_r_hat, n_p, n_t, n_h) {
   coefs_last_r <- mod$beta[((n_r_hat - 1) * (n_p + 1) + 1):(n_r_hat * (n_p + 1))]
 
@@ -66,6 +83,7 @@ get_pred$mbreaks <- function(data, mod, n_r_hat, n_p, n_t, n_h) {
   preds
 }
 
+#' Todo: correct
 get_pred$tsdyn <- function(data, coefs, r, n_h, n_t) {
   preds <- double(n_h)
   for (i in 1:n_h) {
@@ -78,6 +96,7 @@ get_pred$tsdyn <- function(data, coefs, r, n_h, n_t) {
   preds
 }
 
+#' Todo: correct
 get_pred$mswm <- function(data, coefs, r, n_h, n_t) {
   preds <- double(n_h)
 
@@ -89,23 +108,21 @@ get_pred$mswm <- function(data, coefs, r, n_h, n_t) {
 }
 
 
-# Temporary example:
-if (FALSE) {
-  data <- tibble::tibble(
-    y = c(rnorm(30, 2), rnorm(40, 0), rnorm(30, 1)),
-    y_l1 = lag(y, 1L, default = NA)
-  ) |> as.data.frame()
 
-  n_p = 1; n_t = 100; n_h = 1
-  n_r_hat = 3; min_r_size = 0.1; tol = 1e-5; max_iter = 10
-  g = function(x) x; gamma = NULL
-}
+# Creators ---------------------------------------------------------------------
 
-
-
-# Models -----------------------------------------------------------------------
+# Parameters always include n_r_hat and n_p. Often include optimization
+# parameters such as min_r_size, tol, and max_iter
+# All return a generator function enclosing a child of base env carrying the
+# hyperparameters, model function, and methods for getting predictions and
+# regimes
 
 # Structural breaks
+#'
+#' Comments on parameters:
+#' - h set by eps1; model with intercept; no error treatments
+#'
+#' @export
 sbreak <- function(
   n_r_hat, n_p = 1,
   min_r_size = 0.1,
@@ -128,7 +145,6 @@ sbreak <- function(
       # Others:
       prewhit = 0, robust = 0, hetdat = 0, hetvar = 0, hetq = 0, hetomega = 0,
       h = NULL, const = 1
-      # h set by eps1; model with intercept; no error treatments
     )
 
     # Storing results:
@@ -153,8 +169,14 @@ sbreak <- function(
   )
 }
 
-
-# Threshold
+#' Model: Threshold
+#'
+#' Comments on parameters:
+#' - m, ML, MM, MH given by mL etc.; th missing (will be estimated)
+#' - mTh, thDelay missing, given by thVar
+#' - Model in levels and with constants; no threshold restrictions
+#'
+#' @export
 threshold <- function(
   n_r_hat, n_p = 1, g = \(y) y,
   min_r_size = 0.1,
@@ -178,10 +200,7 @@ threshold <- function(
       # Others:
       d = 1, steps = 1,
       include = "const", common = "none", model = "TAR", type = "level",
-      trace = FALSE,  restriction = "none"
-      # m, ML, MM, MH given by mL etc.; th missing (will be estimated)
-      # mTh, thDelay missing, given by thVar
-      # model in levels and with constants; no threshold restrictions
+      restriction = "none", trace = FALSE
     )
 
     # Storing results:
@@ -217,15 +236,23 @@ threshold <- function(
   )
 }
 
-
-# Smooth transition:
-smooth_threshold <- function(
+#' Model: Smooth transition
+#'
+#' Only works for 2 regimes. Comments on parameters:
+#' - m, ML, MM, MH given by mL etc.; th missing (will be estimated)
+#' - mTh, thDelay missing, given by thVar
+#' - Model in levels and with constants; no threshold restrictions
+#' - Also consider starting.control
+#' - Old option: `thVar = data$y_l1[(1 + n_p):(n_t - n_h)]`
+#'
+#' @export
+stransition <- function(
   n_r_hat = 2, n_p = 1, gamma = NULL,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
   defaults <- c(
-    as.list(current_env()), model = smooth_threshold_tsdyn,
+    as.list(current_env()), model = stransition_tsdyn,
     get_pred = get_pred$tsdyn, get_r = get_r$tsdyn
   )
 
@@ -235,18 +262,12 @@ smooth_threshold <- function(
     mod <- model(
       # Data:
       data$y[1:(n_t - n_h)], mL = 1, mH = 1, thDelay = 1,
-      #thVar = data$y_l1[(1 + n_p):(n_t - n_h)],
       # Hyperparameters:
       gamma = gamma,
       # Optimization:
       control = list(maxit = max_iter, abstol = tol),
-      # Also consider starting.control
       # Others:
-      d = 1, steps = 1,
-      include = "const", trace = FALSE
-      # m, ML, MM, MH given by mL etc.; th missing (will be estimated)
-      # mTh, thDelay missing, given by thVar
-      # model in levels and with constants; no threshold restrictions
+      d = 1, steps = 1, include = "const", trace = FALSE
     )
 
     # Storing results:
@@ -281,8 +302,12 @@ smooth_threshold <- function(
   )
 }
 
-
-# Markov
+#' Model: Smooth transition
+#'
+#' Comments on parameters:
+#' - All coefficients switch between regimes, but not vol
+#'
+#' @export
 markov <- function(
   n_r_hat = 2, n_p = 1, gamma = NULL,
   min_r_size = 0.1,
@@ -302,7 +327,6 @@ markov <- function(
       control = list(maxiter = max_iter, tol = tol, parallelization = FALSE),
       # Others:
       sw = c(rep(TRUE, n_p + 1), FALSE)
-      # all coefficients switch between regimes, but not vol
     )
 
     # Storing results:

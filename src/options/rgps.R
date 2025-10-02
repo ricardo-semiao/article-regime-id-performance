@@ -3,15 +3,15 @@
 
 # Loading dependencies
 box::use(
-  ../utils[...],
-  create_rgp = ../creators/rgps
+  src/utils[...],
+  create_rgp = src/creators/rgps
 )
 
 
 
 # Helpers ----------------------------------------------------------------------
 
-#' Transition matrix: diagonal
+#' Internal: Create a diagonal transition matrix
 #'
 #' @param p [`double(n_r)`] Probability of remaining in the same state
 #' (diagonal elements).
@@ -34,8 +34,7 @@ transmat_diag <- function(p, n_r) {
   mat
 }
 
-
-#' Transition matrix: one column with different probability
+#' Internal: Create a transition matrix with favored column
 #'
 #' @param p [`double(n_r)`] Probability of `col` variable.
 #' @param n_r [`integer(1)`] Number of regimes (matrix dimension).
@@ -57,30 +56,25 @@ transmat_main_col <- function(p, n_r, col = 1) {
   mat
 }
 
-
-#' Logistic CDF
+#' Internal: Logistic CDF
 #'
 #' @param x [`numeric()`] input values.
-#' @param location [`numeric(1)`] location parameter.
-#' @param scale [`numeric(1)`] scale parameter.
+#' @param location, scale [`numeric(1)`] Location and scale parameters.
 #'
 #' @returns [`numeric()`] Logistic CDF evaluated at `x`.
 logistic_cdf <- function(x, location = 0, scale = 1) {
   1 / (1 + exp(- (x - location) / scale))
 }
 
-
-#' Exponential CDF
+#' Internal: Exponential CDF
 #'
 #' @param x [`numeric()`] Input values.
-#' @param location [`numeric(1)`] Location parameter.
-#' @param scale [`numeric(1)`] Scale parameter.
+#' @param location, scale [`numeric(1)`] Location and scale parameters.
 #'
 #' @returns [`numeric()`] Exponential CDF evaluated at `x`.
 exponential_cdf <- function(x, location = 0, scale = 1) {
   1 - exp(- (x - location)^2 / scale)
 }
-
 
 #' Names dictionary
 #' @export

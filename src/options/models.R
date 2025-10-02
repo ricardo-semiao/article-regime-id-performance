@@ -3,8 +3,8 @@
 
 # Loading dependencies
 box::use(
-  ../utils[...],
-  create_model = ../creators/models
+  src/utils[...],
+  create_model = src/creators/models
 )
 
 

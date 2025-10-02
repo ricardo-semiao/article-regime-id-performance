@@ -3,20 +3,20 @@
 
 # Loading dependencies
 box::use(
-  ../utils[...],
-  create_sgp = ../creators/sgps
+  src/utils[...],
+  create_sgp = src/creators/sgps
 )
 
 
 
 # Helpers ----------------------------------------------------------------------
 
-#' Create a unconditional SGP from conditional SGPs and regime parameters
+#' Interal: Create a unconditional SGP from conditional SGP and regime nature
 #'
-#' @param funs [`function` or `list(function)`] Conditional SGPs.
+#' @param funs [`function(){}` or `list(function(){})`] Conditional SGPs.
 #' @param args [`list(list())`] SGP parameters for each regime.
 #'
-#' @returns [`function`] A new function combining the regimes.
+#' @returns [`function(){}`] A new function combining the regimes.
 unconditional_sgp <- function(funs, args) {
   if (!is_list(args) || !all(map_lgl(args, is_list))) {
     cli_abort("{.arg args} must be a list of lists.)")
@@ -41,7 +41,6 @@ unconditional_sgp <- function(funs, args) {
     env = global_env()
   )
 }
-
 
 #' Names dictionary
 #' @export

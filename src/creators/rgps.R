@@ -3,20 +3,22 @@
 
 # Loading dependencies
 box::use(
-  ../utils[...]
+  src/utils[...]
 )
 
 
 
 # Creators ---------------------------------------------------------------------
 
+# All return a function with enclosing environment as a child of base, carrying
+# needed objects
 
 #' RGP: Structural breaks
 #'
 #' @param breaks [`integer()`] Strictly increasing vector of break points
 #' (>= 1). Breaks are closed on left.
 #'
-#' @returns  [`function`] Structural break regime generator function.
+#' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
 sbreak <- function(breaks) {
   walk(list(breaks), force)
@@ -33,19 +35,17 @@ sbreak <- function(breaks) {
       r[t, .Internal(which(t < c(!!breaks, Inf)))[1]] <- 1
       r[t, ]
     }),
-    env = pkg_env("base")
+    env = new_environment(list(), pkg_env("base"))
   )
 }
-# Todo: test consistency with n_t and n_r
-
 
 #' SRP: Threshold
 #'
 #' @param breaks [`numeric()`] Strictly increasing vector of thresholds. Breaks
 #' are closed on left.
-#' @param g [`function`] Function for `g(y, t) < breaks`.
+#' @param g [`function(){}`] Function for `g(y, t) < breaks`.
 #'
-#' @returns  [`function`] Threshold regime generator function.
+#' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
 threshold <- function(breaks, g = \(y, t) y[t - 1]) {
   walk(list(breaks, g), force)
@@ -64,20 +64,19 @@ threshold <- function(breaks, g = \(y, t) y[t - 1]) {
     env = new_environment(list(g = g), pkg_env("base"))
   )
 }
-# Todo: implement left_closed argument
+# Todo: implement left_closed argument (not really needed)
 
-
-#' SRP: Smooth Transition.
+#' SRP: Smooth Transition
 #'
 #' Only suitable for 2 regimes.
 #'
 #' @param breaks [`numeric()`] Strictly increasing vector of thresholds. Breaks
 #' are closed on left.
-#' @param g [`function`] Transition function.
+#' @param g [`function(){}`] Transition function.
 #'
-#' @returns  [`function`] Smooth threshold regime generator function.
+#' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
-smooth_threshold <- function(breaks, g) {
+stransition <- function(breaks, g) {
   walk(list(breaks, g), force)
 
   test_conditions(
@@ -98,18 +97,18 @@ smooth_threshold <- function(breaks, g) {
 }
 # Todo: rename to smooth_transition
 
-
 #' RGP: Markov
 #'
 #' @param probs [`matrix()`] Transition probability matrix.
 #'
-#' @returns [`function`] Markov regime generator function.
+#' @returns [`function(){}`] Generator function enclosing a child of base env.
 #' @export
 markov <- function(probs) {
   walk(list(probs), force)
 
   test_conditions(
-    "{.arg probs} must be a bare numeric matrix" = is_bare_double(probs) && is.matrix(probs),
+    "{.arg probs} must be a bare numeric matrix" =
+      is_bare_double(probs) && is.matrix(probs),
     "All values in {.arg probs} must be non-negative" = all(probs >= 0),
     "Each row of {.arg probs} must sum to 1" = all(rowSums(probs) == 1)
   )
@@ -122,7 +121,6 @@ markov <- function(probs) {
       r[t, sample(1:!!n_r, 1, prob = (!!probs)[r[t - 1, ] == 1, ])] <- 1
       r[t, ]
     }),
-    env = pkg_env("base")
+    env = new_environment(list(), pkg_env("base"))
   )
 }
-# Todo: test n_r

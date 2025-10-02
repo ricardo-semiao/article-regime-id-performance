@@ -1,30 +1,29 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Packages to be available across all modules
+# Modules to be available in all scripts:
 
-#' General
+#' Modules: General
 #' @export
 box::use(
   r/core[...],
-  cli[...],
-  glue[...],
+  cli[cli_abort, cli_warn, cli_inform],
+  glue[glue],
   patchwork[...]
 )
 
-#' Tidyverse
+#' Modules: Tidyverse
 #' @export
 box::use(
-  ggplot2[...],
-  dplyr[...],
-  tidyr[...],
-  readr[...],
-  purrr[...],
-  tibble[...],
-  stringr[...],
-  forcats[...],
+  dplyr[...], tidyr[...],
+  tibble[tibble], #readr[...],
+  stringr[...], forcats[...],
+  purrr[...], ggplot2[...],
   rlang[...]
 )
+
+
+# Modules for helpers:
 
 #' Parallel processing
 box::use(
@@ -33,9 +32,9 @@ box::use(
 
 
 
-# Theme ----------------------------------------------------------
+# Theme ------------------------------------------------------------------------
 
-#' Color palette
+#' Theme: Color palette
 #' @export
 pal <- list(
   main = c(
@@ -74,8 +73,7 @@ pal <- list(
   )
 )
 
-
-# Ggplot theme
+# Theme: ggplot theme
 theme_set(
   theme_bw() +
     theme(
@@ -85,7 +83,6 @@ theme_set(
     )
 )
 
-
 #' Arrow for plotting
 #' @export
 arrow1 <- arrow(length = unit(0.02, "npc"), type = "closed")
@@ -94,10 +91,10 @@ arrow1 <- arrow(length = unit(0.02, "npc"), type = "closed")
 
 # General helpers --------------------------------------------------------------
 
-#' Test Multiple Conditions and Abort on Failure
+#' Helper: Abort via multiple conditions
 #'
 #' @param ... [`logical(1)`] Conditions to test.
-#' @param call [`environment`] Passed to [cli::cli_abort()].
+#' @param call [`environment()`] Passed to [cli::cli_abort()].
 #'
 #' @returns  [`NULL`] Aborts if conditions are not met.
 #' @export
@@ -112,10 +109,9 @@ test_conditions <- function(..., call = caller_env()) {
     names(args)[names(args) == ""] <- argnames[! argnames %in% names(args)]
 
     args_text <- as.list(call)[-1] %>%
-      map2(
-        ., `if`(is_null(names(.)), "", names(.)),
-        ~ if (.y == "") expr_deparse(.x) else paste0(.y, " = ", expr_deparse(.x))
-      ) |>
+      map2(., `if`(is_null(names(.)), "", names(.)), \(x, y) {
+        if (y == "") expr_deparse(x) else paste0(y, " = ", expr_deparse(x))
+      }) |>
       str_c(collapse = ", ")
 
     failed <- set_names(names(conditions)[!conditions], "*")
@@ -127,8 +123,7 @@ test_conditions <- function(..., call = caller_env()) {
   }
 }
 
-
-#' Create a list with reference to previous items
+#' Helper: list2 with tibble-like self referencing
 #'
 #' @param ... Arguments to collect in a list. These dots are dynamic.
 #'
@@ -153,12 +148,10 @@ list3 <- function(...) {
   result
 }
 
-
-#' Internal wrapper for ggsave with default units
+#' Helper: ggsave wrapper with default units
 #'
 #' @param filename [`character(1)`] Output file path.
-#' @param width [`numeric(1)`] Plot width.
-#' @param height [`numeric(1)`] Plot height.
+#' @param width, height [`numeric(1)`] Plot dimensions.
 #' @param ... Additional arguments passed to [ggplot::ggsave()].
 #' @param units [`character(1)`] Units for width and height.
 #'
@@ -172,42 +165,48 @@ ggsave2 <- function(filename, width, height, ..., units = "cm") {
 
 # Specific Helpers -------------------------------------------------------------
 
-#' Apply with parallelism and/or safety
+#' Helper: Map with parallelism and/or safety
+#'
+#' `...` is passed to `f`'s environment, as mirai respects it.
 #'
 #' @param x [`list()`-like] Input data to process.
 #' @param f [`function()`] Function to apply to each element of `x`.
 #' @param ... Additional arguments passed to `f`.
-#' @param parallel [`logical(1)`] Whether to use parallel processing.
-#' @param safely [`logical(1)`] Whether to wrap `f` with error handling.
+#' @param parallel, safe [`logical(1)`] Whether to use parallel processing
+#'  and/or [purrr::safely()].
 #'
 #' @returns [`list()`] Results of applying `f` to `x`.
 #' @export
-get_results <- function(x, f, ..., parallel, safely) {
+get_results <- function(x, f, ..., parallel, safe, workers = 4) {
+  if (!is_bare_list(x)) {
+    cli_warn("{.code x} should be a bare list, {.code pmap}-like behavior may \\
+    occour")
+  }
+
   fn_env(f) <- new_environment(list2(...), pkg_env("base"))
-  if (safely) f <- safely(f)
+  if (safe) f <- safely(f)
 
   if (parallel) {
     on.exit(mirai_daemons(0), add = TRUE)
-
     mirai_daemons(4)
-    results <- mirai_collect(mirai_map(x, f, ...), options = c(".progress")) #, ".flat"
 
+    promise <- mirai_map(x, f)
+    results <- mirai_collect(promise, options = c(".progress"))
     results <- map(results, \(x) {
-      if (inherits_any(x, "try-error")) {
-        list(result = NULL, error = x)
-      } else {
-        x
-      }
-    })
+      if (inherits_any(x, "try-error")) list(result = NULL, error = x) else x
+    }) # Connection resets happen before safely can catch them
   } else {
     results <- lapply(x, f)
   }
 
   results
 }
+# Todo: consider passing ".flat" to mirai_collect (not really needed)
 
-
-#' Lag:
+#' Helper: Compute lagged values
+#'
+#' @param x [`vector()`] Input vector.
+#'
 #' @export
 lag <- function(x, n = 1L, default = NA) {
   c(rep(default, n), x[-(length(x) - seq_len(n) + 1)])
