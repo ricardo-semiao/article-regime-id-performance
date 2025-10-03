@@ -45,18 +45,18 @@ unconditional_sgp <- function(funs, args) {
 #' Names dictionary
 #' @export
 options_names <- c(
-  r2_ar1_mu1   = "Mean Change, Small Difference",
-  r2_ar1_mu2   = "Mean Change, Big Difference",
-  r2_ar1_rho1  = "Persistence Change, Big Difference",
-  r2_ar1_rho2  = "Persistence Change, Small Difference",
-  r2_ar1_sign1 = "Sign Switching, Small Difference",
-  r2_ar1_sign2 = "Sign Switching, Big Difference",
-  r2_ar2_pos1  = "New Lag Positive, Small",
-  r2_ar2_pos2  = "New Lag Positive, Big",
-  r2_ar2_neg1  = "New Lag Negative, Small",
-  r2_ar2_neg2  = "New Lag Negative, Big",
-  r2_ar1_vol1  = "Volatility Change, Small Difference",
-  r2_ar1_vol2  = "Volatility Change, Big Difference"
+  r2_ar1_mu1   = "μ (small change)",
+  r2_ar1_mu2   = "μ (big change)",
+  r2_ar1_rho1  = "ρ (big change)",
+  r2_ar1_rho2  = "ρ (small change)",
+  r2_ar1_sign1 = "sign(ρ) (small change)",
+  r2_ar1_sign2 = "sign(ρ) (big change)",
+  r2_ar2_pos1  = "New positive lag (small)",
+  r2_ar2_pos2  = "New positive lag (big)",
+  r2_ar2_neg1  = "New negative lag (small)",
+  r2_ar2_neg2  = "New negative lag (big)",
+  r2_ar1_vol1  = "σ (small change)",
+  r2_ar1_vol2  = "σ (big change)"
 )
 
 

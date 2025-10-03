@@ -26,6 +26,7 @@ mean_pairwise_dist <- function(x) {
 if (FALSE) {
   y <- c(rnorm(30, 4), rnorm(40, 0), rnorm(30, 2))
   r <- c(rep(3, 30), rep(1, 40), rep(2, 30)) # Note the mu-based order
+  r <- sample(3, 100, replace = TRUE)
   n_r <- 3
 }
 
@@ -119,17 +120,19 @@ regimes_duration <- function(y, r, n_r = length(unique(r))) {
 }
 
 #' Metrics - regimes: Estimated transition counts/probabilities matrix
-#' Only works for 2 regimes. Todo: improve.
+#' Creates a factor whose levels are all possible combinations of
+#'  "$r_{t-1}$_$r_t$", then tabulates it and reshapes into a matrix.
 #' @param prop [`logical(1)`] Whether to return transition probabilities
 #' @returns [`matrix(, n_r, n_r)`]
 #' @export
 regimes_transmat <- function(y, r, n_r = length(unique(r)), prop = TRUE) {
-  counts <- matrix(0, n_r, n_r)
-  r_diff <- c(0, diff(r))
-  ind <- r_diff != 0
+  if (n_r < 2) cli_abort("At least 2 regimes are required.")
 
-  counts[c(2, 3)] <- tabulate(r_diff[ind] + 2)[-2]
-  counts[c(1, 4)] <- tabulate(r[!ind])
+  r_lead <- r[-1]
+  x <- paste0(r_lead - diff(r), "_", r_lead)
+  levels <- paste0(rep(1:n_r, each = n_r), "_", rep(1:n_r, times = n_r))
+
+  counts <- matrix(table(factor(x, levels)), n_r, n_r, byrow = TRUE)
 
   if (prop) counts / rowSums(counts) else counts
 }
@@ -140,7 +143,13 @@ regimes_transmat <- function(y, r, n_r = length(unique(r)), prop = TRUE) {
 #'  overlap. Calculated in a pairwise fashion.
 #' @export
 regimes_thresholds <- function(y, r, n_r = length(unique(r))) {
-  pmap(tibble(r1 = 1:(n_r - 1), r2 = 2:n_r), \(r1, r2) {
+  pairs <- if (n_r == 1) {
+    tibble(r1 = 1, r2 = 2)
+  } else {
+    tibble(r1 = 1:(n_r - 1), r2 = 2:n_r)
+  }
+
+  pmap_dbl(pairs, \(r1, r2) {
     min_top_r <- min(y[r == r2])
     max_bot_r <- max(y[r == r1])
     dist <- min_top_r - max_bot_r

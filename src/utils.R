@@ -16,7 +16,7 @@ box::use(
 #' @export
 box::use(
   dplyr[...], tidyr[...],
-  tibble[tibble], #readr[...],
+  tibble[tibble], readr[write_rds],
   stringr[...], forcats[...],
   purrr[...], ggplot2[...],
   rlang[...]
@@ -89,7 +89,7 @@ arrow1 <- arrow(length = unit(0.02, "npc"), type = "closed")
 
 
 
-# General helpers --------------------------------------------------------------
+# Infrastructure Helpers -------------------------------------------------------
 
 #' Helper: Abort via multiple conditions
 #'
@@ -158,7 +158,11 @@ list3 <- function(...) {
 #' @returns [`invisible(NULL)`].
 #' @export
 ggsave2 <- function(filename, width, height, ..., units = "cm") {
-  ggsave(filename, width = width, height = height, ..., units = units)
+  env <- caller_env()
+  ggsave(
+    glue(filename, .envir = env),
+    width = width, height = height, ..., units = units
+  )
 }
 
 
@@ -210,4 +214,10 @@ get_results <- function(x, f, ..., parallel, safe, workers = 4) {
 #' @export
 lag <- function(x, n = 1L, default = NA) {
   c(rep(default, n), x[-(length(x) - seq_len(n) + 1)])
+}
+
+#' Helper: Add significance stars to p-values
+#' @export
+add_star <- function(x) {
+  cut(x, c(-Inf, 0.01, 0.05, 0.1, Inf), c("***", "**", "*", ""))
 }

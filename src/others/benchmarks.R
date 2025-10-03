@@ -28,6 +28,48 @@ box::use(
 
 
 
+# Transmat ---------------------------------------------------------------------
+
+r <- sample(3, 100, replace = TRUE)
+n_r <- length(unique(r))
+
+r_diff <- c(0, diff(r))
+idxs <- which(r_diff != 0)
+
+
+bench::mark(
+  check = FALSE,
+  {
+    r_lead <- r[1:(n_t - 1)]
+    a <- table(factor(paste0(r[1:(n_t - 1)], "_", r_lead + diff(r))))
+    counts <- matrix(a, n_r, n_r, byrow = TRUE)
+    counts
+  },
+  {
+    r_lead <- r[1:(n_t - 1)]
+    a <- tabulate(factor(sort(paste0(r[1:(n_t - 1)], "_", r_lead + diff(r)))))
+    counts <- matrix(a, n_r, n_r, byrow = TRUE)
+    counts
+  }, # inconsistent when a regime does not appear
+  {
+    counts <- matrix(0, n_r, n_r)
+    for (idx in 2:length(r)) {
+      r_before <- r[idx - 1]
+      r_after <- r_before + r_diff[idx]
+      counts[r_before, r_after] <- counts[r_before, r_after] + 1
+    }
+    counts
+  }
+)
+
+
+
+
+
+
+
+
+
 # Matrix indexing --------------------------------------------------------------
 
 m <- matrix(1:3^4, 9, 9)
