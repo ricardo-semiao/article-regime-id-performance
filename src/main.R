@@ -4,7 +4,7 @@
 # box::purge_cache()
 box::use(
   src/utils[...],
-  src/options[...],
+  src/options[sgps, rgps, models],
   src/diagnostics,
   src/others/metrics,
   rTRNG[rnorm_trng]
@@ -35,7 +35,8 @@ dgp_names <- expand_grid(
       #"r2_ar1_sign1", "r2_ar1_sign2",
       #"r2_ar2_pos1", "r2_ar2_pos2",
       #"r2_ar2_neg1", "r2_ar2_neg2",
-    "r2_ar1_vol1", "r2_ar1_vol2"
+    "r2_ar1_vol1", "r2_ar1_vol2",
+    NULL
   ),
   rgp = c(
       #"r2_multinomial_equal", "r2_multinomial_reg1",
@@ -45,8 +46,9 @@ dgp_names <- expand_grid(
     "r2_threshold_x_0", "r2_threshold_x_05",
     #"r2_threshold_abs_05", "r2_threshold_abs_2",
     #"r2_threshold_diff_05", "r2_threshold_diff_2",
-    "r2_lstar_0", "r2_lstar_05"#,
-      #"r2_estar_0", "r2_estar_05"
+    "r2_lstar_0", "r2_lstar_05",
+      #"r2_estar_0", "r2_estar_05",
+    NULL # To correct trailing comma
   )
 ) |>
   mutate(dgp = str_c(sgp, "-", rgp))
@@ -112,25 +114,29 @@ simulate_serie <- function(input) {
   list(r = r, y = y) # Todo:summarize r into vector might be needed for memory
 }
 
+
 # Running simulations:
-simulations <- get_results(
+safe <- TRUE
+simulations <- map_parallel(
   sim_inputs, simulate_serie,
   n_t = n_t,
-  parallel = FALSE, safe = TRUE
+  parallel = TRUE, safe = safe
 )
-# Todo: tentar fazer parallel passando apenas referencias
 
 # Checking errors:
-map(simulations, "error") |> compact() |> names()
-map(simulations, "result") |> keep(~ inherits_any(.x, "try-error")) |> names()
-#simulations[["r2_ar1_vol2-r2_lstar_05-14"]]
+if (safe) {
+  map(simulations, "error") |> compact() |> names()
+  map(simulations, "result") |> keep(~ inherits_any(.x, "try-error")) |> names()
+  #simulations[["r2_ar1_vol2-r2_lstar_05-14"]]
 
+  simulations <- map(simulations, "result")
+}
 
 # Collecting and saving results:
-simulations_data <- imap(map(simulations, "result"), \(res, sim_name) {
+simulations_data <- imap(simulations, \(res, sim_name) {
   sim_opts <- str_split_1(sim_name, "-")
   tibble(
-    group = fct(sim_name), sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
+    sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
     sim = as.integer(sim_opts[3]),
     t = 1:n_t, y = res$y, r = max.col(res$r)
   )
@@ -144,7 +150,7 @@ if (FALSE) write_rds(simulations, "data/simulations.rds")
 # Simulation: Diagnostics ------------------------------------------------------
 
 # Graphs:
-for (i in 1:nrow(dgp_names)) {
+walk(1:nrow(dgp_names), \(i) {
   sgp_name <- dgp_names$sgp[i]
   rgp_name <- dgp_names$rgp[i]
   sims_sample <- sample(n_s, 10)
@@ -167,15 +173,16 @@ for (i in 1:nrow(dgp_names)) {
     regime_aligned = !grepl("threshold", rgp_name)
   )
   if (FALSE) ggsave2("outputs/simulations/stats_rpg-{sgp}-{rgp}.png", 28, 14)
-}
+})
 
 
 # Table of statistics:
-tab <- diagnostics$simulations$table_sgps(simulations_data)
-if (FALSE) cat(gt::as_latex(tab), file = "outputs/simulations/table_sgps.tex")
+.tab <- diagnostics$simulations$table_sgps(simulations_data)
+if (FALSE) cat(gt::as_latex(.tab), file = "outputs/simulations/table_sgps.tex")
 
-tab <- diagnostics$simulations$table_rgps(simulations_data)
-if (FALSE) cat(gt::as_latex(tab), file = "outputs/simulations/table_rgps.tex")
+.tab <- diagnostics$simulations$table_rgps(simulations_data)
+if (FALSE) cat(gt::as_latex(.tab), file = "outputs/simulations/table_rgps.tex")
+rm(.tab)
 
 
 
@@ -188,23 +195,24 @@ model_names <- expand_grid(
   sim_names,
   model = c(
     "r2_sbreak",
-    "r2_threshold_x"#,
+    "r2_threshold_x",
     #"r2_threshold_abs",
     #"r2_threshold_diff",
-    #"r2_stransition",
-    #"r2_markov"
+    "r2_stransition",
+    "r2_markov",
+    NULL
   )
 ) |>
   mutate(dgp_sim_model = str_c(dgp_sim, "-", model))
 
-n_m <- length(unique(model_names$model))
-
+n_m <- length(models$options_names)
 
 # Estimation function:
 # Example: `y = simulations_ys[[1]]; models = models$options`
 estimate_models <- function(y_name) {
   y <- simulations_ys[[y_name]]
   data <- data.frame(y = y, y_l1 = lag(y, 1L, default = NA))
+
   results <- vector("list", n_m)
   names(results) <- names(models)
 
@@ -223,12 +231,12 @@ simulations_ys <- map(simulations, c("result", "y")) %>%
   })
 # Todo: burn in
 
-estimations <- get_results(
+estimations <- map_parallel(
   set_names(names(simulations_ys)), estimate_models,
   models = map(models$options[unique(model_names$model)], safely),
   lag = lag, simulations_ys = simulations_ys,
   n_m = n_m, n_t = n_t, n_h = n_h,
-  parallel = FALSE, safely = FALSE
+  parallel = TRUE, safe = FALSE
 )
 
 # Checking errors:
@@ -237,36 +245,36 @@ map(estimations, "result") |> keep(~ inherits_any(.x, "try-error")) |> names()
 #estimations[["r2_ar1_mu1-r2_markov_symm_high-1"]]
 
 
+# Collecting and saving results:
+if (FALSE) write_rds(estimations, "data/estimations.rds")
 
-# Estimation: Diagnostics ------------------------------------------------------
-
-
-# ...
 estimations_data <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
   map("result") |>
   imap(\(res, sim_name) {
     sim_opts <- str_split_1(sim_name, "-")
     tibble(
-      group = fct(str_c(sim_opts[1:3], collapse = "-")),
       sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
       sim = as.integer(sim_opts[3]), model = fct(sim_opts[4]),
       t = 1:n_t, y = res$y, r = res$r
     )
   }) |>
-  bind_rows() # Todo: do.call(rbind, args = _) for speed?
+  bind_rows()
 
 estimations_meta <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
   map("result") |>
   imap(\(res, sim_name) {
     sim_opts <- str_split_1(sim_name, "-")
     tibble(
-      group = fct(str_c(sim_opts[1:3], collapse = "-")),
       sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
       sim = as.integer(sim_opts[3]), model = fct(sim_opts[4]),
       meta = list(res$meta)
     )
   }) |>
-  bind_rows() # Todo: do.call(rbind, args = _) for speed?
+  bind_rows()
+
+
+
+# Estimation: Diagnostics ------------------------------------------------------
 
 a = estimations_meta %>%
   #filter(str_detect(model, "^r2_")) %>%

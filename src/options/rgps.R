@@ -65,6 +65,7 @@ transmat_main_col <- function(p, n_r, col = 1) {
 logistic_cdf <- function(x, location = 0, scale = 1) {
   1 / (1 + exp(- (x - location) / scale))
 }
+# Todo: remove?
 
 #' Internal: Exponential CDF
 #'
@@ -75,6 +76,7 @@ logistic_cdf <- function(x, location = 0, scale = 1) {
 exponential_cdf <- function(x, location = 0, scale = 1) {
   1 - exp(- (x - location)^2 / scale)
 }
+# Todo: remove?
 
 #' Names dictionary
 #' @export
@@ -218,7 +220,9 @@ options$r2_threshold_diff_2 <- list3(
 options$r2_lstar_0 <- list3(
   n_r = 2,
   fun = create_rgp$stransition(
-    c(0), g = \(y, t, breaks) logistic_cdf(y[t-1], location = breaks, scale = 1)
+    c(0), g = \(y, t, breaks) {
+      1 / (1 + exp(- (y[t-1] - breaks) / 1))
+    }
   ),
   r_start = expr(fun(y, r, t_start))
 )
@@ -227,7 +231,9 @@ options$r2_lstar_0 <- list3(
 options$r2_lstar_05 <- list3(
   n_r = 2,
   fun = create_rgp$stransition(
-    c(0.5), g = \(y, t, breaks) logistic_cdf(y[t-1], location = breaks, scale = 1)
+    c(0.5), g = \(y, t, breaks) {
+      1 / (1 + exp(- (y[t-1] - breaks) / 1))
+    }
   ),
   r_start = expr(fun(y, r, t_start))
 )
@@ -237,7 +243,9 @@ options$r2_lstar_05 <- list3(
 options$r2_estar_0 <- list3(
   n_r = 2,
   fun = create_rgp$stransition(
-    c(0), g = \(y, t, breaks) exponential_cdf(y[t-1], location = breaks, scale = 1)
+    c(0), g = \(y, t, breaks) {
+      1 - exp(- (y[t-1] - breaks)^2 / 1)
+    }
   ),
   r_start = expr(fun(y, r, t_start))
 )
@@ -246,7 +254,9 @@ options$r2_estar_0 <- list3(
 options$r2_estar_05 <- list3(
   n_r = 2,
   fun = create_rgp$stransition(
-    c(0.5), g = \(y, t, breaks) exponential_cdf(y[t-1], location = breaks, scale = 1)
+    c(0.5), g = \(y, t, breaks) {
+      1 - exp(- (y[t-1] - breaks)^2 / 1)
+    }
   ),
   r_start = expr(fun(y, r, t_start))
 )

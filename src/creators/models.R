@@ -3,11 +3,10 @@
 
 # Loading dependencies
 box::use(
-  src/utils[...],
-  mbreaks[sbreak_mbreaks = dofix],
-  tsDyn[threshold_tsdyn = setar, stransition_tsdyn = lstar],
-  MSwM[markov_mswm = msmFit]
+  src/utils[...]
 )
+# Functions imported via `::`: mbreaks::dofix, tsDyn::setar, tsDyn::lstar,
+# MSwM::msmFit
 
 # Temporary example:
 if (FALSE) {
@@ -17,7 +16,7 @@ if (FALSE) {
   ) |> as.data.frame()
 
   n_p <- 1; n_t <- 100; n_h <- 1
-  n_r_hat <- 3; min_r_size <- 0.1; tol <- 1e-5; max_iter <- 10
+  n_r <- 3; min_r_size <- 0.1; tol <- 1e-5; max_iter <- 10
   g <- \(x) x; gamma <- NULL
 }
 
@@ -26,26 +25,61 @@ if (FALSE) {
 # Helpers ----------------------------------------------------------------------
 
 #' Internal: Get regimes from model info
-get_r <- list()
+get_results <- list()
 
-#' Similar to cut(1:n_t, mod$dates). Prediction is straightforward
-get_r$mbreaks <- function(data, mod, n_t, n_r_hat) {
+
+#' Get results from mbreaks::dofix
+#'
+#' - Regimes: similar to cut(1:n_t, mod$dates). Prediction is straightforward
+#' - Series: prediction using last regime's coefficients
+get_results$mbreaks_dofix <- function(data, mod, n_t, n_h, n_r, n_p) {
+  # Regimes:
   date1 <- c(1, mod$date)
   date2 <- c(mod$date - 1, n_t)
 
   r <- integer(n_t)
-  for (s in 1:n_r_hat) {
+  for (s in 1:n_r) {
     r[date1[s]:date2[s]] <- s
   }
 
-  r
+  # Series:
+  coefs_last_r <- mod$beta[((n_r - 1) * (n_p + 1) + 1):(n_r * (n_p + 1))]
+
+  preds <- double(n_h)
+  for (i in 1:n_h) {
+    preds[i] <- sum(coefs_last_r * c(1, data[n_t - i + 1, -1]))
+  }
+
+  y <- c(rep(NA, n_p), mod$fitted.values, preds)
+
+  # Meta information:
+  meta <- list(
+    coefs = matrix(mod$beta, n_r, n_p + 1, byrow = FALSE),
+    switches = c(mod$date)
+  )
+
+  list(y = y, r = r, meta = meta)
 }
 
-#' 1 initial NA and in-sample regimes are given. Predictions are the number of
-#'  thresholds that the threshold variable exceeds plus 1
-get_r$tsdyn <- function(data, mod, thresholds, g, n_t, n_h) {
-  r <- integer(n_t)
 
+#' Get results from tsDyn::setar
+#'
+#' - Regimes: 1 initial NA and in-sample regimes are given. Predictions are the
+#'  number of thresholds that the threshold variable exceeds plus 1
+#' - Series: Todo: correct. 1 more NA than n_p
+get_results$tsdyn_setar <- function(data, mod, n_t, n_h, n_r, n_p, g) {
+  thresholds <- mod$coefficients[grep("const|phi", names(mod$coefficients))]
+  coefs <- matrix(
+    mod$coefficients[grep("^[^th]", names(mod$coefficients))],
+    n_r, n_p + 1, byrow = TRUE
+  )
+  dimnames(coefs) <- list(
+    paste0("Regime ", 1:n_r),
+    c("Intercept", paste0("AR(", 1:n_p, ")"))
+  )
+
+  # Regimes:
+  r <- integer(n_t)
   r[1] <- NA_integer_ # tsDyn with m = 1 un-uses 1 more observation
   r[2:(n_t - n_h)] <- mod$model.specific$regime
 
@@ -53,38 +87,7 @@ get_r$tsdyn <- function(data, mod, thresholds, g, n_t, n_h) {
     r[n_t - i + 1] <- sum(thresholds < g(data$y_l1)[n_t - i + 1]) + 1
   }
 
-  r
-}
-
-#' 2 initial NAs. In-sample regimes' probabilities are the filtered ones.
-#'  Predictions are given by the transitioned filtered probabilities.
-get_r$mswm <- function(data, mod, n_h, n_t) {
-  r <- rbind(NA, NA, mod@Fit@filtProb, NA)
-
-  for (i in n_h:1) {
-    r[(n_t - i + 1), ] <- mod@transMat %*% r[(n_t - i), ]
-  }
-
-  r
-}
-
-#' Internal: Get regimes from model info
-get_pred <- list()
-
-#' Predictions are given using the last regime's coefficients
-get_pred$mbreaks <- function(data, mod, n_r_hat, n_p, n_t, n_h) {
-  coefs_last_r <- mod$beta[((n_r_hat - 1) * (n_p + 1) + 1):(n_r_hat * (n_p + 1))]
-
-  preds <- double(n_h)
-  for (i in 1:n_h) {
-    preds[i] <- sum(coefs_last_r * c(1, data[n_t - i + 1, -1]))
-  }
-
-  preds
-}
-
-#' Todo: correct
-get_pred$tsdyn <- function(data, coefs, r, n_h, n_t) {
+  # Series:
   preds <- double(n_h)
   for (i in 1:n_h) {
     r_i <- r[n_t - i + 1]
@@ -93,73 +96,173 @@ get_pred$tsdyn <- function(data, coefs, r, n_h, n_t) {
     )
   }
 
-  preds
+  y <- c(rep(NA, n_p + 1), mod$fitted.values, preds)
+
+  # Meta information:
+  meta <- list(
+    coefs = coefs,
+    switches = thresholds
+  )
+
+  list(y = y, r = r, meta = meta)
 }
 
-#' Todo: correct
-get_pred$mswm <- function(data, coefs, r, n_h, n_t) {
-  preds <- double(n_h)
 
+#' Get results from tsDyn::lstar
+#'
+#' Only works for 2 regimes
+#' - Regimes: same as tsDyn::setar
+#' - Series: use the current regime's value to weight the coefficients
+get_results$tsdyn_lstar <- function(data, mod, n_t, n_h, n_r, n_p) {
+  threshold <- mod$coefficients["th"]
+  gamma <- mod$coefficients["gamma"]
+  coefs <- matrix(
+    mod$coefficients[grep("const|phi", names(mod$coefficients))],
+    2, n_p + 1, byrow = TRUE
+  )
+
+  # Regimes:
+  r <- 1 / (1 + exp(- (data$y_l1[1:n_t] - threshold) / gamma))
+
+  # Series:
+  preds <- double(n_h)
+  for (i in 1:n_h) {
+    r_i <- r[n_t - i + 1]
+    preds[i] <- sum(
+      (coefs[1, ] * r_i + coefs[2, ] * (1 - r_i)) * c(1, data[n_t - i + 1, -1])
+    )
+  }
+
+  y <- c(rep(NA, n_p + 1), mod$fitted.values, preds)
+
+  # Meta information:
+  meta <- list(
+    coefs = coefs,
+    switches = thresholds
+  )
+
+  list(y = y, r = r, meta = meta)
+}
+
+
+#' Get results from mswm::lstar
+#'
+#' Only works for 2 regimes
+#' - Regimes: same as tsDyn::setar
+#' - Series: use the current regime's value to weight the coefficients
+get_results$tsdyn_lstar <- function(data, mod, n_t, n_h, n_r, n_p) {
+  threshold <- mod$coefficients["th"]
+  gamma <- mod$coefficients["gamma"]
+  coefs <- matrix(
+    mod$coefficients[grep("const|phi", names(mod$coefficients))],
+    2, n_p + 1, byrow = TRUE
+  )
+
+  # Regimes:
+  r <- 1 / (1 + exp(- (data$y_l1[1:n_t] - threshold) / gamma))
+
+  # Series:
+  preds <- double(n_h)
+  for (i in 1:n_h) {
+    r_i <- r[n_t - i + 1]
+    preds[i] <- sum(
+      (coefs[1, ] * r_i + coefs[2, ] * (1 - r_i)) * c(1, data[n_t - i + 1, -1])
+    )
+  }
+
+  y <- c(rep(NA, n_p + 1), mod$fitted.values, preds)
+
+  # Meta information:
+  meta <- list(
+    coefs = coefs,
+    switches = thresholds,
+    gamma = gamma
+  )
+
+  list(y = y, r = (r <= 0.5) + 1, meta = meta)
+}
+
+
+#' Get results from mswm::msmFit
+#'
+#' Predictions overall are the expected values given the probabilities.
+#' - Regimes: the marginal probabilities are the filtered ones. These are
+#'  updated via the transition matrix. The final regime variable is the most
+#'  likely regime.
+#' - Series: average across regimes using the marginal probabilities
+get_results$mswm_msmfit <- function(data, mod, n_t, n_h, n_r, n_p) {
+  coefs <- as.matrix(mod@Coef)
+
+  # Regimes:
+  r <- rbind(NA, NA, mod@Fit@filtProb, NA)
+
+  for (i in n_h:1) {
+    r[(n_t - i + 1), ] <- mod@transMat %*% r[(n_t - i), ]
+  }
+
+  # Series:
+  preds <- double(n_h)
   for (i in 1:n_h) {
     preds[i] <- sum(coefs %*% c(1, data[n_t - i + 1, -1]) * r[(n_t - i + 1), ])
   }
 
-  preds
+  y <- c(rep(NA, n_p + 1), mod@model$fitted.values, preds)
+
+  # Meta information:
+  meta <- list(
+    coefs = coefs,
+    switches = mod@transMat
+  )
+
+  list(y = y, r = max.col(r), meta = meta)
+}
+
+
+# Sanitizing enclosing environments
+for (model_name in names(get_results)) {
+  fn_env(get_results[[model_name]]) <- pkg_env("base")
 }
 
 
 
 # Creators ---------------------------------------------------------------------
 
-# Parameters always include n_r_hat and n_p. Often include optimization
+# Parameters always include n_r and n_p. Often include optimization
 # parameters such as min_r_size, tol, and max_iter
 # All return a generator function enclosing a child of base env carrying the
 # hyperparameters, model function, and methods for getting predictions and
 # regimes
+# Model functions are passed via usual `::`, as box might interact weirdly with
+# parallelism
 
-# Structural breaks
+#' Structural breaks
 #'
 #' Comments on parameters:
 #' - h set by eps1; model with intercept; no error treatments
 #'
 #' @export
 sbreak <- function(
-  n_r_hat, n_p = 1,
+  n_r, n_p = 1,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
   defaults <- c(
-    as.list(current_env()), model = sbreak_mbreaks,
-    get_pred = get_pred$mbreaks, get_r = get_r$mbreaks
+    as.list(current_env()), get_results = get_results$mbreaks_dofix
   )
 
   body <- expr({
-    # Function: mbreaks::dofix
     mod <- mbreaks::dofix(
       # Data:
       "y", "y_l1", x_name = NULL, data = data[(1 + n_p):(n_t - n_h), ],
       # Hyperparameters:
-      fixn = n_r_hat - 1,
+      fixn = n_r - 1,
       # Optimization:
       eps = tol, eps1 = min_r_size, maxi = max_iter, fixb = 0, betaini = NULL,
       # Others:
       prewhit = 0, robust = 0, hetdat = 0, hetvar = 0, hetq = 0, hetomega = 0,
       h = NULL, const = 1
     )
-
-    # Storing results:
-    list(
-      y = c(
-        rep(NA, n_p), # Todo: data$y[1:n_p]?
-        mod$fitted.values,
-        get_pred(data, mod, n_r_hat, n_p, n_t, n_h)
-      ),
-      r = get_r(data, mod, n_t, n_r_hat),
-      meta = list(
-        coefs = matrix(mod$beta, n_r_hat, n_p + 1, byrow = FALSE),
-        switches = c(mod$date)
-      )
-    )
+    get_results(data, mod, n_t, n_h, n_r, n_p)
   })
 
   new_function(
@@ -176,25 +279,28 @@ sbreak <- function(
 #' - mTh, thDelay missing, given by thVar
 #' - Model in levels and with constants; no threshold restrictions
 #'
+#' @param g [`function(y){}`] Transition function. Must be a closure (i.e.
+#'  non-primitive), and will have its environment sanitized to base env.
+#'
 #' @export
 threshold <- function(
-  n_r_hat, n_p = 1, g = \(y) y,
+  n_r, n_p = 1, g = \(y) y,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
+  g <- new_function(exprs(y = ), fn_body(g), pkg_env("base"))
+
   defaults <- c(
-    as.list(current_env()), model = threshold_tsdyn,
-    get_pred = get_pred$tsdyn, get_r = get_r$tsdyn
+    as.list(current_env()), get_results = get_results$tsdyn_setar
   )
 
   body <- expr({
-    # Function: tsDyn::setar
-    mod <- model(
+    mod <- tsDyn::setar(
       # Data:
       data$y[(1 + n_p):(n_t - n_h)], mL = 1, mM = 1, mH = 1,
       thVar = g(data$y_l1)[(1 + n_p):(n_t - n_h)],
       # Hyperparameters:
-      nthresh = n_r_hat - 1,
+      nthresh = n_r - 1,
       # Optimization:
       trim = min_r_size,
       # Others:
@@ -202,31 +308,7 @@ threshold <- function(
       include = "const", common = "none", model = "TAR", type = "level",
       restriction = "none", trace = FALSE
     )
-
-    # Storing results:
-    thresholds <- mod$coefficients[grep("const|phi", names(mod$coefficients))]
-    r <- get_r(data, mod, thresholds, g, n_t, n_h)
-    coefs <- matrix(
-      mod$coefficients[grep("^[^th]", names(mod$coefficients))],
-      n_r_hat, n_p + 1, byrow = TRUE
-    )
-    dimnames(coefs) <- list(
-      paste0("Regime ", 1:n_r_hat),
-      c("Intercept", paste0("AR(", 1:n_p, ")"))
-    )
-
-    list(
-      y = c(
-        rep(NA, n_p + 1),
-        mod$fitted.values,
-        get_pred(data, coefs, r, n_h, n_t)
-      ),
-      r = r,
-      meta = list(
-        coefs = coefs,
-        switches = thresholds
-      )
-    )
+    get_results(data, mod, n_t, n_h, n_r, n_p, g = g)
   })
 
   new_function(
@@ -247,19 +329,17 @@ threshold <- function(
 #'
 #' @export
 stransition <- function(
-  n_r_hat = 2, n_p = 1, gamma = NULL,
+  n_r = 2, n_p = 1, gamma = NULL,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
   defaults <- c(
-    as.list(current_env()), model = stransition_tsdyn,
-    get_pred = get_pred$tsdyn, get_r = get_r$tsdyn
+    as.list(current_env()), get_results = get_results$tsdyn_lstar
   )
 
   body <- expr({
     gamma <- gamma %||% quote(expr = )
-    # Function: tsDyn::lstar
-    mod <- model(
+    mod <- tsDyn::lstar(
       # Data:
       data$y[1:(n_t - n_h)], mL = 1, mH = 1, thDelay = 1,
       # Hyperparameters:
@@ -269,30 +349,7 @@ stransition <- function(
       # Others:
       d = 1, steps = 1, include = "const", trace = FALSE
     )
-
-    # Storing results:
-    threshold <- mod$coefficients["th"]
-    gamma <- mod$coefficients["gamma"]
-
-    r <- 1 / (1 + exp(- (data$y_l1[1:n_t] - threshold) / gamma))
-    coefs <- matrix(
-      mod$coefficients[grep("const|phi", names(mod$coefficients))],
-      2, n_p + 1, byrow = TRUE
-    )
-
-    list(
-      y = c(
-        rep(NA, n_p + 1),
-        mod$fitted.values,
-        get_pred(data, coefs, r, n_h, n_t)
-      ),
-      r = (r <= 0.5) + 1,
-      meta = list(
-        coefs = coefs,
-        gamma = gamma,
-        switches = threshold
-      )
-    )
+    get_results(data, mod, n_t, n_h, n_r, n_p)
   })
 
   new_function(
@@ -302,49 +359,31 @@ stransition <- function(
   )
 }
 
-#' Model: Smooth transition
+#' Model: Markov switching
 #'
 #' Comments on parameters:
 #' - All coefficients switch between regimes, but not vol
 #'
 #' @export
 markov <- function(
-  n_r_hat = 2, n_p = 1, gamma = NULL,
+  n_r = 2, n_p = 1, gamma = NULL,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
   defaults <- c(
-    as.list(current_env()), model = markov_mswm,
-    get_pred = get_pred$mswm, get_r = get_r$mswm
+    as.list(current_env()), get_results = get_results$mswm_msmfit
   )
 
   body <- expr({
-    # Function: MSwM::msmFit
-    mod <- model(
+    mod <- MSwM::msmFit(
       # Data:
-      y ~ 1, k = n_r_hat, p = n_p, data = data[(1 + n_p):(n_t - n_h), ],
+      y ~ 1, k = n_r, p = n_p, data = data[(1 + n_p):(n_t - n_h), ],
       # Optimization:
       control = list(maxiter = max_iter, tol = tol, parallelization = FALSE),
       # Others:
       sw = c(rep(TRUE, n_p + 1), FALSE)
     )
-
-    # Storing results:
-    coefs <- as.matrix(mod@Coef)
-    r <- get_r(data, mod, n_h, n_t)
-
-    list(
-      y = c(
-        rep(NA, n_p + 1),
-        mod@model$fitted.values,
-        get_pred(data, coefs, r, n_h, n_t)
-      ),
-      r = max.col(r),
-      meta = list(
-        coefs = coefs,
-        switches = mod@transMat
-      )
-    )
+    get_results(data, mod, n_t, n_h, n_r, n_p)
   })
 
   new_function(

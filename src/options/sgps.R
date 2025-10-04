@@ -38,25 +38,25 @@ unconditional_sgp <- function(funs, args) {
   new_function(
     args = pairlist2(y = , r = , t = ),
     body = expr(sum(c(!!!ys_expr) * r[t, ])),
-    env = global_env()
+    env = pkg_env("base")
   )
 }
 
 #' Names dictionary
 #' @export
 options_names <- c(
-  r2_ar1_mu1   = "μ (small change)",
-  r2_ar1_mu2   = "μ (big change)",
-  r2_ar1_rho1  = "ρ (big change)",
-  r2_ar1_rho2  = "ρ (small change)",
-  r2_ar1_sign1 = "sign(ρ) (small change)",
-  r2_ar1_sign2 = "sign(ρ) (big change)",
+  r2_ar1_mu1   = "\u03BC (small change)",
+  r2_ar1_mu2   = "\u03BC (big change)",
+  r2_ar1_rho1  = "\u03C1 (big change)",
+  r2_ar1_rho2  = "\u03C1 (small change)",
+  r2_ar1_sign1 = "sign(\u03C1) (small change)",
+  r2_ar1_sign2 = "sign(\u03C1) (big change)",
   r2_ar2_pos1  = "New positive lag (small)",
   r2_ar2_pos2  = "New positive lag (big)",
   r2_ar2_neg1  = "New negative lag (small)",
   r2_ar2_neg2  = "New negative lag (big)",
-  r2_ar1_vol1  = "σ (small change)",
-  r2_ar1_vol2  = "σ (big change)"
+  r2_ar1_vol1  = "\u03C3 (small change)",
+  r2_ar1_vol2  = "\u03C3 (big change)"
 )
 
 

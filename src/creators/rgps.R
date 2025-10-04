@@ -43,12 +43,15 @@ sbreak <- function(breaks) {
 #'
 #' @param breaks [`numeric()`] Strictly increasing vector of thresholds. Breaks
 #' are closed on left.
-#' @param g [`function(){}`] Function for `g(y, t) < breaks`.
+#' @param g [`function(y, t){}`] Function for `g(y, t) < breaks`. Must be a
+#'  closure (i.e. non-primitive), and will have its environment sanitized to
+#'  base env.
 #'
 #' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
 threshold <- function(breaks, g = \(y, t) y[t - 1]) {
   walk(list(breaks, g), force)
+  g <- new_function(exprs(y = , t = ), fn_body(g), pkg_env("base"))
 
   test_conditions(
     "{.arg breaks} must be a bare numeric vector" = is_bare_numeric(breaks),
@@ -72,12 +75,14 @@ threshold <- function(breaks, g = \(y, t) y[t - 1]) {
 #'
 #' @param breaks [`numeric()`] Strictly increasing vector of thresholds. Breaks
 #' are closed on left.
-#' @param g [`function(){}`] Transition function.
+#' @param g [`function(y, t, breaks){}`] Transition function. Must be a closure
+#'  (i.e. non-primitive), and will have its environment sanitized to base env.
 #'
 #' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
 stransition <- function(breaks, g) {
   walk(list(breaks, g), force)
+  g <- new_function(exprs(y = , t = , breaks = ), fn_body(g), pkg_env("base"))
 
   test_conditions(
     "{.arg breaks} must be a bare numeric scalar" = is_bare_numeric(breaks, 1),

@@ -165,6 +165,25 @@ ggsave2 <- function(filename, width, height, ..., units = "cm") {
   )
 }
 
+#' Helper: updates a function body to be safely
+#'
+#' Useful to avoid loading purrr in parallel processing.
+#'
+#' @param .f [`function(){}`] Function to modify.
+#'
+#' @returns [`function(){}`] The same function with a tryCatch'ed body.
+#' @export
+safely_modify <- function(.f) {
+  fn_body(.f) <- expr({
+    tryCatch(
+      expr = list(result = {!!!fn_body(.f)}, error = NULL),
+      error = \(e) list(result = NULL, error = e)
+    )
+  })
+
+  .f
+}
+
 
 
 # Specific Helpers -------------------------------------------------------------
@@ -177,30 +196,30 @@ ggsave2 <- function(filename, width, height, ..., units = "cm") {
 #' @param f [`function()`] Function to apply to each element of `x`.
 #' @param ... Additional arguments passed to `f`.
 #' @param parallel, safe [`logical(1)`] Whether to use parallel processing
-#'  and/or [purrr::safely()].
+#'  and/or `safely()`.
 #'
 #' @returns [`list()`] Results of applying `f` to `x`.
 #' @export
-get_results <- function(x, f, ..., parallel, safe, workers = 4) {
-  if (!is_bare_list(x)) {
-    cli_warn("{.code x} should be a bare list, {.code pmap}-like behavior may \\
-    occour")
+map_parallel <- function(x, f, ..., parallel, safe, workers = 6) {
+  if (inherits_any(x, "data.frame")) {
+    cli_warn("{.code x} is a dataframe, {.code pmap}-like behavior may occour")
   }
 
   fn_env(f) <- new_environment(list2(...), pkg_env("base"))
-  if (safe) f <- safely(f)
+  f_safe <- if (safe) safely_modify(f) else f
 
   if (parallel) {
     on.exit(mirai_daemons(0), add = TRUE)
-    mirai_daemons(4)
+    mirai_daemons(workers)
 
-    promise <- mirai_map(x, f)
+    promise <- mirai_map(x, f_safe)
     results <- mirai_collect(promise, options = c(".progress"))
+
     results <- map(results, \(x) {
       if (inherits_any(x, "try-error")) list(result = NULL, error = x) else x
     }) # Connection resets happen before safely can catch them
   } else {
-    results <- lapply(x, f)
+    results <- lapply(x, f_safe)
   }
 
   results
@@ -215,6 +234,7 @@ get_results <- function(x, f, ..., parallel, safe, workers = 4) {
 lag <- function(x, n = 1L, default = NA) {
   c(rep(default, n), x[-(length(x) - seq_len(n) + 1)])
 }
+fn_env(lag) <- pkg_env("base")
 
 #' Helper: Add significance stars to p-values
 #' @export
