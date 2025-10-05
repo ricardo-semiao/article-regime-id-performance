@@ -10,19 +10,28 @@ box::use(
 
 # Temporary example:
 if (FALSE) {
-  data <- tibble(
-    y = c(rnorm(30, 2), rnorm(40, 0), rnorm(30, 1)),
-    y_l1 = lag(y, 1L, default = NA)
-  ) |> as.data.frame()
-
-  n_p <- 1; n_t <- 100; n_h <- 1
-  n_r <- 3; min_r_size <- 0.1; tol <- 1e-5; max_iter <- 10
+  n_h <- 10; n_burn <- 10; n_t <- 100 + n_h + n_burn
+  n_l <- 1; n_r <- 2
+  min_r_size <- 0.1; tol <- 1e-5; max_iter <- 10
   g <- \(x) x; gamma <- NULL
+  data <- data.frame(y = c(rnorm(50, 2), rnorm(30, 0), rnorm(n_t - 80, 1))) |>
+    data_lags(n_l = 1)
 }
 
 
 
 # Helpers ----------------------------------------------------------------------
+
+# Results are always a list with elements y, r, and meta
+# - y: full series with n_burn + n_l + warmup NAs at start. Warmup NAs vary by
+# model, but are usually 0 or 1
+# - r: regimes, with n_burn + n_l + warmup NAs at start. This is already the
+# summarized regime, the categorical column-vector, not the full matrix of e.g.
+# probabilities
+# - meta: list with model-specific information. Always contains coefs, a matrix
+# with each row being a regime and each column a coefficient, in the order:
+# intercept, lag 1, lag 2, ..., lag n_l. Also contains switches, the meta
+# information about regime changes (e.g. thresholds or transition matrix)
 
 #' Internal: Get regimes from model info
 get_results <- list()
@@ -31,11 +40,11 @@ get_results <- list()
 #' Get results from mbreaks::dofix
 #'
 #' - Regimes: similar to cut(1:n_t, mod$dates). Prediction is straightforward
-#' - Series: prediction using last regime's coefficients. n_p NAs at start
-get_results$mbreaks_dofix <- function(data, mod, n_t, n_h, n_r, n_p) {
+#' - Series: prediction using last regime's coefficients. n_l NAs at start
+get_results$mbreaks_dofix <- function(data, mod, n_burn, n_h, n_t, n_r, n_l) {
   # Regimes:
-  date1 <- c(1, mod$date)
-  date2 <- c(mod$date - 1, n_t)
+  date1 <- n_burn + c(1 - n_burn, mod$date)
+  date2 <- n_burn + c(mod$date - 1, n_t - n_burn)
 
   r <- integer(n_t)
   for (s in 1:n_r) {
@@ -43,18 +52,18 @@ get_results$mbreaks_dofix <- function(data, mod, n_t, n_h, n_r, n_p) {
   }
 
   # Series:
-  coefs_last_r <- mod$beta[((n_r - 1) * (n_p + 1) + 1):(n_r * (n_p + 1))]
+  coefs_last_r <- mod$beta[((n_r - 1) * (n_l + 1) + 1):(n_r * (n_l + 1))]
 
   preds <- double(n_h)
   for (i in 1:n_h) {
     preds[i] <- sum(coefs_last_r * c(1, data[n_t - i + 1, -1]))
   }
 
-  y <- c(rep(NA, n_p), mod$fitted.values, preds)
+  y <- c(rep(NA, n_burn + n_l), mod$fitted.values, preds)
 
   # Meta information:
   meta <- list(
-    coefs = matrix(mod$beta, n_r, n_p + 1, byrow = FALSE),
+    coefs = matrix(mod$beta, n_r, n_l + 1, byrow = FALSE),
     switches = c(mod$date)
   )
 
@@ -66,36 +75,31 @@ get_results$mbreaks_dofix <- function(data, mod, n_t, n_h, n_r, n_p) {
 #'
 #' - Regimes: 1 initial NA and in-sample regimes are given. Predictions are the
 #'  number of thresholds that the threshold variable exceeds plus 1
-#' - Series: current regime's coefficient used at each moment. n_p+1 NAs at
+#' - Series: current regime's coefficient used at each moment. n_l+1 NAs at
 #'  start
-get_results$tsdyn_setar <- function(data, mod, n_t, n_h, n_r, n_p, g) {
-  thresholds <- mod$coefficients[grep("const|phi", names(mod$coefficients))]
+get_results$tsdyn_setar <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, g) {
+  thresholds <- mod$coefficients[grep("^th", names(mod$coefficients))]
   coefs <- matrix(
     mod$coefficients[grep("^[^th]", names(mod$coefficients))],
-    n_r, n_p + 1, byrow = TRUE
-  )
-  dimnames(coefs) <- list(
-    paste0("Regime ", 1:n_r),
-    c("Intercept", paste0("AR(", 1:n_p, ")"))
+    n_r, n_l + 1, byrow = TRUE
   )
 
   # Regimes:
   r <- integer(n_t)
-  r[1] <- NA_integer_ # tsDyn with m = 1 un-uses 1 more observation
-  r[2:(n_t - n_h)] <- mod$model.specific$regime
+  r[1:(n_burn + 1)] <- NA_integer_ # tsDyn with m = 1 un-uses 1 more observation
+  r[(n_burn + 2):(n_t - n_h)] <- mod$model.specific$regime
 
   for (i in n_h:1) {
-    r[n_t - i + 1] <- sum(thresholds < g(data$y_l1)[n_t - i + 1]) + 1
+    r[n_t - i + 1] <- sum(thresholds < g(data[, "y_l1"])[n_t - i + 1]) + 1
   }
 
   # Series:
   preds <- double(n_h)
   for (i in 1:n_h) {
-    r_i <- r[n_t - i + 1]
-    preds[i] <- sum(coefs[r_i, ] * c(1, data[n_t - i + 1, -1]))
+    preds[i] <- sum(coefs[r[n_t - i + 1], ] * c(1, data[n_t - i + 1, -1]))
   }
 
-  y <- c(rep(NA, n_p + 1), mod$fitted.values, preds)
+  y <- c(rep(NA, n_burn + n_l + 1), mod$fitted.values, preds)
 
   # Meta information:
   meta <- list(
@@ -112,16 +116,19 @@ get_results$tsdyn_setar <- function(data, mod, n_t, n_h, n_r, n_p, g) {
 #' Only works for 2 regimes
 #' - Regimes: same as tsDyn::setar
 #' - Series: use the current regime's value to weight the coefficients
-get_results$tsdyn_lstar <- function(data, mod, n_t, n_h, n_r, n_p) {
+get_results$tsdyn_lstar <- function(data, mod, n_burn, n_h, n_t, n_r, n_l) {
   threshold <- mod$coefficients["th"]
   gamma <- mod$coefficients["gamma"]
   coefs <- matrix(
     mod$coefficients[grep("const|phi", names(mod$coefficients))],
-    2, n_p + 1, byrow = TRUE
+    2, n_l + 1, byrow = TRUE
   )
 
   # Regimes:
-  r <- 1 / (1 + exp(- (data$y_l1[1:n_t] - threshold) / gamma))
+  r <- c(
+    rep(NA_integer_, n_burn),
+    1 / (1 + exp(- (data[(n_burn + 1):n_t, "y_l1"] - threshold) / gamma))
+  )
 
   # Series:
   preds <- double(n_h)
@@ -132,7 +139,7 @@ get_results$tsdyn_lstar <- function(data, mod, n_t, n_h, n_r, n_p) {
     )
   }
 
-  y <- c(rep(NA, n_p + 1), mod$fitted.values, preds)
+  y <- c(rep(NA, n_burn + n_l + 1), mod$fitted.values, preds)
 
   # Meta information:
   meta <- list(
@@ -152,11 +159,12 @@ get_results$tsdyn_lstar <- function(data, mod, n_t, n_h, n_r, n_p) {
 #'  updated via the transition matrix. The final regime variable is the most
 #'  likely regime.
 #' - Series: average across regimes using the marginal probabilities
-get_results$mswm_msmfit <- function(data, mod, n_t, n_h, n_r, n_p) {
+get_results$mswm_msmfit <- function(data, mod, n_burn, n_h, n_t, n_r, n_l) {
   coefs <- as.matrix(mod@Coef)
 
   # Regimes:
-  r <- rbind(NA, NA, mod@Fit@filtProb, NA) # Todo: correct to n_p + 1 NAs
+  r <- matrix(NA, n_t, n_r)
+  r[(n_burn + n_l + 1):(n_t - n_h), ] <- mod@Fit@filtProb
 
   for (i in n_h:1) {
     r[(n_t - i + 1), ] <- mod@transMat %*% r[(n_t - i), ]
@@ -168,7 +176,7 @@ get_results$mswm_msmfit <- function(data, mod, n_t, n_h, n_r, n_p) {
     preds[i] <- sum(coefs %*% c(1, data[n_t - i + 1, -1]) * r[(n_t - i + 1), ])
   }
 
-  y <- c(rep(NA, n_p + 1), mod@model$fitted.values, preds)
+  y <- c(rep(NA, n_burn + n_l), mod@model$fitted.values, preds)
 
   # Meta information:
   meta <- list(
@@ -204,7 +212,7 @@ for (model_name in names(get_results)) {
 #'
 #' @export
 sbreak <- function(
-  n_r, n_p = 1,
+  n_r, n_l = 1,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
@@ -213,9 +221,10 @@ sbreak <- function(
   )
 
   body <- expr({
+    z_name <- grep("^y_l[0-9]+", colnames(data), value = TRUE)
     mod <- mbreaks::dofix(
       # Data:
-      "y", "y_l1", x_name = NULL, data = data[(1 + n_p):(n_t - n_h), ],
+      "y", z_name, x_name = NULL, data = data[(n_burn + n_l + 1):(n_t - n_h), ],
       # Hyperparameters:
       fixn = n_r - 1,
       # Optimization:
@@ -224,16 +233,16 @@ sbreak <- function(
       prewhit = 0, robust = 0, hetdat = 0, hetvar = 0, hetq = 0, hetomega = 0,
       h = NULL, const = 1
     )
-    get_results(data, mod, n_t, n_h, n_r, n_p)
+    get_results(data, mod, n_burn, n_h, n_t, n_r, n_l)
   })
 
   new_function(
-    args = exprs(data = , n_t = , n_h = ),
+    args = exprs(data = , n_t = , n_h = , n_burn = ),
     body = body,
     env = new_environment(defaults, pkg_env("base"))
   )
 }
-# Todo: generalize for n_p > 1
+# Todo: generalize for n_l > 1
 
 #' Model: Threshold
 #'
@@ -247,7 +256,7 @@ sbreak <- function(
 #'
 #' @export
 threshold <- function(
-  n_r, n_p = 1, g = \(y) y,
+  n_r, n_l = 1, g = \(y) y,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
@@ -260,8 +269,8 @@ threshold <- function(
   body <- expr({
     mod <- tsDyn::setar(
       # Data:
-      data$y[(1 + n_p):(n_t - n_h)], mL = n_p, mM = n_p, mH = n_p,
-      thVar = g(data$y_l1)[(1 + n_p):(n_t - n_h)],
+      data[(n_burn + n_l + 1):(n_t - n_h), "y"], mL = n_l, mM = n_l, mH = n_l,
+      thVar = g(data[, "y_l1"])[(n_burn + n_l + 1):(n_t - n_h)],
       # Hyperparameters:
       nthresh = n_r - 1,
       # Optimization:
@@ -271,11 +280,11 @@ threshold <- function(
       include = "const", common = "none", model = "TAR", type = "level",
       restriction = "none", trace = FALSE
     )
-    get_results(data, mod, n_t, n_h, n_r, n_p, g = g)
+    get_results(data, mod, n_burn, n_h, n_t, n_r, n_l, g = g)
   })
 
   new_function(
-    args = exprs(data = , n_t = , n_h = ),
+    args = exprs(data = , n_t = , n_h = , n_burn = ),
     body = body,
     env = new_environment(defaults, pkg_env("base"))
   )
@@ -288,11 +297,11 @@ threshold <- function(
 #' - mTh, thDelay missing, given by thVar
 #' - Model in levels and with constants; no threshold restrictions
 #' - Also consider starting.control
-#' - Old option: `thVar = data$y_l1[(1 + n_p):(n_t - n_h)]`
+#' - Old option: `thVar = data$y_l1[(1 + n_l):(n_t - n_h)]`
 #'
 #' @export
 stransition <- function(
-  n_r = 2, n_p = 1, gamma = NULL,
+  n_r = 2, n_l = 1, gamma = NULL,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
@@ -304,7 +313,7 @@ stransition <- function(
     gamma <- gamma %||% quote(expr = )
     mod <- tsDyn::lstar(
       # Data:
-      data$y[1:(n_t - n_h)], mL = n_p, mH = n_p, thDelay = n_p,
+      data[(n_burn + 1):(n_t - n_h), "y"], mL = n_l, mH = n_l, thDelay = n_l,
       # Hyperparameters:
       gamma = gamma,
       # Optimization:
@@ -312,11 +321,11 @@ stransition <- function(
       # Others:
       d = 1, steps = 1, include = "const", trace = FALSE
     )
-    get_results(data, mod, n_t, n_h, n_r, n_p)
+    get_results(data, mod, n_burn, n_h, n_t, n_r, n_l)
   })
 
   new_function(
-    args = exprs(data = , n_t = , n_h = ),
+    args = exprs(data = , n_t = , n_h = , n_burn = ),
     body = body,
     env = new_environment(defaults, pkg_env("base"))
   )
@@ -329,7 +338,7 @@ stransition <- function(
 #'
 #' @export
 markov <- function(
-  n_r = 2, n_p = 1, gamma = NULL,
+  n_r = 2, n_l = 1, gamma = NULL,
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
@@ -340,17 +349,17 @@ markov <- function(
   body <- expr({
     mod <- MSwM::msmFit(
       # Data:
-      y ~ 1, k = n_r, p = n_p, data = data[(1 + n_p):(n_t - n_h), ],
+      y ~ 1, k = n_r, p = n_l, data = as.data.frame(data[(n_burn + 1):(n_t - n_h), ]),
       # Optimization:
       control = list(maxiter = max_iter, tol = tol, parallelization = FALSE),
       # Others:
-      sw = c(rep(TRUE, n_p + 1), FALSE)
+      sw = c(rep(TRUE, n_l + 1), FALSE)
     )
-    get_results(data, mod, n_t, n_h, n_r, n_p)
+    get_results(data, mod, n_burn, n_h, n_t, n_r, n_l)
   })
 
   new_function(
-    args = exprs(data = , n_t = , n_h = ),
+    args = exprs(data = , n_t = , n_h = , n_burn = ),
     body = body,
     env = new_environment(defaults, pkg_env("base"))
   )

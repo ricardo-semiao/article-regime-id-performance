@@ -13,13 +13,16 @@ box::use(
 
 # Simulation parameters:
 n_s <- 30L # Number of simulations
-n_t <- 100L # Number of time periods
-n_burn <- 20L # Burn-in periods
-n_h <- 1L # Number of periods to predict
+n_burn <- 10L # Burn-in periods
+n_h <- 10L # Number of periods to predict
+n_t <- 100L + n_burn + n_h # Number of time periods
 
 
 # Debug:
-#load("personal/workspace.RData")
+if (FALSE) {
+  save.image("personal/workspace.RData")
+  load("personal/workspace.RData")
+}
 
 
 
@@ -79,7 +82,7 @@ errors <- errors_raw |>
 
 # Simulation: Series -----------------------------------------------------------
 
-# Simulation input:
+# Simulation inputs:
 sim_inputs <- pmap(sim_names, \(sgp, rgp, dgp, sim, dgp_sim) {
   list(
     sgp = sgps$options[[sgp]],
@@ -111,9 +114,8 @@ simulate_serie <- function(input) {
     y[t] <- sfun(y, r, t)
   }
 
-  list(r = r, y = y) # Todo:summarize r into vector might be needed for memory
+  list(r = r, y = y) # Todo: summarize r into vector might be needed for memory
 }
-
 
 # Running simulations:
 safe <- TRUE
@@ -126,13 +128,15 @@ simulations <- map_parallel(
 # Checking errors:
 if (safe) {
   map(simulations, "error") |> compact() |> names()
-  map(simulations, "result") |> keep(~ inherits_any(.x, "try-error")) |> names()
-  #simulations[["r2_ar1_vol2-r2_lstar_05-14"]]
-
   simulations <- map(simulations, "result")
 }
 
 # Collecting and saving results:
+if (FALSE) {
+  write_rds(simulations, "data/simulations.rds")
+  simulations <- read_rds("data/simulations.rds")
+}
+
 simulations_data <- imap(simulations, \(res, sim_name) {
   sim_opts <- str_split_1(sim_name, "-")
   tibble(
@@ -143,7 +147,7 @@ simulations_data <- imap(simulations, \(res, sim_name) {
 }) |>
   bind_rows()
 
-if (FALSE) write_rds(simulations, "data/simulations.rds")
+
 
 
 
@@ -186,7 +190,7 @@ rm(.tab)
 
 
 
-# Estimation: Model Options ----------------------------------------------------
+# Estimation: Models -----------------------------------------------------------
 
 # Used models:
 dput(names(models$options))
@@ -205,52 +209,54 @@ model_names <- expand_grid(
 ) |>
   mutate(dgp_sim_model = str_c(dgp_sim, "-", model))
 
-n_m <- length(models$options_names)
+n_l <- 1 # Can be arbitrarily large, must be at least the max n_l used in models
+n_m <- length(unique(model_names$model))
+
+# Estimation inputs:
+est_inputs <- map(simulations, \(sim) list(y = sim$y))
+#est_inputs <- keep_at(est_inputs, ~ grepl("-[1-2]$", .x))
 
 # Estimation function:
-# Example: `y = simulations_ys[[1]]; models = models$options`
-estimate_models <- function(y_name) {
-  y <- simulations_ys[[y_name]]
-  data <- data.frame(y = y, y_l1 = lag(y, 1L, default = NA))
-  # Todo: generalize for n_p > 1
+# Example: `input <- est_inputs[["r2_ar1_rho2-r2_threshold_x_0-2"]]`
+estimate_models <- function(input) {
+  data <- data_lags(data.frame(y = input$y), n_l = n_l)
 
   results <- vector("list", n_m)
-  names(results) <- names(models)
+  names(results) <- names(mods)
 
-  for (mod_name in names(models)) {
-    results[[mod_name]] <- models[[mod_name]](data, n_t, n_h)
+  for (mod_name in names(mods)) {
+    results[[mod_name]] <- mods[[mod_name]](data, n_t, n_h, n_burn)
   }
 
   results # Todo: transpose?
 }
 
-
 # Running estimations:
-simulations_ys <- map(simulations, "y") %>%
-  keep_at(\(sim_names) {
-    sim_names %in% model_names$dgp_sim #& str_detect(sim_names, "mu_1")
-  })
-# Todo: burn in
+safe <- TRUE
+considered_models <- models$options[unique(model_names$model)]
+if (safe) considered_models <- map(considered_models, safely_modify)
 
 estimations <- map_parallel(
-  set_names(names(simulations_ys)), estimate_models,
-  models = map(models$options[unique(model_names$model)], safely),
-  lag = lag, simulations_ys = simulations_ys,
-  n_m = n_m, n_t = n_t, n_h = n_h,
+  est_inputs, estimate_models,
+  mods = considered_models, data_lags = data_lags,
+  n_burn = n_burn, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m,
   parallel = TRUE, safe = FALSE
 )
 
 # Checking errors:
-map(estimations, ~ compact(map(.x, "error"))) |> compact()
-map(estimations, "result") |> keep(~ inherits_any(.x, "try-error")) |> names()
-#estimations[["r2_ar1_mu1-r2_markov_symm_high-1"]]
+if (safe) {
+  map(estimations, ~ compact(map(.x, "error"))) |> compact()
+  estimations <- map(estimations, ~ map(.x, "result"))
+}
 
 
 # Collecting and saving results:
-if (FALSE) write_rds(estimations, "data/estimations.rds")
+if (FALSE) {
+  write_rds(estimations, "data/estimations.rds")
+  estimations <- read_rds("data/simulations.rds")
+}
 
 estimations_data <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
-  map("result") |>
   imap(\(res, sim_name) {
     sim_opts <- str_split_1(sim_name, "-")
     tibble(
@@ -262,7 +268,6 @@ estimations_data <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
   bind_rows()
 
 estimations_meta <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
-  map("result") |>
   imap(\(res, sim_name) {
     sim_opts <- str_split_1(sim_name, "-")
     tibble(

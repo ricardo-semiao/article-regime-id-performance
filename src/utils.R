@@ -16,7 +16,7 @@ box::use(
 #' @export
 box::use(
   dplyr[...], tidyr[...],
-  tibble[tibble], readr[write_rds],
+  tibble[tibble], readr[write_rds, read_rds],
   stringr[...], forcats[...],
   purrr[...], ggplot2[...],
   rlang[...]
@@ -235,6 +235,19 @@ lag <- function(x, n = 1L, default = NA) {
   c(rep(default, n), x[-(length(x) - seq_len(n) + 1)])
 }
 fn_env(lag) <- pkg_env("base")
+
+#' Helper: Add lagged values to a data frame
+#' @export
+data_lags <- function(data, n_l = 1) {
+  data$y_l1 <- lag(data$y)
+
+  for (n in seq_len(n_l - 1)) {
+    data[[paste0("y_l", n + 1)]] <- lag(data[[paste0("y_l", n)]])
+  }
+
+  data
+}
+fn_env(data_lags) <- new_environment(list(lag = lag), pkg_env("base"))
 
 #' Helper: Add significance stars to p-values
 #' @export
