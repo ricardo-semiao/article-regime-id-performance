@@ -7,15 +7,6 @@ box::use(
   bench[mark]
 )
 
-# Parallel modules:
-box::use(
-  mirai[...],
-  parallel[...],
-  future[...], future.apply[...],
-  rTRNG[...], dqrng[...]
-)
-# Others: crew, parallelly, furrr, foreach, doFuture
-
 # Models modules:
 box::use(
   schange = strucchange,
@@ -61,12 +52,6 @@ bench::mark(
     counts
   }
 )
-
-
-
-
-
-
 
 
 
@@ -198,23 +183,7 @@ collect_mirai(res)
 
 
 
-# Parallel Tests ---------------------------------------------------------------
-
-# Old tests removed because of clutter. Old conclusions that still hold:
-# - No reason here not to use the load balanced options
-# - future is probably the worst in terms of speed, mirai possibly the best but
-# parallel might compete
-
-# Questions to answer:
-# - Iterate over collection or pass collection and iterate over its names?
-# - Best loop orders?
-
-
-
 # Models -----------------------------------------------------------------------
-
-# At the correct time, import only the function used, same with mirai
-
 
 set.seed(42)
 data <- tibble(
@@ -266,20 +235,6 @@ bench <- inject(mark(
 ))
 bench
 
-# Standardizing
-mod <- mbreaks$dofix(
-  "y", "ly", data = data[(1 + n_p):(n_t - n_h), ], fixn = 2,
-  prewhit = 0, robust = 0, hetdat = 0, hetvar = 0, hetq = 0, hetomega = 0
-)
-mod |> str()
-fitted(mod)
-
-coefs <- mod$beta[(2 * n_coef + 1):(3 * n_coef)]
-x <- c(1, data$ly[])
-
-y <- c(data$y[1:n_p], fitted(mod))
-#...
-
 
 # Threshold:
 models <- exprs(
@@ -290,22 +245,10 @@ models <- exprs(
   )
 )
 
-mod = tsdyn$setar(
-  data$y[(1 + n_p):(n_t - n_h)], m = 1, nthresh = 2,
-  thVar = data$ly[(1 + n_p):(n_t - n_h)],
-  d = 1, steps = 1, trim = 0.15
-)
-
 inject(mark(
   !!!models,
   check = FALSE, , min_iterations = 2
 ))
-
-mod |> str()
-mod$coefficients
-mod$fitted.values
-mod$model.specific$regime
-predict(mod, thVar = data$ly[(n_t - n_h + 1):n_t])
 
 
 # Smooth transition:
@@ -337,7 +280,6 @@ inject(mark(
 
 
 # Markov switching:
-
 models <- exprs(
   mswm = mswm$msmFit(
     y ~ 1, data = data[(1 + n_p):(n_t - n_h), ], k = 3, p = 1,
@@ -349,39 +291,6 @@ inject(mark(
   !!!models,
   check = FALSE, , min_iterations = 2
 ))
-
-mod
-
-library(MSTest)
-
-mod <- mstest$MSARmdl(
-  matrix(data$y[1:(n_t - n_h)], n_t - n_h), p = 1, k = 3,
-  control = list(getSE = FALSE, thtol = 1e-5, msvar = FALSE)
-)
-
-# Clustering:
-x <- data |>
-  mutate(
-    l2y = lag(y, 2, default = 0),
-    l3y = lag(y, 3, default = 0),
-    rollmean = zoo::rollmean(y, 5, fill = 0, align = "right"),
-    rollsd = zoo::rollapply(y, 5, sd, fill = 0, align = "right"),
-    rollautocor = zoo::rollapply(y, 5, fill = 0, align = "right", \(x) {
-      cor(x[-1], lag(x)[-1])
-    }),
-    t = 1:n_t
-  )
-
-
-mod <- kmeans(x[1:(n_t - n_h), ], centers = 3)
-mod |> str()
-mod$cluster
-
-mbreaks:::dofix()
-mbreaks:::estim()
-mbreaks:::OLS()
-
-arima()
 
 
 

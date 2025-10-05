@@ -212,6 +212,7 @@ n_m <- length(models$options_names)
 estimate_models <- function(y_name) {
   y <- simulations_ys[[y_name]]
   data <- data.frame(y = y, y_l1 = lag(y, 1L, default = NA))
+  # Todo: generalize for n_p > 1
 
   results <- vector("list", n_m)
   names(results) <- names(models)
@@ -225,7 +226,7 @@ estimate_models <- function(y_name) {
 
 
 # Running estimations:
-simulations_ys <- map(simulations, c("result", "y")) %>%
+simulations_ys <- map(simulations, "y") %>%
   keep_at(\(sim_names) {
     sim_names %in% model_names$dgp_sim #& str_detect(sim_names, "mu_1")
   })
