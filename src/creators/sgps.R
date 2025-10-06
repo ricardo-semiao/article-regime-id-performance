@@ -1,7 +1,7 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Loading dependencies
+# Loading dependencies:
 box::use(
   src/utils[...]
 )
@@ -20,7 +20,7 @@ box::use(
 #'
 #' @returns  [`expression()`] Expression for AR calculation.
 #' @export
-ar <- function(mu, ..., vol = 1) {
+ar <- function(mu = 0, ..., vol = 1) {
   rhos <- list2(...)
   walk(list(mu, rhos, vol), force)
 

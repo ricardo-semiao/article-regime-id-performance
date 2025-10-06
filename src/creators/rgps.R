@@ -1,7 +1,7 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Loading dependencies
+# Loading dependencies:
 box::use(
   src/utils[...]
 )

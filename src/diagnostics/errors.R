@@ -1,9 +1,9 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Loading dependencies
+# Loading dependencies:
 box::use(
-  ./diagnostics_utils[...]
+  ./utils_diagnostics[...]
 )
 
 

@@ -1,7 +1,7 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Loading dependencies
+# Loading dependencies:
 box::use(
   src/utils[...],
   create_model = src/creators/models
@@ -9,31 +9,44 @@ box::use(
 
 
 
-# Helpers ----------------------------------------------------------------------
+# Options ----------------------------------------------------------------------
 
-#' Names dictionary
+#' Models' names dictionary
 #' @export
-options_names <- c(
-  sbreak = "Structural Breaks",
-  threshold = "Threshold",
-  threshold_abs = "Absolute Threshold",
-  stransition = "Smooth Transition",
-  markov = "Markov Switching"
+dict <- c(
+  r2_sbreak = "Structural Breaks",
+  r2_threshold_x = "Threshold x",
+  r2_threshold_abs = "Threshold |x|",
+  r2_threshold_abs = "Threshold Dx",
+  r2_stransition = "Smooth Transition",
+  r2_markov = "Markov Switching"
 )
 
-
-
-# Options ----------------------------------------------------------------------
+#' Models' parameters
+#' @export
+params <- list(
+  r2_sbreak = list3(
+    n_r = 2, rgp = "sbreak", args = list(n_r = n_r)
+  ),
+  r2_threshold_x = list3(
+    n_r = 2, rgp = "threshold", args = list(n_r = n_r)
+  ),
+  r2_threshold_abs = list3(
+    n_r = 2, rgp = "threshold", args = list(n_r = n_r, g = \(y) abs(y))
+  ),
+  r2_threshold_diff = list3(
+    n_r = 2, rgp = "threshold", args = list(n_r = n_r, g = \(y) diff(y))
+  ),
+  r2_stransition = list3(
+    n_r = 2, rgp = "stransition", args = list(n_r = n_r)
+  ),
+  r2_markov = list3(
+    n_r = 2, rgp = "markov", args = list(n_r = n_r)
+  )
+)
 
 #' Model options
 #' @export
-options <- list()
-
-
-# 2 Regimes
-options$r2_sbreak <- create_model$sbreak(2)
-options$r2_threshold_x <- create_model$threshold(2)
-options$r2_threshold_abs <- create_model$threshold(2, g = \(y) abs(y))
-options$r2_threshold_diff <- create_model$threshold(2, g = \(y) diff(y))
-options$r2_stransition <- create_model$stransition(2)
-options$r2_markov <- create_model$markov(2)
+options <- map(params, \(p) {
+  inject(create_model[[p$rgp]](!!!p$args))
+})

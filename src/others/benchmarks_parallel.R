@@ -53,8 +53,8 @@ simulate_serie1 <- function(input) {
 
 sim_inputs1 <- pmap(sim_names, \(sgp, rgp, dgp, sim, dgp_sim) {
   list(
-    sgp = sgps$options[[sgp]],
-    rgp = rgps$options[[rgp]],
+    sgp = options$sgps[[sgp]],
+    rgp = options$rgps[[rgp]],
     errors = errors[, dgp_sim]
   )
 }) |>
@@ -184,8 +184,8 @@ sim_inputs2 <- pmap(sim_names, \(sgp, rgp, dgp, sim, dgp_sim) {
 
 sim_inputs3 <- pmap_dfr(sim_names, \(sgp, rgp, dgp, sim, dgp_sim) {
   list(
-    sgp = list(sgps$options[[sgp]]),
-    rgp = list(rgps$options[[rgp]]),
+    sgp = list(options$sgps[[sgp]]),
+    rgp = list(options$rgps[[rgp]]),
     error = list(errors[, dgp_sim])
   )
 })
@@ -214,7 +214,7 @@ bench_ref_sim$ref <- mark(
   min_iterations = 2,
   ref = {map_parallel(
     sim_inputs2, simulate_serie2,
-    n_t = n_t, sgps = sgps$options, rgps = rgps$options, errors = errors,
+    n_t = n_t, sgps = options$sgps, rgps = options$rgps, errors = errors,
     parallel = TRUE, safe = FALSE
   )}
 )
@@ -232,7 +232,7 @@ bench_ref_sim$hybrid <- mark(
   min_iterations = 2,
   hybrid = {map_parallel(
     sim_inputs4, simulate_serie4,
-    n_t = n_t, sgps = sgps$options, rgps = rgps$options,
+    n_t = n_t, sgps = options$sgps, rgps = options$rgps,
     parallel = TRUE, safe = FALSE
   )}
 )
@@ -304,7 +304,7 @@ bench_obj_sim$mirai_dots <- mark(
   min_iterations = 2,
   mirai_dots = {map_parallel2(
     sim_inputs4, simulate_serie4,
-    n_t = n_t, sgps = sgps$options, rgps = rgps$options,
+    n_t = n_t, sgps = options$sgps, rgps = options$rgps,
     parallel = TRUE, safe = FALSE
   )}
 )
@@ -313,7 +313,7 @@ bench_obj_sim$new_args <- mark(
   min_iterations = 2,
   new_args = {map_parallel3(
     sim_inputs4, simulate_serie4,
-    n_t = n_t, sgps = sgps$options, rgps = rgps$options,
+    n_t = n_t, sgps = options$sgps, rgps = options$rgps,
     parallel = TRUE, safe = FALSE
   )}
 )
@@ -435,7 +435,7 @@ bench_ref_est$ref <- mark(
   min_iterations = 2,
   ref = {map_parallel(
     set_names(names(simulations_ys))[1:200], estimate_models1,
-    models = models$options[unique(model_names$model)],
+    models = options$models[unique(model_names$model)],
     lag = lag, simulations_ys = simulations_ys,
     n_m = n_m, n_t = n_t, n_h = n_h,
     parallel = TRUE, safe = FALSE
@@ -446,7 +446,7 @@ bench_ref_est$obj <- mark(
   min_iterations = 2,
   obj = {map_parallel(
     simulations_ys[1:200], estimate_models2,
-    models = models$options[unique(model_names$model)],
+    models = options$models[unique(model_names$model)],
     lag = lag, simulations_ys = simulations_ys,
     n_m = n_m, n_t = n_t, n_h = n_h,
     parallel = TRUE, safe = FALSE
@@ -467,7 +467,7 @@ bench_obj_est$mirai_dots <- mark(
   min_iterations = 2,
   mirai_dots = {map_parallel2(
     simulations_ys[1:100], estimate_models2,
-    models = models$options[unique(model_names$model)],
+    models = options$models[unique(model_names$model)],
     lag = lag, simulations_ys = simulations_ys,
     n_m = n_m, n_t = n_t, n_h = n_h,
     parallel = TRUE, safe = FALSE
@@ -478,7 +478,7 @@ bench_obj_est$new_args <- mark(
   min_iterations = 2,
   new_args = {map_parallel3(
     simulations_ys[1:100], estimate_models2,
-    models = models$options[unique(model_names$model)],
+    models = options$models[unique(model_names$model)],
     lag = lag, simulations_ys = simulations_ys,
     n_m = n_m, n_t = n_t, n_h = n_h,
     parallel = TRUE, safe = FALSE
@@ -499,7 +499,7 @@ bench_back_est$parm <- mark(
   min_iterations = 2,
   parm = {map_parallel_parm(
     simulations_ys[1:200], estimate_models2,
-    models = models$options[unique(model_names$model)],
+    models = options$models[unique(model_names$model)],
     lag = lag, simulations_ys = simulations_ys,
     n_m = n_m, n_t = n_t, n_h = n_h,
     parallel = TRUE, safe = TRUE
@@ -510,7 +510,7 @@ bench_back_est$parp <- mark(
   min_iterations = 2,
   parp = {map_parallel_parp(
     simulations_ys[1:200], estimate_models2,
-    models = models$options[unique(model_names$model)],
+    models = options$models[unique(model_names$model)],
     lag = lag, simulations_ys = simulations_ys,
     n_m = n_m, n_t = n_t, n_h = n_h,
     parallel = TRUE, safe = TRUE

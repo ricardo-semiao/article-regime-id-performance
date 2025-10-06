@@ -1,7 +1,7 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Loading dependencies
+# Loading dependencies:
 box::use(
   src/utils[...]
 )
@@ -28,10 +28,11 @@ if (FALSE) {
 # - r: regimes, with n_burn + n_l + warmup NAs at start. This is already the
 # summarized regime, the categorical column-vector, not the full matrix of e.g.
 # probabilities
-# - meta: list with model-specific information. Always contains coefs, a matrix
-# with each row being a regime and each column a coefficient, in the order:
-# intercept, lag 1, lag 2, ..., lag n_l. Also contains switches, the meta
-# information about regime changes (e.g. thresholds or transition matrix)
+# - meta: list with model-specific information:abstol
+#   - Always contains coefs, a matrix with each row being a regime and each
+#   column a coefficient, in the order: intercept, lag 1, lag 2, ..., lag n_l.
+#   - Also contains switches, the meta information about regime changes (e.g.
+#   thresholds or transition matrix)
 
 #' Internal: Get regimes from model info
 get_results <- list()

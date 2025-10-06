@@ -1,10 +1,58 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Loading dependencies
+# Loading dependencies:
 box::use(
   src/utils[...]
 )
+
+
+
+# Helper -----------------------------------------------------------------------
+
+#' Helper: Compute metric based on SGP
+#' @export
+sgp_metric <- function(sgp, y, r, n_r = length(unique(r)), ...) {
+  force(n_r)
+
+  switch(str_replace(sgp, "^r[0-9]_ar[0-9]_([a-z]+)[0-9]$", "\\1"),
+    "mu"   = series_average(y, r, n_r, ...) |>
+      set_names(glue("Mean(y | R{1:n_r})")),
+    "rho"  = series_autocorr(y, r, n_r, ...) |>
+      set_names(glue("ACF1(y | R{1:n_r})")),
+    "sign" = series_sign_prop(y, r, n_r, ...) |>
+      set_names(glue("Sign%(y | R{1:n_r})")),
+    "vol"  = series_volatility(y, r, n_r, ...) |>
+      set_names(glue("SD(y | R{1:n_r})")),
+    c("NA" = NA) # Not considering new lag
+  )
+}
+
+#' Helper: Compute metric based on RGP
+#' @export
+rgp_metric <- function(rgp, y, r, n_r = length(unique(r)), ...) {
+  force(n_r)
+
+  transmat_diag_named <- function(y, r, n_r, ...) {
+    names <- glue("Prob({1:n_r} | {1:n_r})")
+    set_names(diag(regimes_transmat(y, r, n_r, ...)), names)
+  }
+  thresholds_named <- function(y, r, n_r, ...) {
+    names <- if (n_r == 1) {
+      c("Threshold(1-2)")
+    } else {
+      glue("Threshold({1:(n_r - 1)}-{2:n_r})")
+    }
+    set_names(regimes_thresholds(y, r, n_r, ...), names)
+  }
+
+  switch(str_replace(rgp, "^r[0-9]_([a-z]+)_[a-z0-9_]+$", "\\1"),
+    "threshold"   = thresholds_named(y, r, n_r, ...),
+    "stransition" = thresholds_named(y, r, n_r, ...),
+    "markov"      = transmat_diag_named(y, r, n_r, ...),
+    c("NA" = NA) # Not considering multinomial nor sbreaks
+  )
+}
 
 
 
@@ -60,34 +108,34 @@ performance_mape <- function(y, y_true, n_h, n_t) {
 
 #' Metrics - series: Conditional average
 #' @export
-series_average <- function(y, r, n_r = length(unique(r))) {
+series_average <- function(y, r, n_r = length(unique(r)), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
-    mean(y[r == s])
+    mean(y[r == s], ...)
   })
 }
 
 #' Metrics - series: Conditional ACF
 #' @param n [`integer(1)`] Lag order.
 #' @export
-series_autocorr <- function(y, r, n_r = length(unique(r)), n = 1) {
+series_autocorr <- function(y, r, n_r = length(unique(r)), n = 1, ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
-    cor(y[r == s][-(1:n)], lag(y[r == s], n)[-(1:n)])
+    cor(y[r == s][-(1:n)], lag(y[r == s], n)[-(1:n)], ...)
   })
 }
 
 #' Metrics - series: Conditional ACF
 #' @export
-series_sign_prop <- function(y, r, n_r = length(unique(r))) {
+series_sign_prop <- function(y, r, n_r = length(unique(r)), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
-    mean(diff(y[r == s]) >= 0)
+    mean(diff(y[r == s]) >= 0, ...)
   })
 }
 
 #' Metrics - series: Conditional SD
 #' @export
-series_volatility <- function(y, r, n_r = length(unique(r))) {
+series_volatility <- function(y, r, n_r = length(unique(r)), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
-    sd(y[r == s])
+    sd(y[r == s], ...)
   })
 }
 
@@ -102,9 +150,9 @@ series_volatility <- function(y, r, n_r = length(unique(r))) {
 #' For each regime's observations, counts how many had a different previous
 #'  value
 #' @export
-regimes_instances <- function(y, r, n_r = length(unique(r))) {
+regimes_instances <- function(y, r, n_r = length(unique(r)), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
-    sum((c(1, diff(r)) != 0)[r == s])
+    sum((c(1, diff(r)) != 0)[r == s], ...)
   })
 }
 
@@ -113,9 +161,9 @@ regimes_instances <- function(y, r, n_r = length(unique(r))) {
 #'  instance (across all regimes). `r == s` subsets the ones for a specific
 #'  regime, and table counts how many observations each instance had.
 #' @export
-regimes_duration <- function(y, r, n_r = length(unique(r))) {
+regimes_duration <- function(y, r, n_r = length(unique(r)), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
-    mean(table(cumsum(abs(c(0, diff(r))))[r == s]))
+    mean(table(cumsum(abs(c(0, diff(r))))[r == s]), ...)
   })
 }
 
@@ -125,7 +173,7 @@ regimes_duration <- function(y, r, n_r = length(unique(r))) {
 #' @param prop [`logical(1)`] Whether to return transition probabilities
 #' @returns [`matrix(, n_r, n_r)`]
 #' @export
-regimes_transmat <- function(y, r, n_r = length(unique(r)), prop = TRUE) {
+regimes_transmat <- function(y, r, n_r = length(unique(r)), prop = TRUE, ...) {
   if (n_r < 2) cli_abort("At least 2 regimes are required.")
 
   r_lead <- r[-1]
@@ -142,7 +190,7 @@ regimes_transmat <- function(y, r, n_r = length(unique(r)), prop = TRUE) {
 #'  midpoint between min. of upper regime and max. of lower regime, even if they
 #'  overlap. Calculated in a pairwise fashion.
 #' @export
-regimes_thresholds <- function(y, r, n_r = length(unique(r))) {
+regimes_thresholds <- function(y, r, n_r = length(unique(r)), ...) {
   pairs <- if (n_r == 1) {
     tibble(r1 = 1, r2 = 2)
   } else {
@@ -150,8 +198,8 @@ regimes_thresholds <- function(y, r, n_r = length(unique(r))) {
   }
 
   pmap_dbl(pairs, \(r1, r2) {
-    min_top_r <- min(y[r == r2])
-    max_bot_r <- max(y[r == r1])
+    min_top_r <- min(y[r == r2], ...)
+    max_bot_r <- max(y[r == r1], ...)
     dist <- min_top_r - max_bot_r
     if (dist > 0) min_top_r + dist / 2 else max_bot_r - dist / 2
   })

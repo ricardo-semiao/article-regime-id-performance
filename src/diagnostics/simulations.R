@@ -1,9 +1,9 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Loading dependencies
+# Loading dependencies:
 box::use(
-  ./diagnostics_utils[...]
+  ./utils_diagnostics[...]
 )
 
 if (Sys.getenv("RADIAN_VERSION") == "") box::use(gt[...])
@@ -29,76 +29,6 @@ if (Sys.getenv("RADIAN_VERSION") == "") box::use(gt[...])
 
 
 
-# Exported Helpers -------------------------------------------------------------
-
-#' Helper: Subset and relabel simulation data
-#'
-#' @param sgps, rgps [`character()`] SGP/RGP values to filter by.
-#'  If `NULL`, no filtering is applied on RGP.
-#' @param sims [`numeric()`] Simulation identifiers to filter by. If
-#'  `NULL`, no filtering is applied on simulations.
-#'
-#' @returns [`data.frame()`-like] Filtered and relabeled simulations data.
-#' @export
-subset_simulations <- function(data, sgps = NULL, rgps = NULL, sims = NULL) {
-  data %>%
-    filter(
-      if (is_null(sgps)) TRUE else sgp %in% sgps,
-      if (is_null(rgps)) TRUE else rgp %in% rgps,
-      if (is_null(sims)) TRUE else sim %in% sims
-    ) %>%
-    mutate(
-      sgp = fct_relabel(sgp, ~ sgp_names[.x]),
-      rgp = fct_relabel(rgp, ~ rgp_names[.x])
-    )
-}
-
-#' Helper: Compute metric based on SGP
-#' @export
-sgp_metric <- function(sgp, y, r, n_r = length(unique(r))) {
-  force(n_r)
-
-  switch(str_replace(sgp, "^r[0-9]_ar[0-9]_([a-z]+)[0-9]$", "\\1"),
-    "mu"   = metrics$series_average(y, r, n_r) |>
-      set_names(glue("Mean(y | R{1:n_r})")),
-    "rho"  = metrics$series_autocorr(y, r, n_r) |>
-      set_names(glue("ACF1(y | R{1:n_r})")),
-    "sign" = metrics$series_sign_prop(y, r, n_r) |>
-      set_names(glue("Sign%(y | R{1:n_r})")),
-    "vol"  = metrics$series_volatility(y, r, n_r) |>
-      set_names(glue("SD(y | R{1:n_r})")),
-    c("NA" = NA) # Not considering new lag
-  )
-}
-
-#' Helper: Compute metric based on RGP
-#' @export
-rgp_metric <- function(rgp, y, r, n_r = length(unique(r))) {
-  force(n_r)
-
-  transmat_diag_named <- function(y, r, n_r) {
-    names <- glue("Prob({1:n_r} | {1:n_r})")
-    set_names(diag(metrics$regimes_transmat(y, r, n_r)), names)
-  }
-  thresholds_named <- function(y, r, n_r) {
-    names <- if (n_r == 1) {
-      c("Threshold(1-2)")
-    } else {
-      glue("Threshold({1:(n_r - 1)}-{2:n_r})")
-    }
-    set_names(metrics$regimes_thresholds(y, r, n_r), names)
-  }
-
-  switch(str_replace(rgp, "^r[0-9]_([a-z]+)_[a-z0-9_]+$", "\\1"),
-    "threshold" = thresholds_named(y, r, n_r),
-    "markov"    = transmat_diag_named(y, r, n_r),
-    c("NA" = NA) # Not considering multinomial nor st nor sbreaks
-  )
-}
-# Todo: move these to src/metrics?
-
-
-
 # Series Values and Distribution -----------------------------------------------
 
 #' Diagnostics - simulations: Visualize simulated series' values
@@ -106,7 +36,7 @@ rgp_metric <- function(rgp, y, r, n_r = length(unique(r))) {
 #'  include regimes background or not.
 #' @export
 series_values <- function(
-  data, sims = 1, n_burn = NA, multiple = TRUE,
+  data, sims = 1, n_burn = NA, multiple = TRUE, hline = NULL,
   title = NULL, faceted = NULL
 ) {
   gdata <- filter(data, sim %in% sims)
@@ -114,13 +44,14 @@ series_values <- function(
   ggplot(gdata, aes(x = t, y = y)) +
     conditional_rect(sims, multiple = multiple) +
     annotate_burn(n_burn) +
+    {if (!is_null(hline)) geom_hline(yintercept = hline)} +
     geom_line(
       aes(color = as.factor(r), group = as.factor(sim)),
       alpha = if (length(sims) == 1) 1 else 0.6, linewidth = 1
     ) +
     conditional_facet(gdata$sgp, gdata$rgp, faceted) +
     # Aesthetics:
-    scale_color_manual(values = unname(pal$main)) +
+    scale_color_manual(values = unname(pal$main), na.translate = FALSE) +
     labs(
       title = title, x = "Time", y = "Value",
       color = "Regime", fill = "Regime"
@@ -131,11 +62,12 @@ series_values <- function(
 #' @export
 series_distribution <- function(
   data, n_burn = 0,
-  title = NULL, faceted = NULL
+  hline = NULL, title = NULL, faceted = NULL
 ) {
   data %>%
     filter(t > n_burn) %>%
     ggplot(aes(y = y, color = as.factor(r))) +
+    {if (!is_null(hline)) geom_hline(yintercept = hline)} +
     geom_density(linewidth = 1) +
     conditional_facet(data$sgp, data$rgp, faceted) +
     # Aesthetics:
@@ -156,12 +88,12 @@ panel_simulations <- function(
   g_distribution <- series_distribution(data, n_burn = n_burn) +
     geom_line(aes(NA_real_, NA_real_, color = as.factor(r))) +
     theme(legend.direction = "horizontal")
-  
-  y_lims <- range(filter(data, sim == 1)$y, na.rm = TRUE)
+
+  y_lims <- range(filter(data)$y, na.rm = TRUE, finite = TRUE)
 
   (
     g_values - g_distribution &
-      ylim(y_lims[1] * 1.2, y_lims[2] * 1.2) 
+      ylim(y_lims[1] * 1.1, y_lims[2] * 1.1) 
   ) +
     plot_layout(
       nrow = 1, guides = "collect", axes = "collect_y"
@@ -251,7 +183,7 @@ stats_density <- function(
     # Aesthetics:
     conditional_color(regime_aligned) +
     labs(
-      title = title, x = "Time", y = "Value",
+      title = title, x = "Density", y = "Value",
       linetype = "Statistic", color = "Statistic"
     )
 }
@@ -286,7 +218,7 @@ panel_stats <- function(
     geom_line(aes(NA_real_, NA_real_, color = as.factor(stat))) +
     theme(legend.direction = "horizontal")
 
-  y_lims <- range(g_accumulated$data$value, na.rm = TRUE)
+  y_lims <- range(g_accumulated$data$value, na.rm = TRUE, finite = TRUE)
 
   (
     g_accumulated - g_distribution &
@@ -306,7 +238,7 @@ panel_stats <- function(
 
 #' Diagnostics - metrics: Table of SGPs metrics
 #' @export
-table_sgps <- function(data) {
+table_sgps <- function(data, dgps = NULL) {
   # Setup:
   if (Sys.getenv("RADIAN_VERSION") != "") {
     cli_abort("This function requires {{gt}}, which does not work well in \\
@@ -318,14 +250,17 @@ table_sgps <- function(data) {
     tab_spanner(data, r_name, matches(r_name))
   }
 
+  if (!is_null(dgps)) {
+    data <- filter(data, str_c(sgp, rgp, sep = "-") %in% dgps)
+  }
   n_r <- length(unique(data$r))
 
   # Metrics and ANOVA:
   data_metrics <- data %>%
     group_by(sgp, rgp, sim) %>%
     reframe(
-      r = 1:length(unique(r)),
       sgp_metric = sgp_metric(sgp[1], y, r),
+      r = 1:length(unique(r))
     )
 
   data_anova <- data_metrics %>%
@@ -356,8 +291,8 @@ table_sgps <- function(data) {
         formatC(pvalue, format = "e", digits = 1),
         add_star(pvalue)
       ),
-      sgp = fct_relabel(sgp, ~ sgp_names[.x]),
-      rgp = fct_relabel(rgp, ~ rgp_names[.x])
+      sgp = fct_relabel(sgp, ~ dicts$sgps[.x]),
+      rgp = fct_relabel(rgp, ~ dicts$rgps[.x])
     ) |>
     gt() %>%
     reduce(1:n_r, add_spanner, .init = .) |>
@@ -373,7 +308,7 @@ table_sgps <- function(data) {
 
 #' Diagnostics - metrics: Table of RGPs metrics
 #' @export
-table_rgps <- function(data) {
+table_rgps <- function(data, dgps = NULL) {
   # Setup:
   if (Sys.getenv("RADIAN_VERSION") != "") {
     cli_abort("This function requires {{gt}}, which does not work well in \\
@@ -385,6 +320,9 @@ table_rgps <- function(data) {
       str_replace(" NA", "-")
   }
 
+  if (!is_null(dgps)) {
+    data <- filter(data, str_c(sgp, rgp, sep = "-") %in% dgps)
+  }
   dgp_names <- expand_grid(
     sgp_name = unique(data$sgp),
     rgp_name = unique(data$rgp)
@@ -408,8 +346,8 @@ table_rgps <- function(data) {
   data_final |>
     ungroup() |>
     mutate(
-      sgp = fct_relabel(sgp, ~ sgp_names[.x]),
-      rgp = fct_relabel(rgp, ~ rgp_names[.x])
+      sgp = fct_relabel(sgp, ~ dicts$sgps[.x]),
+      rgp = fct_relabel(rgp, ~ dicts$rgps[.x])
     ) |>
     gt() |>
     text_transform(location = cells_column_labels(), \(x) {

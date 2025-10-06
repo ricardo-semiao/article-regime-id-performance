@@ -335,7 +335,7 @@ mark(
   a = {
     get_results(
       simulations_ys, estimate_models,
-      models = map(models$options[unique(model_names$model)], safely),
+      models = map(options$models[unique(model_names$model)], safely),
       lag = lag,
       n_m = n_m, n_t = n_t, n_h = n_h,
       parallel = FALSE, safely = FALSE
@@ -344,7 +344,7 @@ mark(
   b = {
     get_results(
       simulations_ys, estimate_models,
-      models = map(models$options[unique(model_names$model)], safely),
+      models = map(options$models[unique(model_names$model)], safely),
       lag = lag,
       n_m = n_m, n_t = n_t, n_h = n_h,
       parallel = TRUE, safely = FALSE

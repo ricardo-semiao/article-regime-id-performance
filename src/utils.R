@@ -7,7 +7,7 @@
 #' @export
 box::use(
   r/core[...],
-  cli[cli_abort, cli_warn, cli_inform],
+  cli = cli[cli_abort, cli_warn, cli_inform],
   glue[glue],
   patchwork[...]
 )
@@ -123,6 +123,16 @@ test_conditions <- function(..., call = caller_env()) {
   }
 }
 
+#' Helper: Custom [cli::cli_alert()]
+#' @export
+cli_alert_items <- function(failed_items) {
+  if (length(failed_items) == 0) {
+    cli$cli_alert_success("No errors found.")
+  } else {
+    cli$cli_alert_danger("Items with errors: {.val {failed_items}}")
+  }
+}
+
 #' Helper: list2 with tibble-like self referencing
 #'
 #' @param ... Arguments to collect in a list. These dots are dynamic.
@@ -184,10 +194,6 @@ safely_modify <- function(.f) {
   .f
 }
 
-
-
-# Specific Helpers -------------------------------------------------------------
-
 #' Helper: Map with parallelism and/or safety
 #'
 #' `...` is passed to `f`'s environment, as mirai respects it.
@@ -224,7 +230,10 @@ map_parallel <- function(x, f, ..., parallel, safe, workers = 6) {
 
   results
 }
-# Todo: consider passing ".flat" to mirai_collect (not really needed)
+
+
+
+# Specific Helpers -------------------------------------------------------------
 
 #' Helper: Compute lagged values
 #'
