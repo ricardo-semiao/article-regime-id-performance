@@ -7,7 +7,7 @@ box::use(
   src/utils2[...],
   src/options[dicts, params, options],
   src/diagnostics,
-  src/others/metrics,
+  src/metrics/metrics,
   rTRNG[rnorm_trng]
 )
 
@@ -266,6 +266,22 @@ if (safe) {
 }
 
 
+
+# Estimations: Checks ----------------------------------------------------------
+
+# Checking regimes:
+check_n_regimes <- imap_dfr(estimations, \(sim, name) {
+  c(name = name, map(sim, \(model) length(table(model$r)))[])
+}) |>
+  pivot_longer(-name, names_to = "model") |>
+  filter(value != 2)
+
+for (l in split(check_n_regimes, 1:nrow(check_n_regimes))) {
+  estimations[[l$name]][[l$model]] <- NULL
+}
+estimations <- map(estimations, compact)
+
+
 # Collecting and saving results:
 if (FALSE) {
   write_rds(estimations, "data/estimations.rds") %>%
@@ -309,12 +325,6 @@ estimations_meta <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
 
 
 # Estimation: Diagnostics ------------------------------------------------------
-
-# Checking regimes:
-map_dfr(estimations, \(sim) map_dbl(sim, \(model) length(unique(model$r)))) |>
-  colMeans()
-estimations[[1]]$r2_threshold_x$r |> unique()
-
 
 # Setup:
 model_names_main <- model_names |>
@@ -375,70 +385,56 @@ if (FALSE) cat(gt::as_latex(.tab), file = "outputs/estimations/table_residuals.t
 
 # Metrics ----------------------------------------------------------------------
 
-
-n_r_hat <- 2
-# sim_name <- names(est_inputs)[[1]]
-# sim_results <- estimations[[sim_name]]
-# model_result <- estimations[[sim_name]]$r2_threshold_x
-
-metrics_data <- imap(estimations, function(sim_results, sim_name) {
-  y_true <- est_inputs[[sim_name]]$y
-
-  imap(sim_results, \(model_result, model_name) {
-    x <- model_result
-
-    rmv_idxs <- is.na(x$y) | is.na(x$r) | (! x$r %in% (1:n_r_hat))
-    y <- x$y[!rmv_idxs]
-    r <- x$r[!rmv_idxs]
-
-    list(
-      "dgp_sim" = sim_name,
-      "model" = model_name,
-      rmse = metrics$performance_rmse(x$y, y_true, n_h, n_t),
-      average_dist = metrics$series_average(y, r, n_r_hat) |>
-        metrics$mean_pairwise_dist(),
-      average_sd = metrics$series_average(y, r, n_r_hat) |> sd()
-    )
-  })
-}) |>
-  list_flatten() |>
-  bind_rows()
-
-metrics_data <- left_join(
-  metrics_data,
-  select(sim_names, dgp_sim, sgp, rgp, sim),
-  by = "dgp_sim"
+data_models_final <- get_data_final(
+  estimations_data, simulations_data, estimations_meta, "models"
 )
+data_models_final
+
+data_regimes_final <- get_data_final(
+  estimations_data, simulations_data, estimations_meta, "regimes"
+)
+data_regimes_final
 
 
 
 # Comparisons ------------------------------------------------------------------
 
-map(metrics_data[c("rgp", "sgp", "model")], unique)
-metrics_data <- metrics_data |>
+# Do for both data_models_final and data_regimes_final. Regimes has an extra
+# regime variable
+
+
+# Adjusting factor levels:
+map(data_models_final[c("rgp", "sgp", "model")], levels)
+reg_data <- data_models_final |>
   mutate(
     sgp = str_remove(sgp, "[^_]$"),
     rgp = str_remove(rgp, "_[^_]+$"),
   ) %>%
   filter(sgp == "r2_ar1_mu")
 
-lm(rmse ~ sim, metrics_data) |> summary()
-lm(rmse ~ sgp, metrics_data) |> summary()
-lm(rmse ~ rgp, metrics_data) |> summary()
-lm(rmse ~ sgp * rgp, metrics_data) |> summary()
 
-lm(rmse ~ model, metrics_data) |> summary()
-lm(rmse ~ model + sgp + rgp, metrics_data) |> summary()
-lm(rmse ~ model*rgp + sgp, metrics_data) |> summary()
-#lm(rmse ~ model*rgp*sgp, metrics_data) |> summary()
+# First step:
+# Add regressions on the identification of regime variable and metrics
+# themselves
 
-lm(rmse ~ average_sd, metrics_data) |> summary()
-lm(rmse ~ model*rgp + sgp + average_sd, metrics_data) |> summary()
-lm(rmse ~ model*rgp + sgp*average_sd, metrics_data) |> summary()
-lm(rmse ~ model*rgp + sgp + model*average_sd, metrics_data) |> summary()
-# lm(rmse ~ average_dist, metrics_data) |> summary()
 
-ggplot(metrics_data, aes(average_sd, rmse, color = model)) +
-  geom_point() #+
+# Basic regressions:
+lm(rmse ~ sim, reg_data) |> summary()
+lm(rmse ~ sgp * rgp, reg_data) |> summary()
+lm(rmse ~ model*rgp + sgp, reg_data) |> summary()
+
+
+# Metrics must be separated by the relevant factor (SGP metrics run separately
+# for each SGP, same for RGP)
+lm(rmse ~ model*rgp + sgp + sgp_metric_est, reg_data) |> summary()
+lm(rmse ~ model*rgp + sgp + model*sgp_metric_est, reg_data) |> summary()
+
+
+# Graphs:
+reg_data |>
+  filter(rmse < 100) |>
+  ggplot(aes(sgp_metric_est, rmse)) +
+  geom_point(aes(color = model, shape = model)) +
+  ggh4x::facet_grid2(vars(rgp), vars(sgp), scales = "free", independent = "all")
+  #scale_x_log10() + scale_y_log10() +
   #geom_smooth(method = "lm") +
-  #ggh4x::facet_grid2(vars(rgp), vars(sgp), scales = "free", independent = "all")

@@ -5,7 +5,7 @@
 #' @export
 box::use(
   src/utils[...],
-  metrics = src/others/metrics[sgp_metric, rgp_metric],
+  metrics = src/metrics/metrics[sgp_metric, rgp_metric],
   src/options[dicts, params]
 )
 

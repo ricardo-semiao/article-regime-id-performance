@@ -87,16 +87,18 @@ if (FALSE) {
 
 #' Metrics - performance: RMSE
 #' @export
-performance_rmse <- function(y, y_true, n_h, n_t) {
-  error <- y[(n_t - n_h + 1):n_t] - y_true[(n_t - n_h + 1):n_t]
-  sqrt(sum(error^2) / length(n_h))
+performance_rmse <- function(y, y_true, n_h, n_t, t = 1:length(y), ...) {
+  idx <- t %in% (n_t - n_h + 1):n_t
+  error <- y[idx] - y_true[idx]
+  sqrt(mean(error^2, ...))
 }
 
 #' Metrics - performance: MAPE
 #' @export
-performance_mape <- function(y, y_true, n_h, n_t) {
-  error <- y[(n_t - n_h + 1):n_t] - y_true[(n_t - n_h + 1):n_t]
-  mean(abs(error) / abs(y_true[(n_t - n_h + 1):n_t]))
+performance_mape <- function(y, y_true, n_h, n_t, t = 1:length(y), ...) {
+  idx <- t %in% (n_t - n_h + 1):n_t
+  error <- y[idx] - y_true[idx]
+  mean(abs(error) / abs(y_true[idx]), ...)
 }
 
 

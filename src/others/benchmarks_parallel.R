@@ -6,7 +6,7 @@ box::use(
   src/utils[...],
   src/options[sgps, rgps, models],
   src/diagnostics,
-  src/others/metrics,
+  src/metrics/metrics,
   rTRNG[rnorm_trng],
   bench[mark]
 )

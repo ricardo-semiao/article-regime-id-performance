@@ -27,15 +27,9 @@ if (FALSE) {
 
 #' Internal: Get error data by joining simulation and estimation results
 get_error_data <- function(data_s, data_e, regime_aligned) {
-  data_s <- filter(data_s,
-    data_s$sgp %in% unique(data_e$sgp) &
-      data_s$rgp %in% unique(data_e$rgp) &
-      data_s$sim %in% unique(data_e$sim)
-  )
-
   left_join(
-    rename(data_s, y_true = y, r_true = r),
     rename(data_e, y_est = y, r_est = r),
+    rename(data_s, y_true = y, r_true = r),
     by = c("sgp", "rgp", "sim", "t")
   ) |>
     mutate(

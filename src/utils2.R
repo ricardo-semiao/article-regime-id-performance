@@ -72,18 +72,21 @@ regimes_order <- function(coefs, sgp_name) {
 #' Helper: Get correct parameters from params list
 #' Todo: document and think where to put
 #' @export
-get_correct_params <- function(dgp_names) {
-  imap_dfr(params$sgps, \(p, sgp_name) {
+get_correct_params <- function(dgp_names, relabel = TRUE) {
+  res <- imap_dfr(params$sgps, \(p, sgp_name) {
     imap_dfr(p$args, \(arg, s) {
       c(regime = s, arg[])
     }) |>
       pivot_longer(-regime, names_to = "coef", values_to = "value") |>
       mutate(sgp = sgp_name, .before = 1)
   }) %>%
-    filter(coef %in% c("mu", "rho1"), sgp %in% unique(dgp_names$sgp)) %>%
-    mutate(
-      sgp = fct_relabel(sgp, ~ dicts$sgps[.x])
-    )
+    filter(coef %in% c("mu", "rho1"), sgp %in% unique(dgp_names$sgp))
+  
+  if (relabel) {
+    mutate(res, sgp = fct_relabel(sgp, ~ dicts$sgps[.x]))
+  } else {
+    res
+  }
 }
 
 
