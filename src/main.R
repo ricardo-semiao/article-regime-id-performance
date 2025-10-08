@@ -359,6 +359,7 @@ model_names_main <- model_names |>
     n_burn = n_burn, n_t = n_t, n_h = n_h,
     title = glue("SGP: {dicts$sgps[sgp]}\nRGP: {dicts$rgps[rgp]}\nModel: {dicts$models[model]}")
   )
+  ggsave2("outputs/estimations/fit-{rgp}-{model}.png", 28, 14)
 }
 
 
@@ -395,7 +396,7 @@ pwalk(distinct(model_names, rgp, sim, model), \(rgp, model, ...) {
   dgp_names_main$dgp, na.rm = TRUE, n_burn = n_burn
 )
 if (FALSE) cat(gt::as_latex(.tab), file = "outputs/estimations/table_residuals.tex")
-
+# Todo: table across regime correctness
 
 
 # Metrics ----------------------------------------------------------------------
@@ -456,8 +457,11 @@ lm(rmse ~ model * rgp + sgp * rgp, reg_data) |> summary()
 
 # Metrics must be separated by the relevant factor (SGP metrics run separately
 # for each SGP, same for RGP)
-lm(rmse ~ model*rgp + sgp + sgp_metric_est, reg_data) |> summary()
-lm(rmse ~ model*rgp + sgp + model*sgp_metric_est, reg_data) |> summary()
+lm(rmse ~ model*rgp + rgp + sgp_metric_est, filter(reg_data, sgp == "r2_ar1_vol")) |> summary()
+lm(rmse ~ model*rgp + rgp + sgp_metric_diff, filter(reg_data, sgp == "r2_ar1_vol")) |> summary()
+lm(rmse ~ model*rgp + rgp + model*sgp_metric_est, reg_data) |> summary()
+
+lm(rmse ~ model*rgp + rgp + mu_diff, filter(reg_data, sgp == "r2_ar1_mu")) |> summary()
 
 
 # Graphs:
