@@ -84,10 +84,9 @@ panel_simulations <- function(
   data, n_burn = NA, title = NULL
 ) {
   g_values <- series_values(data, sims = 1, n_burn = n_burn) +
-    theme(legend.position = "none")
-  g_distribution <- series_distribution(data, n_burn = n_burn) +
-    geom_line(aes(NA_real_, NA_real_, color = as.factor(r))) +
     theme(legend.direction = "horizontal")
+  g_distribution <- series_distribution(data, n_burn = n_burn) +
+    theme(legend.position = "none")
 
   y_lims <- range(filter(data)$y, na.rm = TRUE, finite = TRUE)
 
@@ -96,7 +95,7 @@ panel_simulations <- function(
       ylim(y_lims[1] * 1.1, y_lims[2] * 1.1) 
   ) +
     plot_layout(
-      nrow = 1, guides = "collect", axes = "collect_y"
+      nrow = 1, guides = "collect", axes = "collect_y", design = "112"
     ) +
     plot_annotation(
       title = title,
@@ -133,7 +132,8 @@ stats_accumulated <- function(
     reframe(
       map_dfr(1:max(data$t), \(tmax) {
         stats(y = y[t <= tmax], r = r[t <= tmax], n_r = length(unique(r)))
-      }),
+      }) |>
+        `colnames<-`(c("1", "2")),
       t = 1:max(data$t), r = if (length(sims) == 1) r else NA
     ) %>%
     pivot_longer(
@@ -170,7 +170,8 @@ stats_density <- function(
   gdata <- data %>%
     group_by(sgp, rgp, sim) %>%
     reframe(
-      map_dfc(stats(y = y, r = r, n_r = length(unique(r))), ~ .x)
+      map_dfc(stats(y = y, r = r, n_r = length(unique(r))), ~ .x) |>
+        `colnames<-`(c("1", "2"))
     ) %>%
     pivot_longer(
       -c(sgp, rgp, sim),
@@ -178,7 +179,7 @@ stats_density <- function(
     )
 
   ggplot(gdata, aes(y = value)) +
-    geom_density(aes(color = stat)) +
+    geom_density(aes(color = stat), linewidth = 1) +
     conditional_facet(gdata$sgp, gdata$rgp, faceted) +
     # Aesthetics:
     conditional_color(regime_aligned) +
@@ -210,13 +211,12 @@ panel_stats <- function(
   g_accumulated <- stats_accumulated(
     data, stats, sims, n_burn, regime_aligned = regime_aligned
   ) +
-    theme(legend.position = "none")
+    theme(legend.direction = "horizontal")
 
   g_distribution <- stats_density(
     data, stats, n_burn, regime_aligned = regime_aligned
   ) +
-    geom_line(aes(NA_real_, NA_real_, color = as.factor(stat))) +
-    theme(legend.direction = "horizontal")
+    theme(legend.position = "none")
 
   y_lims <- range(g_accumulated$data$value, na.rm = TRUE, finite = TRUE)
 
@@ -224,7 +224,9 @@ panel_stats <- function(
     g_accumulated - g_distribution &
       ylim(y_lims[1] * 1.0, y_lims[2] * 1.0) 
   ) +
-    plot_layout(nrow = 1, guides = "collect", axes = "collect_y") +
+    plot_layout(
+      nrow = 1, guides = "collect", axes = "collect_y", design = "112"
+    ) +
     plot_annotation(
       title = title,
       subtitle = glue("SGP: {unique(data$sgp)}\nRGP: {unique(data$rgp)}"),

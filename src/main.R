@@ -21,7 +21,7 @@ n_t <- 100L + n_burn + n_h # Number of time periods
 
 # Debug:
 if (FALSE) {
-  save.image("personal/workspace.RData")
+  #save.image("personal/workspace.RData")
   load("personal/workspace.RData")
 }
 
@@ -187,7 +187,7 @@ pwalk(dgp_names_main, \(sgp, rgp, dgp) {
     simulations_data, diagnostics$simulations$panel_stats,
     unique(dgp_names_main$sgp), rgp,
     dimension = "sgp", option = sgp, sims = sims_sample[1:5], n_burn = n_burn,
-    regime_aligned = !grepl("threshold", rgp), lims = c(0, 2)
+    regime_aligned = TRUE, lims = c(0, 3)
   )
   ggsave2("outputs/simulations/stats_sgp-{rgp}.png", 28, 14)
 
@@ -196,7 +196,7 @@ pwalk(dgp_names_main, \(sgp, rgp, dgp) {
     unique(dgp_names_main$sgp), rgp,
     dimension = "rgp", option = rgp, sims = sims_sample[1:5], n_burn = n_burn,
     regime_aligned = !grepl("threshold", rgp), lims = c(0, 15)
-  )
+  ) & ylim(0, 1)
   ggsave2("outputs/simulations/stats_rpg-{rgp}.png", 28, 14)
 })
 
@@ -369,7 +369,7 @@ pwalk(distinct(model_names_main, rgp, model), \(rgp, model, ...) {
     estimations_data, simulations_data, diagnostics$estimations$panel_residuals,
     sgps = unique(model_names_main$sgp), rgp = rgp, model = model,
     n_burn = n_burn, n_t = n_t, n_h = n_h,
-    regime_aligned = TRUE, hline = 0, title = NULL, lims = c(0, 0.4)
+    regime_aligned = FALSE, hline = 0, title = NULL, lims = c(0, 0.4)
   ) +
     plot_annotation(
       title = glue("RGP: {dicts$rgps[rgp]};  Model: {dicts$models[model]}")
@@ -386,7 +386,7 @@ pwalk(distinct(model_names, rgp, sim, model), \(rgp, model, ...) {
   diagnostics$estimations$coefs_distribution(
     data, params, model_names
   )
-  if (FALSE) ggsave2("outputs/estimations/coefs-{rgp}-{model}.png", 28, 14)
+  if (FALSE) ggsave2("outputs/estimations/coefs-{rgp}-{model}.png", 26, 16)
 })
 
 
@@ -397,6 +397,7 @@ pwalk(distinct(model_names, rgp, sim, model), \(rgp, model, ...) {
 )
 if (FALSE) cat(gt::as_latex(.tab), file = "outputs/estimations/table_residuals.tex")
 # Todo: table across regime correctness
+
 
 
 # Metrics ----------------------------------------------------------------------

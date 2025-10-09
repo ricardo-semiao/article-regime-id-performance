@@ -114,7 +114,9 @@ panel_estimations <- function(
   )
   
   g <- c(as.list(g_values)[], as.list(g_distribution)[]) |>
-    wrap_plots(byrow = FALSE, guides = "collect", axes = "collect") &
+    wrap_plots(
+      byrow = FALSE, guides = "collect", axes = "collect", design = "112"
+    ) &
     ylim(y_lims[1] * 1.1, y_lims[2] * 1.1) &
     conditional_color(TRUE, na.translate = FALSE)
   g +
@@ -191,7 +193,7 @@ panel_residuals <- function(
       ylim(y_lims[1] * 1.1, y_lims[2] * 1.1) 
   ) +
     plot_layout(
-      nrow = 1, guides = "collect", axes = "collect_y"
+      nrow = 1, guides = "collect", axes = "collect_y", design = "112"
     ) +
     plot_annotation(
       title = title,
@@ -227,7 +229,8 @@ coefs_distribution <- function(
       names_to = c("regime", "coef"),
       values_to = "value",
       names_transform = list(regime = as.integer)
-    )
+    ) |>
+    mutate(regime = c(2, 1)[regime])
 
   ggplot(gdata, aes(x = value, color = as.factor(regime))) +
     geom_density() +
@@ -236,9 +239,8 @@ coefs_distribution <- function(
       linetype = "dashed"
     ) +
     ggh4x::facet_grid2(vars(sgp), vars(coef), scales = "free", independent = "y") +
-    ggh4x::facetted_pos_scales(
-      x = map(lims, \(x) scale_x_continuous(limits = x))
-    ) +
+    xlim(-4, 4) +
+    scale_color_manual(values = unname(pal$main)) +
     labs(
       title = title, x = "Value", y = "Density",
       color = "Regime", fill = "Regime"

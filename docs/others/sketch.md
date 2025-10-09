@@ -212,6 +212,8 @@ In the notation above I omitted the error term. For our purposes, it is more use
 
 Consider the notation shorthand $y \coloneqq y_{1:T}$, and similarly for other variables, used for the rest of this work.
 
+<!-- Is the above it needed? -->
+
 Let the set of considered DGPs be $P$ (for 'processes'). These will be defined in @sec-sets.
 
 
@@ -238,18 +240,20 @@ Conditional metrics are functions that receive a vector of series and a vector o
 
 That is, a conditional metric $c$ is a function such that:
 
-\begin{align*}
-    &c: (y, r) \mapsto (R_s)_{s = 1}^S \mapsto \mathbb{R}^{S}\\
-    &R_s \coloneqq (y_t ~:~ r^s_t = \max\{r_t\})
-\end{align*}
+\begin{equation}
+\begin{aligned}{l}
+    c: (y, r) \mapsto (R_s)_{s = 1}^S \mapsto \mathbb{R}^{S} \\
+    R_s \coloneqq \left\{ y_t ~:~ r^s_t = \max\{r_t\} \right\}
+\end{aligned}
+\end{equation}
+
+Let the set of metrics be $C$ (for 'criteria'). These will be defined in @sec-obj-metrics.
 
 Metrics can be calculated in different ways. One can use the true values and get the characteristics of the true DGP, or the estimated values and get the characteristics of the estimated model. In each, the value of $S$ or $\hat{S}$ can be different, and so the dimension of the result. Another option is to calculate the difference between the true and estimated metrics, or, for that matter, the metrics of the difference (residuals). This framework allows for any of these options, but in the current state of this work, I focus on the estimated metrics, as they are the only thing available to the econometrician in practice.
 
 Most of the time, the absolute value of the metric across regimes is not always comparable across DGPs/models. However, the difference between regimes is. In this work, I focus on calculating some measure of dispersion of the metrics across regimes.
 
 > Ambas as frases acima podem mudar conforme filtramos as ideias.
-
-Let the set of metrics be $C$ (for 'criteria'). These will be defined in @sec-obj-metrics.
 
 <!-- Dataset $A3$ can only be calculated when, across DGP and estimated model, the number of regimes match, and the same and only parameter varies. For example, for 2 regimes, with only the intercept changing, regimes in the true and estimated series can be identified by the same consistent way: the "regime with high intercept" and the "regime with low intercept". Any case where this matching does not happen is discarded for $A3$. -->
 
@@ -552,11 +556,11 @@ Let $i \in 1:I$, $I \in \mathbb{N}$ be the simulation index.
 
 ## Simulating Series
 
-I assume that all DGPs have the same error distribution -- but note that a DGP can have a volatility parameter multiplying its error. Thus, we need to create $I$ sets of random error vectors, each of size $1:T$. The nesting order does not matter, and the errors were generated for each pair $(dgp, s)$, in parallel, using [TRNG](https://www.numbercrunch.de/trng/). Let $\Epsilon$ denote the set of all errors.
+I assume that all DGPs have the same error distribution -- but note that a DGP can have a volatility parameter multiplying its error. Thus, we need to create $I$ sets of random error vectors, each of size $1:T$. The nesting order does not matter, and the errors were generated for each pair $(dgp, i)$, in parallel, using [TRNG](https://www.numbercrunch.de/trng/). Let $\Epsilon$ denote the set of all errors.
 
-For each $p \in 1:|P|$ and $i \in 1:I$, let $\Epsilon_{p, s}$ denote the vector of errors generated for the $p$-th DGP and the $s$-th simulation. Similar indexing definitions will be used for similar collections throughout this document.
+For each $p \in 1:|P|$ and $i \in 1:I$, let $\Epsilon_{p, i}$ denote the vector of errors generated for the $p$-th DGP and the $s$-th simulation. Similar indexing definitions will be used for similar collections throughout this document.
 
-Let $Y$ and $R$ denote the sets of generated series and regime variables. For each $p$ and $s$, their elements are denoted via the index notation $Y_{p, s}$ and $R_{p, s}$. They are computed given $\Epsilon_{p, s}$:
+Let $Y$ and $R$ denote the sets of generated series and regime variables. For each $p$ and $i$, their elements are denoted via the index notation $Y_{p, i}$ and $R_{p, i}$. They are computed given $\Epsilon_{p, s}$:
 
 \begin{algorithm}[H]
 \begin{algorithmic}[1]
@@ -687,7 +691,7 @@ The processing follows the same steps as before, with initial visual diagnostics
 
 ### Residuals
 
-The first question is about the model's fit. Figure @fig-mod-v1 shows the residuals and their distribution for the MS-AR(1) model, estimated on top of an SB RGP. While figure @fig-mod-v1 indicates the estimated regimes in the colors, figure @fig-mod-v2 indicates whether the regime was correct or not.
+The first question is about the model's fit. @fig-mod-v1 shows the residuals and their distribution for the MS-AR(1) model, estimated on top of an SB RGP. While figure @fig-mod-v1 indicates the estimated regimes in the colors, figure @fig-mod-v2 indicates whether the regime was correct or not.
 
 ![Residuals of MS-AR(1) estimating a SB-AR(1)](../../outputs/estimations/residuals-r2_markov_symm_high-r2_sbreak-a.png){#fig-mod-v1}
 
