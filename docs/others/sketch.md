@@ -5,6 +5,7 @@ author: "Student: Ricardo Semião e Castro\nAdvisor: Prof. Marcelo Fernandes"
 date: today
 
 bibliography: ../references.bib
+csl: ../abnt.csl
 
 number-sections: true
 fig-cap-location: top
@@ -103,20 +104,22 @@ The rest of this work is divided as follows: the general framework is presented 
 
 
 
-# Regime switching literature {#sec-lit}
+# The Regime switching literature {#sec-lit}
 
-{Opening phrase and relationship with state space models. The models were already concepts within stat literature, but in econometrics, their seminal introduction}
+The regime switching literature is vast and with many models' variations. It is important to map the models, the similarities and differences between them. Additionally, an important starting point is to discuss what is already known about their forecasting performance and the factors that influence it. Each is done in the sections below. Before doing so, I will better define the bounds of RS literature by discussing two closely related ones.
 
-The regime switching literature is vast and with many models' variations. It is important to map the models, the similarities and differences between them. Additionally, an important starting point is to discuss what is already known about their forecasting performance and the factors that influence it. Each is done in the sections below.
+The first is the state-space (SS) literature, with its quintessential implementation in [@Kalman1960]. While RS and SS models have developed as somewhat independent fields, RS can be viewed as a subset of SS, where state (regime) variable and the observed series variable are modeled separately. This separation is central to the framework used in this paper. Bridges between the literatures include Switching State-Space Models and the seminal work by [@Kim1994], which extends Hamilton's Markov-switching model to general state-space models.
+
+The second is the structural break (SB) literature, the most relevant starting point being [@Chow1960]. Much of it is devoted to diagnosing breaks, which are indeed present in RS settings, with the non-constant parameters. However, SB models typically treat breaks as exogenous and non-recurring. Bridging the gap, works like [@Bai1998] allow for multiple unknown breaks, which can be relevant for RS contexts, while [@Chib1998] demonstrates that SBs can be formulated as Markov-switching processes that have only positive probability for staying in the initial regime and switching to the next, not for switching back.
 
 
 ## Regime switching models
 
-Two of the most essencial aspects of the different approaches are: (i) if the latent regime variable is modeled in a deterministic or stochastic fashion, and (ii) if the changes between regimes are abrupt or smooth.
+Two of the most essencial aspects of the different RS approaches are: (i) if the latent regime variable is modeled in a deterministic or stochastic fashion, and (ii) if the changes between regimes are abrupt or smooth.
 
-The most common deterministic models are the threshold-based ones, where some observable variable being above or below some threshold(s) is what determines the regime. The work of Howell Tong in [@Tong1978] and [@Tong1980] popularized the Threshold Auto-Regressive model, each regime having its own set of autorregressive parameters. Tong proposed that capturing smooth transitions between regimes would be important, and Timo Teräsvirta defined the Smooth Transition AutoRegressive model in [@Terasvirta1992] and [@Terasvirta1994], where the distance between an observable variable and some threshold determines the continuous weight of each regime.
+The most common deterministic models are the threshold-based ones, where some observable variable being above or below some threshold(s) is what determines the regime. The work of Howell Tong in [@Tong1978] and [@Tong1980] popularized the threshold autoregressive model, each regime having its own set of autorregressive parameters. Tong proposed that capturing smooth transitions between regimes would be important, and Timo Teräsvirta defined the smooth transition autotegressive model in [@Terasvirta1992] and [@Terasvirta1994], where the distance between an observable variable and some threshold determines the continuous weight of each regime.
 
-On the stochastic front, the Markov Switching literature started with the seminal work of James Hamilton in [@Hamilton1989] via the MSAR model, where the regime is governed by an unobservable Markov process -- the probability of switching to another other regime is constant and depends only on the current regime. This implies in an geometric distribution for the amount of periods in a given regime's instance. The Markov Switching Smooth Transition, as in @TODO, model exist, but has more added complexity than the very natural jump from the TAR to the STAR model.
+On the stochastic front, the Markov switching literature started with the seminal work of James Hamilton in [@Hamilton1989] via the MSAR model, where the regime is governed by an unobservable Markov process -- the probability of switching to another other regime is constant and depends only on the current regime. This implies in an geometric distribution for the amount of periods in a given regime's instance. The Markov switching smooth transition, as in [@Elliott2018], model exist, but has more added complexity than the very natural jump from the TAR to the STAR model.
 
 Moving forward, many variations on the regime variable modelling were created. The threshold variable have a delay or some transformation, it can be the series itself, an exogenous variable, or even a non-linear combination of variables ([@Chen2011]). The probability distributions of MS models were extended to allow different distributions for the time spent in one regime, and dependence on more past values ([@Ferguson1980]). The smooth transition function has several options, with common ones being the logistic and the exponential. The models were generalized to any number of regimes, with the STAR model being equivalent to a Neural Network, as described by [@Medeiros2000].
 
@@ -124,7 +127,7 @@ Blurring the line between deterministic and stochastic models, [@Chang2017] uses
 
 As I will note in this work, the functional form across regimes and the regime process itself are fairly independent, thus other variations arise from considering more complex functions than the autoregressive one. ARMA models have their RS counterparts ([@Brockwell1992]). Not only the mean, but the variance can also be modelled: the ARCH/GARCH family, very relevant for finance, have their regime switching versions ([@Hamilton1994], [@Chen2011]). More recently, models such as decision trees have been adapted to the regime switching context, as in [@Adam2024]. Similarly, there are also models for vectors of times series.
 
-General reviews on RS models include [@Tan2025], [@Porter2000], [@Hamilton2020], while [@Chen2011] focuses on threshold models, [@Dick2002] in smooth transition, and [@Song2021] in Markov switching.
+General reviews on RS models include [@Tan2025], [@Potter2000], [@Hamilton2020], while [@Chen2011] focuses on threshold models, [@Dijk2002] in smooth transition, and [@Song2021] in Markov switching. Note that RS models are considered in both frequentist and Bayesian frameworks, with the latter inheriting a lot from the SS models estimation literature.
 
 
 ## Forecasting performance
@@ -420,12 +423,13 @@ The dataset $D$ is already in a friendly format for analyzing the relationship b
 
 The functional form of the SGP could be important in its interaction with the other ingredients of the DGP. Additionally, some topics are interested in specific SGPs, such as conditional volatility in finance and GARCH models. For now, however, this does not seem to be the main point of interest. I will consider only an $AR(1)$ process, for its simplicity, popularity, and ease of estimation.
 
-As discussed, it is useful to consider only within-regime weakly stationarity, even though many interesting DGPs are non-stationary. This restricts the parameters to $|\rho_1| < 1$. The only SGP functional form considered is the following:
+As discussed, it is useful to consider only within-regime weakly stationarity, even though many interesting DGPs are non-stationary. This restricts the absolute value of the $AR(1)$ parameter to $1$. The only SGP functional form considered is the following:
 
 \begin{equation}
 \begin{array}{ll}
-    &y_t(. ~;~ (\mu, \rho_1, \sigma)) = \mu + \rho_1 y_{t-1} + \sigma \cdot \varepsilon_t, ~~ \varepsilon_t \sim \mathcal{N}(0, 1)\\
-    &|\rho_1| < 1, ~~ \sigma > 0
+    &f_{\sgp}(. ~;~ (\mu^s, \rho^s_1, \sigma^s)) = \mu^s + \rho^s_1 y_{t-1} + \sigma^s \cdot \varepsilon_t\\
+    &\varepsilon_t \sim \mathcal{N}(0, 1)\\
+    &|\rho^s_1| < 1, ~~ \sigma^s > 0
 \end{array} \tag{SGP-AR(1)}
 \end{equation}
 
@@ -770,15 +774,14 @@ If there is time, test if the practical recommendations help in a real-world exa
 
 Here I start by summarizing the motivation and methodology.
 
-Then, I focus on the main results. First, with the more descriptive findings about properties of the models, then, the practical recommendations of metrics an econometrician should look at when choosing a model.
+Then, I focus on the main results. First, with the more descriptive findings about properties of the models, then, the practical recommendations of metrics an econometrician should look at when choosing a model[^ai].
 
+> Sobre a nota de rodapé: É necessário colocar algo assim? Talvez como nota de rodapé na primeira página?
+
+[ai]: AI disclaimer: this work was generated generally without the help of large language models, except sparringly as a research tool and code autocompletions during the implementation phase.
 
 
 # References {.unnumbered .unlisted}
-
-AI disclaimer: this work was generated generally without the help of large language models, the only relevant exception being code autocompletion during the coding implementation phase.
-
-> É necessário colocar algo assim? Talvez como nota de rodapé na primeira página?
 
 ::: {#refs}
 :::
@@ -810,7 +813,7 @@ AI disclaimer: this work was generated generally without the help of large langu
 
 **Empirical model:** Given $\tau$, the model estimates $\mu$ and $\rho_1$ via OLS in each regime. $\tau$ is chosen by minimizing the sum of squared residuals over a grid search of breakpoints.
 
-Similarly defined as in @TODO. Reviw of other options in @TODO.
+Similarly defined as in [@Bai1998]. Reviw of other options in [@Casini2018].
 
 
 ### Self-Exciting Threshold (SET)
@@ -846,7 +849,7 @@ Often, the function $g$ depends on a smoothness parameter $\gamma$, i.e., when $
 
 **Empirical model:** Estimated via non-linear squares of the residuals, over $\mu$, $\rho_1$ (for each regime), $\tau$, and $\gamma$. Uses some numerical optimization, which depends on starting values and does not guarantee a global optimum.
 
-Similarly defined as in [@Terasvirta1994]. Review of other options in [@Dick2002]
+Similarly defined as in [@Terasvirta1994]. Review of other options in [@Dijk2002]
 
 
 ### Markov-Switching (MS)
@@ -924,9 +927,9 @@ Recall that a RC metric returns a sequence with entries for each regime, so also
 Given the weakly stationary within regimes assumption, the regime-conditional moments are independent of the RGP, and are the simple $AR(1)$ moments:
 
 \begin{align*}
-    \mu(y_t | s) &\coloneqq E[y_t | y_t \in R_s] = \mu^s\\
-    \sigma(y_t | s) &\coloneqq Var[y_t | y_t \in R_s] = \sqrt{\frac{\sigma}{1 - (\rho^s_1)}}\\
-    \rho_j(y_t | s) &\coloneqq Cov[y_t, y_{t-1} | y_t \in R_s] = (\rho^s_1)^j, ~~ j \in \mathbb{N}^*
+    \mu(y_t | s) &\coloneqq E[y_t | y_t \in R_s] = frac{\mu^s}{1 - \rho^s_1}\\
+    \sigma(y_t | s) &\coloneqq Var[y_t | y_t \in R_s] = \sqrt{\frac{(\sigma^s)^2}{1 - (\rho^s_1)}}\\
+    \rho_j(y_t | s) &\coloneqq Corr[y_t, y_{t-1} | y_t \in R_s] = (\rho^s_1)^j, ~~ j \in \mathbb{N}^*
 \end{align*}
 
 
