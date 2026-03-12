@@ -1,79 +1,371 @@
-@article{Chow1960,
- ISSN = {00129682, 14680262},
- URL = {http://www.jstor.org/stable/1910133},
- author = {Gregory C. Chow},
- journal = {Econometrica},
- number = {3},
- pages = {591--605},
- publisher = {[Wiley, Econometric Society]},
- title = {Tests of Equality Between Sets of Coefficients in Two Linear Regressions},
- volume = {28},
- year = {1960}
+
+# Organization
+
+- Main fields (in order): author, year, title, url; then the rest, in alphabetical order. url must always be the doi.org url, if available
+- All field names in lowercase (and types too, when possible)
+- All fields must have spaces before and after the equal sign, and must always use curly brackets
+- All entry id's must be CamelCaseYYYY with the first author's main surname
+
+
+# General reviews
+
+@Article{Tan2025,
+	AUTHOR = {Tan, Zhenni and Wu, Yuehua},
+	TITLE = {On Regime Switching Models},
+	JOURNAL = {Mathematics},
+	VOLUME = {13},
+	YEAR = {2025},
+	NUMBER = {7},
+	ARTICLE-NUMBER = {1128},
+	URL = {https://www.mdpi.com/2227-7390/13/7/1128},
+	ISSN = {2227-7390},
+	DOI = {10.3390/math13071128}
 }
 
-@article{BaiPerron1998,
-  ISSN = {00129682, 14680262},
-  URL = {http://www.jstor.org/stable/2998540},
-  author = {Jushan Bai and Pierre Perron},
-  journal = {Econometrica},
-  number = {1},
-  pages = {47--78},
-  publisher = {[Wiley, Econometric Society]},
-  title = {Estimating and Testing Linear Models with Multiple Structural Changes},
-  volume = {66},
-  year = {1998}
+@article{Porter2000,
+    author = {Potter, Simon},
+    year = {2000},
+    month = {01},
+    pages = {},
+    title = {Nonlinear Time Series Modeling: An Introduction},
+    volume = {13},
+    journal = {SSRN Electronic Journal},
+    doi = {10.2139/ssrn.207928}
 }
 
-@article{Hamilton1989,
-  ISSN = {00129682, 14680262},
-  URL = {http://www.jstor.org/stable/1912559},
-  author = {James D. Hamilton},
-  journal = {Econometrica},
-  number = {2},
-  pages = {357--384},
-  publisher = {[Wiley, Econometric Society]},
-  title = {A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle},
-  volume = {57},
-  year = {1989}
+@inbook{Hamilton2020,
+    url = {https://doi.org/10.1515/9780691218632-185},
+    title = {22 Modeling Time Series with Changes in Regime},
+    booktitle = {Time Series Analysis},
+    author = {James Douglas Hamilton},
+    publisher = {Princeton University Press},
+    address = {Princeton},
+    pages = {677--677},
+    doi = {doi:10.1515/9780691218632-185},
+    isbn = {9780691218632},
+    year = {2020},
+    lastchecked = {2026-03-11}
+}
+
+## Unused
+
+inbook{inbook,
+	author = {Lange, Theis and Rahbek, Anders},
+	year = {2009},
+	month = {02},
+	pages = {871-887},
+	title = {An Introduction to Regime Switching Time Series Models},
+	isbn = {978-3-540-71296-1},
+	doi = {10.1007/978-3-540-71297-8_38}
+}
+
+
+
+# Specific reviews
+
+## T
+
+@article{Chen2011,
+    title={A review of threshold time series models in finance},
+    author={Cathy W. S. Chen and Feng-Chi Liu and Mike K. P. So},
+    journal={Statistics and Its Interface},
+    year={2011},
+    volume={4},
+    pages={167-181},
+    url={https://doi.org/10.4310/SII.2011.v4.n2.a12}
+}
+
+## ST
+
+@article{Dick2002,
+    author = {Dick van Dijk and Timo Teräsvirta and Philip Hans Franses},
+    title = {SMOOTH TRANSITION AUTOREGRESSIVE MODELS — A SURVEY OF RECENT DEVELOPMENTS},
+    journal = {Econometric Reviews},
+    volume = {21},
+    number = {1},
+    pages = {1--47},
+    year = {2002},
+    publisher = {Taylor \& Francis},
+    doi = {10.1081/ETC-120008723},
+    URL = {https://doi.org/10.1081/ETC-120008723},
+    eprint = {https://doi.org/10.1081/ETC-120008723}
+}
+
+## MS
+
+@misc{Song2021,
+    title={Markov Switching},
+    ISBN={9780190625979},
+    url={http://dx.doi.org/10.1093/acrefore/9780190625979.013.174},
+    DOI={10.1093/acrefore/9780190625979.013.174},
+    journal={Oxford Research Encyclopedia of Economics and Finance},
+    publisher={Oxford University Press},
+    author={Song, Yong and Woźniak, Tomasz},
+    year={2021},
+    month=mar
+}
+
+## Unused
+
+MS in empirical finance - https://doi.org/10.1108/S0731-9053(2011)000027B004
+
+
+
+# Papers introducing models
+
+## T
+
+@article{Tong1978,
+    title={On a threshold model},
+    author={Tong, Howell},
+    journal={Pattern recognition and signal processing},
+    pages={575--586},
+    year={1978},
+    publisher={Springer Netherlands},
+    doi = {10.1007/978-94-009-9941-1_24}
+}
+
+@article{Tong1980,
+    ISSN = {00359246},
+    URL = {http://www.jstor.org/stable/2985164},
+    author = {H. Tong and K. S. Lim},
+    journal = {Journal of the Royal Statistical Society. Series B (Methodological)},
+    number = {3},
+    pages = {245--292},
+    publisher = {[Royal Statistical Society, Oxford University Press]},
+    title = {Threshold Autoregression, Limit Cycles and Cyclical Data},
+    urldate = {2025-10-07},
+    volume = {42},
+    year = {1980}
+}
+
+## ST
+
+@article{Terasvirta1992,
+    author = {Terasvirta, T. and Anderson, H. M.},
+    title = {Characterizing nonlinearities in business cycles using smooth transition autoregressive models},
+    journal = {Journal of Applied Econometrics},
+    volume = {7},
+    number = {S1},
+    pages = {S119-S136},
+    doi = {https://doi.org/10.1002/jae.3950070509},
+    url = {https://onlinelibrary.wiley.com/doi/abs/10.1002/jae.3950070509},
+    eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/jae.3950070509},
+    year = {1992}
 }
 
 @article{Terasvirta1994,
-  ISSN = {01621459, 1537274X},
-  URL = {http://www.jstor.org/stable/2291217},
-  author = {Timo Teräsvirta},
-  journal = {Journal of the American Statistical Association},
-  number = {425},
-  pages = {208--218},
-  publisher = {[American Statistical Association, Taylor & Francis, Ltd.]},
-  title = {Specification, Estimation, and Evaluation of Smooth Transition Autoregressive Models},
-  volume = {89},
-  year = {1994}
+    ISSN = {01621459, 1537274X},
+    URL = {http://www.jstor.org/stable/2291217},
+    author = {Timo Teräsvirta},
+    journal = {Journal of the American Statistical Association},
+    number = {425},
+    pages = {208--218},
+    publisher = {[American Statistical Association, Taylor & Francis, Ltd.]},
+    title = {Specification, Estimation, and Evaluation of Smooth Transition Autoregressive Models},
+    volume = {89},
+    year = {1994}
 }
 
-@article{TongLim1980,
-  ISSN = {00359246},
-  URL = {http://www.jstor.org/stable/2985164},
-  author = {H. Tong and K. S. Lim},
-  journal = {Journal of the Royal Statistical Society. Series B (Methodological)},
-  number = {3},
-  pages = {245--292},
-  publisher = {[Royal Statistical Society, Oxford University Press]},
-  title = {Threshold Autoregression, Limit Cycles and Cyclical Data},
-  urldate = {2025-10-07},
-  volume = {42},
-  year = {1980}
+## MS
+
+@article{Hamilton1989,
+    ISSN = {00129682, 14680262},
+    URL = {http://www.jstor.org/stable/1912559},
+    author = {James D. Hamilton},
+    journal = {Econometrica},
+    number = {2},
+    pages = {357--384},
+    publisher = {[Wiley, Econometric Society]},
+    title = {A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle},
+    volume = {57},
+    year = {1989}
 }
 
+
+# Extensions
+
+MS-ARCH:
+@article{Hamilton1994,
+    title = {Autoregressive conditional heteroskedasticity and changes in regime},
+    journal = {Journal of Econometrics},
+    volume = {64},
+    number = {1},
+    pages = {307-333},
+    year = {1994},
+    issn = {0304-4076},
+    doi = {https://doi.org/10.1016/0304-4076(94)90067-1},
+    url = {https://www.sciencedirect.com/science/article/pii/0304407694900671},
+    author = {James D Hamilton and Raul Susmel},
+    keywords = {ARCH models, Stock prices, Regime-switching models, Volatility},
+}
+
+MS with general distributions:
+@InCollection{Ferguson1980,
+  Title                    = {Variable Duration Models for Speech},
+  Author                   = {John. D. Ferguson},
+  Booktitle                = {Symposium on the Application of Hidden {M}arkov Models to Text and Speech},
+  Publisher                = {IDA-CRD},
+  Year                     = {1980},
+  Editor                   = {John. D. Ferguson},
+  Pages                    = {143--179},
+  url = {https://cir.nii.ac.jp/crid/1572824499605644288}
+}
+
+T-ARMA models:
+@article{Brockwell1992,
+    author = {Brockwell, Peter J. and Liu, Jian and Tweedie, Richard L.},
+    title = {ON THE EXISTENCE OF STATIONARY THRESHOLD AUTOREGRESSIVE MOVING-AVERAGE PROCESSES},
+    journal = {Journal of Time Series Analysis},
+    volume = {13},
+    number = {2},
+    pages = {95-107},
+    keywords = {SETARMA model, stationarity, ARMA models, random coefficient AR process},
+    doi = {https://doi.org/10.1111/j.1467-9892.1992.tb00096.x},
+    url = {https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-9892.1992.tb00096.x},
+    eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1111/j.1467-9892.1992.tb00096.x},
+    year = {1992}
+}
+
+Multiple regimes STAR:
 @phdthesis{Medeiros2000,
-  author = {Marcelo Cunha Medeiros},
-  title = {Modelos com múltiplos regimes para séries temporais limiares, transições suaves, e redes neurais},
-  school = {Pontifícia Universidade Católica do Rio de Janeiro, Departamento de Engenharia Elétrica},
-  year = {2000},
-  note = {Tese (doutorado) - Pontifícia Universidade Católica do Rio de Janeiro, Departamento de Engenharia Elétrica. Bibliografia: f. 111-115. Acesso restrito aos usuários cadastrados no Sistema de Bibliotecas da PUC-Rio. Também disponível na forma impressa. Reprodução eletrônica. Niterói, R.J. : Outservice Eletrônica, 2003. Modo de acesso: World Wide Web. Exigências do sistema: conexão com a Internet, World Wide Web browser e Adobe Acrobat Reader},
-  keywords = {Análise de séries temporais, Engenharia elétrica -- Teses},
-  abstract = {O objetivo desta tese é apresentar modelos mais flexíveis com troca de regimes, combinando as idéias provenientes dos modelos com limiar, com transição suave e redes neurais. Os modelos aqui discutidos possuem múltiplos regimes e a transição entre eles é controlada por uma combinação linear de variáveis conhecidas. Um procedimento de modelagem, baseada no trabalho de Teräsvirta e Lin (1993), Eiterheim e Teräsvirta (1996), e Rech, Teräsvirta e Tschernig (1999), consistindo das etapas de especificação, estimação e avaliação, foi desenvolvido, desta forma possibilitando ao analista de séries temporais escolher entre diferentes alternativas durante o processo de modelagem.},
-  advisor = {Álvaro de Lima Veiga Filho},
-  url = {https://doi.org/10.17771/PUCRio.acad.7549},
-  id = {puc.131716},
-  pages = {xiv, 115 f. ; 30 cm}
+    author = {Marcelo Cunha Medeiros},
+    title = {Modelos com múltiplos regimes para séries temporais limiares, transições suaves, e redes neurais},
+    school = {Pontifícia Universidade Católica do Rio de Janeiro, Departamento de Engenharia Elétrica},
+    year = {2000},
+    note = {Tese (doutorado) - Pontifícia Universidade Católica do Rio de Janeiro, Departamento de Engenharia Elétrica. Bibliografia: f. 111-115. Acesso restrito aos usuários cadastrados no Sistema de Bibliotecas da PUC-Rio. Também disponível na forma impressa. Reprodução eletrônica. Niterói, R.J. : Outservice Eletrônica, 2003. Modo de acesso: World Wide Web. Exigências do sistema: conexão com a Internet, World Wide Web browser e Adobe Acrobat Reader},
+    keywords = {Análise de séries temporais, Engenharia elétrica -- Teses},
+    abstract = {O objetivo desta tese é apresentar modelos mais flexíveis com troca de regimes, combinando as idéias provenientes dos modelos com limiar, com transição suave e redes neurais. Os modelos aqui discutidos possuem múltiplos regimes e a transição entre eles é controlada por uma combinação linear de variáveis conhecidas. Um procedimento de modelagem, baseada no trabalho de Teräsvirta e Lin (1993), Eiterheim e Teräsvirta (1996), e Rech, Teräsvirta e Tschernig (1999), consistindo das etapas de especificação, estimação e avaliação, foi desenvolvido, desta forma possibilitando ao analista de séries temporais escolher entre diferentes alternativas durante o processo de modelagem.},
+    advisor = {Álvaro de Lima Veiga Filho},
+    url = {https://doi.org/10.17771/PUCRio.acad.7549},
+    id = {puc.131716},
+    pages = {xiv, 115 f. ; 30 cm}
 }
+
+MS-decision trees:
+@article{Adam2024,
+    title = "Markov-switching decision trees",
+    keywords = "Decision trees, EM algorithm, Hidden Markov models, Time series modeling",
+    author = "Timo Adam and Marius {\"O}tting and Rouven Michels",
+    note = "Publisher Copyright: {\textcopyright} The Author(s) 2024.",
+    year = "2024",
+    doi = "10.1007/s10182-024-00501-6",
+    language = "English",
+    volume = "108",
+    pages = "461–476",
+    journal = "AStA Advances in Statistical Analysis",
+    issn = "1863-8171",
+    publisher = "Springer Verlag",
+    number = "2",
+}
+
+MS + T:
+@article{Chang2017,
+	title = {A new approach to model regime switching},
+	journal = {Journal of Econometrics},
+	volume = {196},
+	number = {1},
+	pages = {127-143},
+	year = {2017},
+	issn = {0304-4076},
+	doi = {https://doi.org/10.1016/j.jeconom.2016.09.005},
+	url = {https://www.sciencedirect.com/science/article/pii/S0304407616301671},
+	author = {Yoosoon Chang and Yongok Choi and Joon Y. Park},
+}
+
+@article{Wu2007,
+    ISSN = {10170405, 19968507},
+    URL = {http://www.jstor.org/stable/26432520},
+    author = {Senlin Wu and Rong Chen},
+    journal = {Statistica Sinica},
+    number = {1},
+    pages = {241--S38},
+    publisher = {Institute of Statistical Science, Academia Sinica},
+    title = {THRESHOLD VARIABLE DETERMINATION AND THRESHOLD VARIABLE DRIVEN SWITCHING AUTOREGRESSIVE MODELS},
+    urldate = {2026-03-11},
+    volume = {17},
+    year = {2007}
+}
+
+Clustering:
+@inproceedings{Akioyamen2020,
+    series={ICAIF ’20},
+    title={A hybrid learning approach to detecting regime switches in financial markets},
+    url={http://dx.doi.org/10.1145/3383455.3422521},
+    DOI={10.1145/3383455.3422521},
+    booktitle={Proceedings of the First ACM International Conference on AI in Finance},
+    publisher={ACM},
+    author={Akioyamen, Peter and Tang, Yi Zhou and Hussien, Hussien},
+    year={2020},
+    month=oct, pages={1–7},
+    collection={ICAIF ’20}
+}
+
+@misc{Paparrizos2024,
+    title={Bridging the Gap: A Decade Review of Time-Series Clustering Methods}, 
+    author={John Paparrizos and Fan Yang and Haojun Li},
+    year={2024},
+    eprint={2412.20582},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    url={https://arxiv.org/abs/2412.20582}, 
+}
+
+
+# Others
+
+@ARTICLE{Hu2022,
+    author = {{Hu}, Jianchang and {Szymczak}, Silke},
+    title = "{A review on longitudinal data analysis with random forest in precision medicine}",
+    journal = {arXiv e-prints},
+    keywords = {Statistics - Machine Learning, Computer Science - Machine Learning},
+    year = 2022,
+    month = aug,
+    eid = {arXiv:2208.04112},
+    pages = {arXiv:2208.04112},
+    doi = {10.48550/arXiv.2208.04112},
+    archivePrefix = {arXiv},
+    eprint = {2208.04112},
+    primaryClass = {stat.ML},
+    adsurl = {https://ui.adsabs.harvard.edu/abs/2022arXiv220804112H},
+    adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
+
+
+
+
+
+@article{Chow1960,
+    ISSN = {00129682, 14680262},
+    URL = {http://www.jstor.org/stable/1910133},
+    author = {Gregory C. Chow},
+    journal = {Econometrica},
+    number = {3},
+    pages = {591--605},
+    publisher = {[Wiley, Econometric Society]},
+    title = {Tests of Equality Between Sets of Coefficients in Two Linear Regressions},
+    volume = {28},
+    year = {1960}
+}
+
+@article{BaiPerron1998,
+    ISSN = {00129682, 14680262},
+    URL = {http://www.jstor.org/stable/2998540},
+    author = {Jushan Bai and Pierre Perron},
+    journal = {Econometrica},
+    number = {1},
+    pages = {47--78},
+    publisher = {[Wiley, Econometric Society]},
+    title = {Estimating and Testing Linear Models with Multiple Structural Changes},
+    volume = {66},
+    year = {1998}
+}
+
+
+
+
+
+
+
+
