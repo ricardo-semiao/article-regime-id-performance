@@ -211,7 +211,7 @@ coefs_distribution <- function(
   models = unique(model_names$model),
   lims = list(mu = c(NA, NA), rho1 = c(NA, NA)), title = NULL
 ) {
-  correct <- get_correct_params(params, dicts, model_names)
+  correct <- get_correct_params(model_names)
 
   gdata <- data %>%
     filter(model %in% dicts$models[models]) %>%

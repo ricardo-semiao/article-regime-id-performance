@@ -7,6 +7,10 @@ box::use(
   bench[mark]
 )
 
+box::use(
+  src/metrics/metrics
+)
+
 # Models modules:
 box::use(
   schange = strucchange,
@@ -15,6 +19,61 @@ box::use(
   star = starvars,
   mstest = MSTest,
   mswm = MSwM
+)
+
+
+
+# Getting Metrics --------------------------------------------------------------
+
+simulations_tmp <- read_rds("data/simulations.rds")
+simulations_tmp <- map(simulations_tmp, "result")
+n_t <- 120
+
+data_tmp <- imap(simulations_tmp[sample(length(simulations_tmp), 5000)], \(res, sim_name) {
+  sim_opts <- str_split_1(sim_name, "-")
+  tibble(
+    sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
+    sim = as.integer(sim_opts[3]),
+    t = 1:n_t, y = res$y, r = max.col(res$r)
+  )
+}) |>
+  bind_rows()
+
+
+
+mark(
+  check = FALSE,
+  dplyr = data_tmp |>
+    group_by(sgp, rgp, sim) |>
+    summarise(
+      sgp_metric_est = metrics$sgp_metric(sgp[1], y, r) |> sd(),
+      rgp_metric_est = metrics$rgp_metric(rgp[1], y, r) |> sd(),
+      a = abs(sgp_metric_est - rgp_metric_est)
+    ),
+  dtplyr = dtplyr::lazy_dt(data_tmp) |>
+    group_by(sgp, rgp, sim) |>
+    summarise(
+      sgp_metric_est = metrics$sgp_metric(sgp[1], y, r) |> sd(),
+      rgp_metric_est = metrics$rgp_metric(rgp[1], y, r) |> sd()
+    ) |>
+    ungroup() |>
+    mutate(a = abs(sgp_metric_est - rgp_metric_est)) |>
+    as_tibble()
+)
+
+
+
+# Unnesting --------------------------------------------------------------------
+
+x <- map(1:50, ~ list(1, 2, 3, 4))
+
+bench::mark(
+  manual = map_dfr(x, ~ list(a = .x[[1]], b = .x[[2]], c = .x[[3]], d = .x[[4]])),
+  unnest = map_dfr(x, \(z) {
+    names(z) <- c("a", "b", "c", "d")
+    list(z = list(z))
+  }) |>
+    unnest_wider(z)
 )
 
 

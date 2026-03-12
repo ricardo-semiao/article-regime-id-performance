@@ -81,7 +81,7 @@ get_correct_params <- function(dgp_names, relabel = TRUE) {
       mutate(sgp = sgp_name, .before = 1)
   }) %>%
     filter(coef %in% c("mu", "rho1"), sgp %in% unique(dgp_names$sgp))
-  
+
   if (relabel) {
     mutate(res, sgp = fct_relabel(sgp, ~ dicts$sgps[.x]))
   } else {

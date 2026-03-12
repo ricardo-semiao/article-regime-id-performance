@@ -7,13 +7,13 @@ box::use(
   src/utils2[...],
   src/options[dicts, params, options],
   src/diagnostics,
-  src/metrics/metrics,
+  src/metrics,
   rTRNG[rnorm_trng]
 )
 
 
 # Simulation parameters:
-n_s <- 30L # Number of simulations
+n_s <- 500L # Number of simulations
 n_burn <- 10L # Burn-in periods
 n_h <- 10L # Number of periods to predict
 n_t <- 100L + n_burn + n_h # Number of time periods
@@ -27,7 +27,7 @@ if (FALSE) {
 
 
 
-# Setup: DGP options -----------------------------------------------------------
+# Simulation: Considered Options -----------------------------------------------
 
 # Used combinations:
 walk(list(options$sgps, options$rgps), ~ dput(names(.x)))
@@ -126,34 +126,40 @@ simulations <- map_parallel(
   parallel = TRUE, safe = safe
 )
 
-# Checking errors:
-if (safe) {
-  names(compact(map(simulations, "error"))) |> cli_alert_items()
-  simulations <- map(simulations, "result")
-}
 
-# Collecting and saving results:
+# Saving results:
 if (FALSE) {
   write_rds(simulations, "data/simulations.rds") %>%
     {cli$cli_alert_success("Simulations saved to {.file data/simulations.rds}")}
   simulations <- read_rds("data/simulations.rds")
 }
 
+# Checking errors:
+if (safe) {
+  names(compact(map(simulations, "error"))) |> cli_alert_items()
+  simulations <- map(simulations, "result")
+}
+
+
+# Collecting results:
 simulations_data <- imap(simulations, \(res, sim_name) {
   sim_opts <- str_split_1(sim_name, "-")
   tibble(
-    sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
-    sim = as.integer(sim_opts[3]),
+    sgp = sim_opts[1], rgp = sim_opts[2], sim = sim_opts[3],
     t = 1:n_t, y = res$y, r = max.col(res$r)
   )
 }) |>
-  bind_rows()
+  bind_rows() |>
+  mutate(
+    across(c(sgp, rgp), fct),
+    across(c(sim, r), as.integer)
+  )
 
 
 
 # Simulation: Diagnostics ------------------------------------------------------
 
-# Setup
+# Setup:
 sims_sample <- sample(n_s, 10)
 
 dgp_names_main <- dgp_names |>
@@ -258,16 +264,20 @@ estimations <- map_parallel(
   parallel = TRUE, safe = FALSE
 )
 
+
+# Saving results:
+if (FALSE) {
+  write_rds(estimations, "data/estimations.rds") %>%
+    {cli$cli_alert_success("Estimations saved to {.file data/estimations.rds}")}
+  estimations <- read_rds("data/estimations.rds")
+}
+
 # Checking errors:
 if (safe) {
   names(compact(map(estimations, ~ compact(map(.x, "error"))))) |>
     cli_alert_items()
-  estimations <- map(estimations, ~ map(.x, "result"))
+  estimations <- map(estimations, ~ compact(map(.x, "result")))
 }
-
-
-
-# Estimations: Checks ----------------------------------------------------------
 
 # Checking regimes:
 check_n_regimes <- imap_dfr(estimations, \(sim, name) {
@@ -275,32 +285,31 @@ check_n_regimes <- imap_dfr(estimations, \(sim, name) {
 }) |>
   pivot_longer(-name, names_to = "model") |>
   filter(value != 2)
+table(check_n_regimes$model)
 
 for (l in split(check_n_regimes, 1:nrow(check_n_regimes))) {
   estimations[[l$name]][[l$model]] <- NULL
 }
 estimations <- map(estimations, compact)
+rm(check_n_regimes, l)
 
 
-# Collecting and saving results:
-if (FALSE) {
-  write_rds(estimations, "data/estimations.rds") %>%
-    {cli$cli_alert_success("Estimations saved to {.file data/estimations.rds}")}
-  estimations <- read_rds("data/estimations.rds")
-}
-
+# Collecting results:
 estimations_data <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
   imap(\(res, sim_name) {
     sim_opts <- str_split_1(sim_name, "-")
-    meta <- res$meta
-    ord <- regimes_order(meta$coefs, sim_opts[1])
-    tibble(
-      sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
-      sim = as.integer(sim_opts[3]), model = fct(sim_opts[4]),
-      t = 1:n_t, y = res$y, r = ord[res$r]
+    ord <- regimes_order(res$meta$coefs, sim_opts[1])
+
+    list(
+      sgp = sim_opts[1], rgp = sim_opts[2], sim = sim_opts[3],
+      model = sim_opts[4], t = 1:n_t, y = res$y, r = ord[res$r]
     )
   }) |>
-  bind_rows()
+  bind_rows() |>
+  mutate(
+    across(c(sgp, rgp, model), fct),
+    across(c(sim, r), as.integer)
+  )
 
 estimations_meta <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
   imap(\(res, sim_name) {
@@ -314,13 +323,17 @@ estimations_meta <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
       rownames = paste0("R", 1:nrow(meta$coefs))
     )
 
-    tibble(
-      sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
-      sim = as.integer(sim_opts[3]), model = fct(sim_opts[4]),
-      meta = list(meta)
+    list(
+      sgp = sim_opts[1], rgp = sim_opts[2], sim = sim_opts[3],
+      model = sim_opts[4], meta = list(meta)
     )
   }) |>
-  bind_rows()
+  bind_rows() |>
+  mutate(
+    across(c(sgp, rgp, model), fct),
+    across(c(sim), as.integer)
+  )
+# Todo: other metas also need to be ordered
 
 
 
@@ -338,7 +351,8 @@ model_names_main <- model_names |>
 
 # Example of true vs fitted plot:
 {
-  sgp <- "r2_ar1_mu2"; rgp <- "r2_markov_symm_high"; model <- "r2_markov"
+  sgp <- "r2_ar1_rho2"; rgp <- "r2_markov_symm_high"; model <- "r2_markov"
+  sgp <- "r2_ar1_mu2"; rgp <- "r2_threshold_x_05"; model <- "r2_threshold_x"
   diagnostics$estimations$panel_estimations(
     subset_results(simulations_data, sgps = sgp, rgps = rgp, model = model),
     subset_results(estimations_data, sgps = sgp, rgps = rgp, model = model),
@@ -350,22 +364,23 @@ model_names_main <- model_names |>
 
 # Residuals panel for each RGP-Model pair (each with all SGPs within):
 pwalk(distinct(model_names_main, rgp, model), \(rgp, model, ...) {
-  plot_all_sgps2(
+  plot_sgps_est(
     estimations_data, simulations_data, diagnostics$estimations$panel_residuals,
-    sgps = unique(model_names_main$sgp), n_burn = n_burn, n_t = n_t, n_h = n_h,
-    regime_aligned = FALSE, hline = 0, title = NULL, lims = c(0, 0.4)
+    sgps = unique(model_names_main$sgp), rgp = rgp, model = model,
+    n_burn = n_burn, n_t = n_t, n_h = n_h,
+    regime_aligned = TRUE, hline = 0, title = NULL, lims = c(0, 0.4)
   ) +
     plot_annotation(
       title = glue("RGP: {dicts$rgps[rgp]};  Model: {dicts$models[model]}")
     )
-  ggsave2("outputs/estimations/residuals-{rgp}-{model}.png", 28, 14)
+  ggsave2("outputs/estimations/residuals-{rgp}-{model}-na.png", 28, 14)
 })
 
 
 # Residuals panel for each RGP-Model pair (each with all SGPs within):
 pwalk(distinct(model_names, rgp, sim, model), \(rgp, model, ...) {
   data <- subset_results(
-    estimations_meta, dicts, rgps = rgp, model = model
+    estimations_meta, rgps = rgp, model = model
   )
   diagnostics$estimations$coefs_distribution(
     data, params, model_names
@@ -385,13 +400,20 @@ if (FALSE) cat(gt::as_latex(.tab), file = "outputs/estimations/table_residuals.t
 
 # Metrics ----------------------------------------------------------------------
 
-data_models_final <- get_data_final(
-  estimations_data, simulations_data, estimations_meta, "models"
+# data_s = simulations_data; data_e = estimations_data; data_m = estimations_meta
+data_models_final <- metrics$get_data_final(
+  simulations_data, estimations_data, estimations_meta, "models",
+  n_t = n_t, n_warm = n_burn + n_l + 1, n_h = n_h, model_names = model_names
 )
 data_models_final
+if (FALSE) {
+  write_rds(data_models_final, "data/data_models_final.rds") %>%
+    {cli$cli_alert_success("Final models data saved to {.file data/data_models_final.rds}")}  
+}
 
-data_regimes_final <- get_data_final(
-  estimations_data, simulations_data, estimations_meta, "regimes"
+data_regimes_final <- metrics$get_data_final(
+  simulations_data, estimations_data, simulations_data, estimations_meta, "regimes",
+  n_t = n_t, n_warm = n_burn + n_l + 1, n_h = n_h, model_names = model_names
 )
 data_regimes_final
 
@@ -402,6 +424,7 @@ data_regimes_final
 # Do for both data_models_final and data_regimes_final. Regimes has an extra
 # regime variable
 
+colnames(reg_data)
 
 # Adjusting factor levels:
 map(data_models_final[c("rgp", "sgp", "model")], levels)
@@ -409,8 +432,15 @@ reg_data <- data_models_final |>
   mutate(
     sgp = str_remove(sgp, "[^_]$"),
     rgp = str_remove(rgp, "_[^_]+$"),
-  ) %>%
-  filter(sgp == "r2_ar1_mu")
+  )
+map(reg_data[c("rgp", "sgp", "model")], unique)
+
+
+# Removing extreme outliers:
+reg_data$rmse |> cut(breaks = c(0, 5, 10, 25, 50, 100, 1000, Inf)) |> table()
+reg_data$mape |> cut(breaks = c(0, 5, 10, 25, 50, 100, 1000, Inf)) |> table()
+# Todo: histogram with log_x
+reg_data <- filter(reg_data, rmse < 10)
 
 
 # First step:
@@ -421,7 +451,7 @@ reg_data <- data_models_final |>
 # Basic regressions:
 lm(rmse ~ sim, reg_data) |> summary()
 lm(rmse ~ sgp * rgp, reg_data) |> summary()
-lm(rmse ~ model*rgp + sgp, reg_data) |> summary()
+lm(rmse ~ model * rgp + sgp * rgp, reg_data) |> summary()
 
 
 # Metrics must be separated by the relevant factor (SGP metrics run separately
@@ -431,10 +461,33 @@ lm(rmse ~ model*rgp + sgp + model*sgp_metric_est, reg_data) |> summary()
 
 
 # Graphs:
-reg_data |>
-  filter(rmse < 100) |>
-  ggplot(aes(sgp_metric_est, rmse)) +
-  geom_point(aes(color = model, shape = model)) +
-  ggh4x::facet_grid2(vars(rgp), vars(sgp), scales = "free", independent = "all")
-  #scale_x_log10() + scale_y_log10() +
-  #geom_smooth(method = "lm") +
+reg_data$rmse |> cut(breaks = c(5, 10, 25, 50, 100, 1000)) |> table()
+(reg_data$rmse > 5) |> table()
+
+plot_results <- function(
+  data, x,
+  logx = FALSE, logy = FALSE, smooth = TRUE, n = 3000
+) {
+  data |>
+    slice_sample(n = n) |>
+    ggplot(aes({{x}}, rmse)) +
+    geom_point(aes(color = model, shape = model), alpha = 0.5) +
+    ggh4x::facet_grid2(vars(rgp), vars(sgp), scales = "free", independent = "all") +
+    list(
+      if (logx) scale_x_log10(),
+      if (logy) scale_y_log10(),
+      if (smooth) geom_smooth(aes(color = model), method = "lm", fill = NA)
+    )
+}
+
+plot_results(reg_data, mape, logx = TRUE)
+
+plot_results(reg_data, sgp_metric_est)
+plot_results(reg_data, sgp_metric_true)
+plot_results(reg_data, sgp_metric_diff)
+
+plot_results(reg_data, mu_est)
+plot_results(reg_data, mu_diff)
+
+plot_results(reg_data, rho1_est)
+plot_results(reg_data, rho1_diff)

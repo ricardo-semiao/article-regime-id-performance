@@ -266,8 +266,9 @@ table_sgps <- function(data, dgps = NULL) {
   data_anova <- data_metrics %>%
     group_by(sgp, rgp) %>%
     summarise(
-      pvalue = anova(lm(sgp_metric ~ r))[["Pr(>F)"]][1]
+      pvalue = t.test(sgp_metric ~ r)[["p.value"]]
     )
+  # Todo: consider `anova(lm(sgp_metric ~ r))[["Pr(>F)"]][1]`
 
   data_final <- data_metrics %>%
     group_by(sgp, rgp, r) %>%

@@ -176,7 +176,10 @@ regimes_duration <- function(y, r, n_r = length(unique(r)), ...) {
 #' @returns [`matrix(, n_r, n_r)`]
 #' @export
 regimes_transmat <- function(y, r, n_r = length(unique(r)), prop = TRUE, ...) {
-  if (n_r < 2) cli_abort("At least 2 regimes are required.")
+  if (n_r < 2) {
+    n_r <- 2 # Todo: correct?
+    #cli_abort("At least 2 regimes are required.")
+  }
 
   r_lead <- r[-1]
   x <- paste0(r_lead - diff(r), "_", r_lead)
@@ -206,4 +209,4 @@ regimes_thresholds <- function(y, r, n_r = length(unique(r)), ...) {
     if (dist > 0) min_top_r + dist / 2 else max_bot_r - dist / 2
   })
 }
-# Todo: consider `... else NA`
+# Todo: consider `... else NA`; sanitize

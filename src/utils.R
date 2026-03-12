@@ -129,7 +129,8 @@ cli_alert_items <- function(failed_items) {
   if (length(failed_items) == 0) {
     cli$cli_alert_success("No errors found.")
   } else {
-    cli$cli_alert_danger("Items with errors: {.val {failed_items}}")
+    cli$cli_alert_danger("{length(failed_items)} items with errors: \\
+    {.val {failed_items}}")
   }
 }
 
