@@ -25,6 +25,7 @@ format:
                 \usepackage{algorithm}
                 \usepackage{algpseudocode}
                 \usepackage{float}
+                \usepackage{multirow}
                 \makeatletter         
                 \renewcommand\maketitle{
                     {\raggedright
@@ -78,12 +79,16 @@ The first focus is common in forecasting econometrics: exactly identifying the d
 
 The second focus is less orthodox and specific to RS models. These models are special in the sense that they not only identify the series in question but also its states -- its regimes -- thus allowing the econometrician to describe the distribution of each regime and how different they are from each other. This characterization of regimes' distributions might be informative for the model's performance: for example, if the DGP implies different intercepts across regimes, a model whose identified regimes have the same conditional average is probably not capturing that dynamic well; or some class of model can be good at capturing that dynamic but bad at capturing changes on the persistence. These examples might seem obvious, but I will show that there is many useful information to be taken from this kind of analysis.
 
-The nature of this project is explorative. I will simulate a diverse set of DGPs and try to find stylized facts about how each RS model adjusts to them, and how the characteristics of the estimated regimes relate to this adjustment. To make things more concrete, in the remainder of this section I synthesize the methodology, describe the patterns I hope to find, and present some of the actual findings. Additionally, I briefly present the literature on RS models and how my work contributes to it.
+The nature of this project is explorative. I will simulate a diverse set of DGPs and try to find stylized facts about how each RS model adjusts to them, and how the characteristics of the estimated regimes relate to this adjustment. To make things more concrete, in the remainder of this section I synthesize the methodology, describe the patterns I hope to find, and present some of the actual findings.
+
+<!-- ARCHIVE: Additionally, I briefly present the literature on RS models and how my work contributes to it. -->
 
 
 ## Basic methodology and hypothesis {#sec-intro-method}
 
-The methodology follows a common setup. The first step is to establish a theoretical framework that describes all RS models in a unified way. Here, I denote the separate 'ingredients' in an RS DGP: the _series generating process_ (SGP) and the _regime generating process_ (RGP). By varying these 'ingredients', I define a diverse set of DGPs to be considered. Then, Monte Carlo simulations are used to generate series, each being fitted by all RS models. As many questions can arise from the broad motivation of this research, creating a very general and expandable setup and implementation is a goal in itself.
+The methodology follows a common setup. The first step is to establish a theoretical framework that describes all RS models in a unified way. Here, I denote the separate 'ingredients' in an RS DGP: the _series generating process_ (SGP) and the _regime generating process_ (RGP). By varying these 'ingredients', I define a diverse set of DGPs to be considered. Then, Monte Carlo simulations are used to generate series, each being fitted by all RS models. As many questions can arise from the broad motivation of this research, creating a very general and expandable setup and implementation is a goal in itself. To restrain the focus, I will consider only stationary $AR(1)$ processes (SGPs), and when regime changes are known to exist.
+
+<!-- UPDATE: with 2 regimes only -->
 
 For the first part of the work, processing the Monte Carlo results starts with visualizing the generated series, understanding how each DGP 'works' and how RGP and SGP interact. With this in hand, the fit of the models can be visualized, checking which models captured the dynamics in which contexts. Then, more systematic regression analysis is done, explaining the performance of each estimated model by the DGP and model used, as well as interactions between the two, which can capture measures of mis-specification.
 
@@ -100,7 +105,7 @@ In parallel, there are more specific questions: How does the effect of mis-speci
 - Parada de ter 2 focos: Poderiamos ir alem no de considerar DGPs e modelos complexos, estudar mais a sensibilidade a má especificação, mas vamos deixar o framework/código pronto para isso, mas dar foco no segundo foco, que é a parada das métricas. Justificação: tbm é util para usar as métricas para identificar regimes, pré-modelagem, de maneira mais agnóstica. Poderia ter exercício específico pra isso
 -->
 
-The rest of this work is divided as follows: the general framework is presented in @sec-theory and @sec-sim, while the specific implementation chosen is presented in @sec-cons and @sec-impl. The exploratory analysis is done in @sec-exp, and the systematic analysis in @sec-exs. Finally, @sec-conclusion concludes. <!-- UPDATE -->
+The rest of this work is divided as follows: @sec-lit presents the literature review. the general framework is presented in @sec-theory and @sec-sim, while the specific implementation chosen is presented in @sec-cons and @sec-impl. The exploratory analysis is done in @sec-exp, and the systematic analysis in @sec-exs. Finally, @sec-conclusion concludes. <!-- UPDATE -->
 
 
 
@@ -121,32 +126,32 @@ The most common deterministic models are the threshold-based ones, where some ob
 
 On the stochastic front, the Markov switching literature started with the seminal work of James Hamilton in [@Hamilton1989] via the MSAR model, where the regime is governed by an unobservable Markov process -- the probability of switching to another other regime is constant and depends only on the current regime. This implies in an geometric distribution for the amount of periods in a given regime's instance. The Markov switching smooth transition, as in [@Elliott2018], model exist, but has more added complexity than the very natural jump from the TAR to the STAR model.
 
-Moving forward, many variations on the regime variable modelling were created. The threshold variable have a delay or some transformation, it can be the series itself, an exogenous variable, or even a non-linear combination of variables ([@Chen2011]). The probability distributions of MS models were extended to allow different distributions for the time spent in one regime, and dependence on more past values ([@Ferguson1980]). The smooth transition function has several options, with common ones being the logistic and the exponential. The models were generalized to any number of regimes, with the STAR model being equivalent to a Neural Network, as described by [@Medeiros2000].
+Moving forward, many variations on the regime variable modelling were created. The threshold variable have a delay or some transformation, it can be the series itself, an exogenous variable, or even a non-linear combination of variables [@Chen2011]. The probability distributions of MS models were extended to allow different distributions for the time spent in one regime, and dependence on more past values [@Ferguson1980]. The smooth transition function has several options, with common ones being the logistic and the exponential. The models were generalized to any number of regimes, with the STAR model being equivalent to a Neural Network, as described by [@Medeiros2000].
 
 Blurring the line between deterministic and stochastic models, [@Chang2017] uses threshold dynamics but adding an innovation that is dependent with the previous state's innovation, and simplifies to a MS model when the threshold dynamic is exogenous and stationary. [@Wu2007] creates a half-threshold half-random regime process. There are also unsupervisioned approaches of estimation, that make no assumption on the nature of the latent process, as in [@Akioyamen2020], where some clustering model can be used to identify regimes, and later the functional form can be estimated for each regime separately.
 
-As I will note in this work, the functional form across regimes and the regime process itself are fairly independent, thus other variations arise from considering more complex functions than the autoregressive one. ARMA models have their RS counterparts ([@Brockwell1992]). Not only the mean, but the variance can also be modelled: the ARCH/GARCH family, very relevant for finance, have their regime switching versions ([@Hamilton1994], [@Chen2011]). More recently, models such as decision trees have been adapted to the regime switching context, as in [@Adam2024]. Similarly, there are also models for vectors of times series.
+As I will note in this work, the functional form across regimes and the regime process itself are fairly independent, thus other variations arise from considering more complex functions than the autoregressive one. ARMA models have their RS counterparts [@Brockwell1992]. Not only the mean, but the variance can also be modelled: the ARCH/GARCH family, very relevant for finance, have their regime switching versions ([@Hamilton1994, @Chen2011]). More recently, models such as decision trees have been adapted to the regime switching context, as in [@Adam2024]. Similarly, there are also models for vectors of times series.
 
-General reviews on RS models include [@Tan2025], [@Potter2000], [@Hamilton2020], while [@Chen2011] focuses on threshold models, [@Dijk2002] in smooth transition, and [@Song2021] in Markov switching. Note that RS models are considered in both frequentist and Bayesian frameworks, with the latter inheriting a lot from the SS models estimation literature.
+General reviews on RS models include [@Tan2025], [@Potter2000], and [@Hamilton2020], while [@Chen2011] focuses on threshold models, [@Dijk2002] in smooth transition, and [@Song2021] in Markov switching. Note that RS models are considered in both frequentist and Bayesian frameworks, with the latter inheriting a lot from the SS models estimation literature.
 
 
 ## Forecasting performance
 
-<!-- TODO: Com um outro nome, mas falar:
+There are many research topics in RS performance. I'll focus on (i) important factors that relate to model selection and parametrization, to contextualize the decisions I made in this work; and (ii) comparisons between models, to contextualize the experiments I ran.
 
-I start by familiarizing the reader with the literature of RS models and its seminal papers. Then, I present a review of the known factors that influence their performance, both to compare with my results and to contextualize the contribution of this work.
+While RS models are frequently cited for their superior in-sample fit, which is useful for explaining historical phenomena, [@Robert1999] noted that even minor errors in forecasting the future regime state can propagate through the non-linear structure, causing the overall prediction to perform worse than linear alternatives. Furthermore, standard metrics like mean squared error may be ill-suited for evaluating non-linear time series, potentially masking the utility of these models in capturing turning points or specific economic states.
 
-## Existing regime switching models
+A primary challenge in RS modeling is managing the trade-off between flexibility and overfitting. The most critical decision is on the number of regimes: too few can underfit, while too many might lead to overparametrization. Similarly, allowing, all parameters to switch can help capture complex dynamics and avoid mis-specification, but doing it when unneeded often dilutes out-of-sample power [@Tan2025].
 
-> Ainda não escrevi o texto final, mas é uma simples introdução de cada, mais sobre intuição e aplicações do que matemática. Para cada modelo: S-Breaks - teste de Chow e Bai-Perron; TAR/SETAR papers do Howell Tong; Markov Hamilton, inclusive HMM para business cycle; STAR - papers do Timo Teräsvirta.
+Each model also have their own specificities. For Markov Switching models, the estimation method is relevant: for example, EM algorithms have been noted to balance accuracy and speed in high-dimensional settings [@Akbal2024]. Moreover, the translation of soft posterior probabilities into hard regime labels affects accuracy, and different rules have different properties [@Hall2025]. For deterministic models, the challenge lies in variable selection: identifying the correct threshold variable, delay parameter, or non-linear combination of variables remains a significant hurdle for effective specification.
 
-Important papers: [[@Chow1960]], [@BaiPerron1998], [[@Hamilton1989]], [[@Terasvirta1994]], [@TongLim1980].
+Many papers compare the different RS models in many different contexts ([@Clements1998], [@Bierbrauer2004], [@Pinson2008], [@Janczura2010], [@Elias2014], [@Chen2014], [@Panopoulou2015], [@Verne2021], [@Aydin2022]), and no single model is universally superior. The same context can present a different "best" model depending on the focus (e.g. nowcasting, regime identification, portfolio performance, etc.) [@Akbal2024].
 
-## Known factors influencing performance
+TAR models are best employed when regime changes are triggered by a single, observable variable with rigid boundaries. They've shown effective for financial assets like gold prices and exchange rates, where transitions are fast rather than gradual [@Aydin2022]. However, their reliance on observable triggers is a limitation: in contexts like offshore wind power, where fluctuations are driven by complex, non-observable states, TAR models fail to capture the underlying dynamics and significantly underperform compared to latent variable models [@Pinson2008].
 
-> Ainda não escrevi o texto final, as conclusões vão na linha de: (i) muita análise em contextos econômicos, as simulações feitas aqui são úteis para poder isolar melhor as coisas; (ii) a análise das características dos regimes é pouco explorada, por mais que em parte por ser algo menos ortodoxo também. -->
+STAR models are theoretically appropriate for gradual economic adjustments but often face practical identification challenges. In many financial applications, the estimated smoothness parameter becomes so high that the model collapses into an abrupt threshold model, rendering the specific "smooth" specification inefficient [@Aydin2022]. However, STAR models can outperform MS in macroeconomic contexts characterized by explosive volatility, such as GDP growth requiring the capture of "brutal" transitions typical of recession phases [@Verne2021].
 
-
+Markov-Switching Models (MS/MSAR) are the superior choice when regimes are driven by latent, multi-factor variables (e.g., market sentiment or meteorology) rather than a single observable index. But, with a more flexible regime framework, they have shown to be more sensitive to specification of the number of regimes [@Bierbrauer2004], [@Janczura2010].
 
 
 
@@ -163,7 +168,7 @@ In this work, I consider only univariate series.
 
 [^colon]: Let $a:b \coloneqq \{a, a+1, \dots, b\}$ for $a \leq b \in \mathbb{Z}$, and $y_{a:b} \coloneqq \{y_a, \dots, y_b\}$.
 
-A DGP can be written in terms of a pair: _regime generating process_ (RGP) and _series generating process_ (SGP). These are functions with parameters $\Theta_r$ and $\Theta_y$, respectively, such that:
+A DGP can be written in terms of a pair: _regime generating process_ (RGP) and _series generating process_ (SGP). This is essentially the separation between the state/system equation, and the output/measurement equation, in state space models. They are functions with parameters $\Theta_r$ and $\Theta_y$, respectively, such that:
 
 \begin{equation}
 \begin{array}{rrlllll}
@@ -547,13 +552,29 @@ The errors should be i.i.d. Gaussian with mean $0$ and should not present any pa
 
 On top of visualizing the series, to further check for problems in the series generations, the regime-conditional and inconditional moments are estimated and tested against their true values. Additionally, the ANOVA test of equal moment on all regimes is done. The regime-conditional true values are calculated as the standard $AR(1)$ moments. There is only an analytical formula for the unconditional moments of the SB and MS RGP, calculated via iterated expectations.
 
-Table **TODO** shows the results. Each group of lines corresponds to the moments of a DGP. The first two columns relate to the values conditional in regime 1 and 2, the third column gives the unconditional values. Each cell has the value of the moment, and in brackets the p-value of the null hypothesis that the moment is equal to its true value. The last column shows the ANOVA p-value.
+Table @TODO shows the results. Each group of lines corresponds to the moments of a DGP. The first two columns relate to the values conditional in regime 1 and 2, the third column gives the unconditional values. Each cell has the value of the moment, and in brackets the p-value of the null hypothesis that the moment is equal to its true value. The last column shows the ANOVA p-value.
 
 > Os valores finais dos diagnósticos podem mudar. Coloco aqui uma tabela de placeholder.
 
-```{=tex}
+\begin{table}[]
+\begin{tabular}{cc|ccc|ccc|ccc|c}
+\multirow{2}{*}{RGP}  & \multirow{2}{*}{RN} & \multicolumn{3}{c}{s = 1} & \multicolumn{3}{c}{s = 2} & \multicolumn{3}{c}{Incondicional} & \multirow{2}{*}{ANOVA} \\
+    & & $\mu$ & $\rho$ & $\sigma$ & $\mu$ & $\rho$ & $\sigma$ & $\mu$ & $\rho$ & $\sigma$ &   \\\hline\hline
+\multirow{3}{*}{RPG1} & $\Delta$$\mu$  & 9.4* & & & & & &  &  &  & \textless 0.05 \\
+    & $\Delta$$\rho$  &  & & & & & &  &  &  &   \\
+    & $\Delta$$\sigma$  &  & & & & & &  &  &  &   \\
+\multirow{3}{*}{RPG2} & $\Delta$$\mu$  &  & & & & & &  &  &  &   \\
+    & $\Delta$$\rho$  &  & & & & & &  &  &  &   \\
+    & $\Delta$$\sigma$  &  & & & & & &  &  &  &   \\
+\multirow{3}{*}{RPG3} & $\Delta$$\mu$  &  & & & & & &  &  &  &   \\
+    & $\Delta$$\rho$  &  & & & & & &  &  &  &   \\
+    & $\Delta$$\sigma$  &  & & & & & &  &  &  &
+\end{tabular}
+\end{table}
+
+<!-- ```{=tex}
 \input{../../outputs/simulations/table_sgps.tex}
-```
+``` -->
 
 <!-- TODO: Table -->
 
@@ -570,7 +591,7 @@ There are several aspects in which each DGP's generated series differ, and how t
 
 By graphing the latest time-point considered in the calculation of the metrics on the x-axis, and the value of the metric on the y-axis, we can see how the separation evolves across sample size. This is useful because the sample size is one of the most important factos for the models to learn how to separate the regimes.
 
-> Item. Coloco aqui a análise antiga só para referência.
+> Idem. Coloco aqui a análise antiga só para referência.
 
 @fig-sim-m1 shows the metrics for the SB-AR(1) model, with a break at the middle. The left-hand side shows the metrics calculated with the data up to the time on the x-axis, yielding a 'rolling' metric that can be used to analyze convergence. The right-hand side shows the distribution of the metrics calculated with the full series, for all simulations. We can see how the second regime only has information starting from $T/2$. Each row represents a different regime nature, thus a different conditional metric (mean, ACF(1), and SD, respectively).
 
@@ -776,15 +797,16 @@ Here I start by summarizing the motivation and methodology.
 
 Then, I focus on the main results. First, with the more descriptive findings about properties of the models, then, the practical recommendations of metrics an econometrician should look at when choosing a model[^ai].
 
-> Sobre a nota de rodapé: É necessário colocar algo assim? Talvez como nota de rodapé na primeira página?
-
-[ai]: AI disclaimer: this work was generated generally without the help of large language models, except sparringly as a research tool and code autocompletions during the implementation phase.
 
 
 # References {.unnumbered .unlisted}
 
 ::: {#refs}
 :::
+
+AI disclaimer: this work was generated generally without the help of large language models, except sparringly as a research tool and code autocompletions during the implementation phase.
+
+> É necessário colocar algo assim? Talvez como nota de rodapé na primeira página?
 
 
 
