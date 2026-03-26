@@ -10,7 +10,8 @@
         "recommendations": [
             "rdebugger.r-debugger",
             "reditorsupport.r",
-            "reditorsupport.r-syntax"
+            "reditorsupport.r-syntax",
+            "quarto.quarto"
         ]
     }
 }

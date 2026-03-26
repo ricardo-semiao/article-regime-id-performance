@@ -39,6 +39,7 @@ format:
                 \DeclareMathOperator*{\argmin}{arg\,min}
                 \setcounter{tocdepth}{2}
                 \setcounter{secnumdepth}{3}
+                \numberwithin{equation}{section}
                 \let\oldsection\section
                 \renewcommand\section{\clearpage\oldsection}         
 ---
@@ -48,6 +49,8 @@ format:
 \newcommand{\rgp}{\text{rgp}}
 \newcommand{\dgp}{\text{dgp}}
 \renewcommand{\mod}{\text{mod}}
+\newcommand{\met}{\text{met}}
+\newcommand{\disp}{\text{disp}}
 
 \renewenvironment{quote}
     {\list{}{\rightmargin\leftmargin}%
@@ -60,6 +63,10 @@ format:
 > Várias outras mudanças, te conto na reunião. A introdução mudou mais o linguajar (learning e não inferência). O framework teorico mudou só a parte de métricas, onde adicionei definições de estacionariedade necessárias. As seções seguintes eu principalmente reorganizei como dito no comentário acima. A "Simulation implementation" é nova, e é aquela versão mais focada dos diagnósticos.
 
 > Fiz a revisão de literatura.
+
+<!-- TODO: comentários:
+- Juntar 3 e 4?
+ -->
 
 
 
@@ -78,7 +85,7 @@ As with any forecasting model, it is important to understand the factors that in
 
 The first focus is common in forecasting econometrics: exactly identifying the data generating process (DGP) is the exception, not the rule, so the modeling goal is actually to find a robust approximator. It is important to document how each RS model behaves under different mis-specifications, explore possible universal approximators, and understand how each element of the DGP affects the learning problem of the models.
 
-The second focus is less orthodox and specific to RS models. These models are special in the sense that they not only identify the series in question but also its states -- its regimes -- thus allowing the econometrician to describe the distribution of each regime and how different they are from each other. This characterization of regimes' distributions might be informative for the model's performance: for example, if the DGP implies different intercepts across regimes, a model whose identified regimes have the same conditional average is probably not capturing that dynamic well; or some class of model can be good at capturing that dynamic but bad at capturing changes on the persistence. These examples might seem obvious, but I will show that there is many useful information to be taken from this kind of analysis.
+The second focus is less orthodox and specific to RS models. These models are special in the sense that they not only identify the series in question but also its states -- its regimes -- thus allowing the econometrician to describe the distribution of each regime and how different they are from each other. This characterization of regimes' distributions might be informative for the model's performance: for example, if the DGP implies different intercepts across regimes, a model whose identified regimes have the same conditional average is probably not capturing that dynamic well; or some class of model can be good at capturing that dynamic but bad at capturing changes on the persistence. These examples might seem obvious, but I will show that there is much useful information to be taken from this kind of analysis.
 
 The nature of this project is explorative. I will simulate a diverse set of DGPs and try to find stylized facts about how each RS model adjusts to them, and how the characteristics of the estimated regimes relate to this adjustment. To make things more concrete, in the remainder of this section I synthesize the methodology, describe the patterns I hope to find, and present some of the actual findings.
 
@@ -87,9 +94,7 @@ The nature of this project is explorative. I will simulate a diverse set of DGPs
 
 ## Basic methodology and hypothesis {#sec-intro-method}
 
-The methodology follows a common setup. The first step is to establish a theoretical framework that describes all RS models in a unified way. Here, I denote the separate 'ingredients' in an RS DGP: the _series generating process_ (SGP) and the _regime generating process_ (RGP). By varying these 'ingredients', I define a diverse set of DGPs to be considered. Then, Monte Carlo simulations are used to generate series, each being fitted by all RS models. As many questions can arise from the broad motivation of this research, creating a very general and expandable setup and implementation is a goal in itself. To restrain the focus, I will consider only stationary $AR(1)$ processes (SGPs), and when regime changes are known to exist.
-
-<!-- UPDATE: with 2 regimes only -->
+The methodology follows a common setup. The first step is to establish a theoretical framework that describes all RS models in a unified way. Here, I denote the separate 'ingredients' in an RS DGP: the _series generating process_ (SGP) and the _regime generating process_ (RGP). By varying these 'ingredients', I define a diverse set of DGPs to be considered. Then, Monte Carlo simulations are used to generate series, each being fitted by all RS models. As many questions can arise from the broad motivation of this research, creating a very general and expandable setup and implementation is a goal in itself. To restrain the focus, I will consider only stationary $AR(1)$ processes (SGPs), and when regime changes are assumed to exist.
 
 For the first part of the work, processing the Monte Carlo results starts with visualizing the generated series, understanding how each DGP 'works' and how RGP and SGP interact. With this in hand, the fit of the models can be visualized, checking which models captured the dynamics in which contexts. Then, more systematic regression analysis is done, explaining the performance of each estimated model by the DGP and model used, as well as interactions between the two, which can capture measures of mis-specification.
 
@@ -106,32 +111,36 @@ In parallel, there are more specific questions: How does the effect of mis-speci
 - Parada de ter 2 focos: Poderiamos ir alem no de considerar DGPs e modelos complexos, estudar mais a sensibilidade a má especificação, mas vamos deixar o framework/código pronto para isso, mas dar foco no segundo foco, que é a parada das métricas. Justificação: tbm é util para usar as métricas para identificar regimes, pré-modelagem, de maneira mais agnóstica. Poderia ter exercício específico pra isso
 -->
 
-The rest of this work is divided as follows: @sec-lit presents the literature review. the general framework is presented in @sec-theory and @sec-sim, while the specific implementation chosen is presented in @sec-cons and @sec-impl. The exploratory analysis is done in @sec-exp, and the systematic analysis in @sec-exs. Finally, @sec-conclusion concludes. <!-- UPDATE -->
+The rest of this work is divided as follows: @sec-lit presents the literature review. the general framework is presented in @sec-theory and @sec-sim, while the specific implementation chosen is presented in @sec-impl. The results are split into an exploratory section ([-@sec-exp]) and a systematic one ([-@sec-sys]). Finally, @sec-conclusion concludes. <!-- UPDATE -->
 
 
 
 # Related literature {#sec-lit}
 
-The regime switching literature is vast and with many models' variations. It is important to map the models, the similarities and differences between them. Additionally, an important starting point is to discuss what is already known about their forecasting performance and the factors that influence it. Each is done in the sections below. Before doing so, I will better define the bounds of RS literature by discussing two closely related ones.
+The regime switching literature is vast and contains many model variations. It is important to map the models, the similarities, and the differences between them. Additionally, an important starting point is to discuss what is already known about their forecasting performance and the factors that influence it. Each is done in the sections below. Before doing so, I will better define the bounds of RS literature by discussing two closely related ones.
 
-The first is the state-space (SS) literature, with its quintessential implementation by @Kalman1960. While RS and SS models have developed as somewhat independent fields, RS can be viewed as a subset of SS, where state (regime) variable and the observed series variable are modeled separately. This separation is central to the framework used in this paper. Bridges between the literatures include Switching State-Space Models and the seminal work by @Kim1994, which extends Hamilton's Markov-switching model to general state-space models.
+The first is the state-space (SS) literature, with its quintessential implementation by @Kalman1960. While RS and SS models have developed as somewhat independent fields, RS can be viewed as a subset of SS, where the state (regime) variable and the observed series variable are modeled separately. This separation is central to the framework used in this paper. Bridges between the literatures include Switching State-Space Models and the seminal work by @Kim1994, which extends Hamilton's Markov-switching model to general state-space models.
 
-The second is the structural break (SB) literature, the most relevant starting point being with @Chow1960. Much of it is devoted to diagnosing breaks, which are indeed present in RS settings, with the non-constant parameters. However, SB models typically treat breaks as exogenous and non-recurring. Bridging the gap, @Bai1998 allow for multiple unknown breaks, which can be relevant for RS contexts, while @Chib1998 demonstrates that SBs can be formulated as Markov-switching processes that have only positive probability for staying in the initial regime and switching to the next, not for switching back.
+The second is the structural break (SB) literature, the most relevant starting point being @Chow1960. Much of it is devoted to diagnosing breaks, which are indeed present in RS settings, with the non-constant parameters. However, SB models typically treat breaks as exogenous and non-recurring. Bridging the gap, @Bai1998 allows for multiple unknown breaks, which can be relevant for RS contexts, while @Chib1998 demonstrates that SBs can be formulated as Markov-switching processes that have only positive probability for staying in the initial regime and switching to the next, not for switching back.
 
 
 ## Regime switching models
 
-Two of the most essencial aspects of the different RS approaches are: (i) if the latent regime variable is modeled in a deterministic or stochastic fashion, and (ii) if the changes between regimes are abrupt or smooth.
+Two of the most essential aspects of the different RS approaches are: (i) if the latent regime variable is modeled in a deterministic or stochastic fashion, and (ii) if the changes between regimes are abrupt or smooth.
 
-The most common deterministic models are the threshold-based ones, where some observable variable being above or below some threshold(s) is what determines the regime. The work of @Tong1978 and [-@Tong1980] popularized the threshold autoregressive model, each regime having its own set of autorregressive parameters. Tong proposed that capturing smooth transitions between regimes would be important, and @Terasvirta1992, [-@Terasvirta1994] defined the smooth transition autotegressive model in , where the distance between an observable variable and some threshold determines the continuous weight of each regime.
+The most common deterministic models are the threshold-based ones, where some observable variable being above or below some threshold(s) is what determines the regime. The work of @Tong1978 and [-@Tong1980] popularized the threshold autoregressive model, each regime having its own set of autoregressive parameters. Tong proposed that capturing smooth transitions between regimes would be important, and @Terasvirta1992, [-@Terasvirta1994] defined the smooth transition autoregressive model, where the distance between an observable variable and some threshold determines the continuous weight of each regime.
 
-On the stochastic front, the Markov switching literature started with @Hamilton1989 via the MSAR model, where the regime is governed by an unobservable Markov process -- the probability of switching to another other regime is constant and depends only on the current regime. This implies in an geometric distribution for the amount of periods in a given regime's instance. The Markov switching smooth transition model, as defined by @Elliott2018, exist, but has more added complexity than the very natural jump from the TAR to the STAR model.
+On the stochastic front, the Markov switching literature started with @Hamilton1989 via the MSAR model, where the regime is governed by an unobservable Markov process -- the probability of switching to another regime is constant and depends only on the current regime. This implies a geometric distribution for the number of periods in a given regime's instance[^instance]. The Markov switching smooth transition model, as defined by @Elliott2018, exists, but has more added complexity than the very natural jump from the TAR to the STAR model.
 
-Moving forward, many variations on the regime variable modelling were created. The threshold variable can have a delay or some transformation, it can be the series itself, an exogenous variable, or even a non-linear combination of variables [@Chen2011]. The probability distributions of MS models were extended to allow different distributions for the time spent in one regime, and dependence on more past values [@Ferguson1980]. The smooth transition function has several options, with common ones being the logistic and the exponential. The models were generalized to any number of regimes, with the STAR model being equivalent to a Neural Network, as described by @Medeiros2000.
+[^instance]: Throughout this document, 'regime instance' will be used to describe a contiguous period of time without switches. In a given series, a given regime can have several instances.
 
-Blurring the line between deterministic and stochastic models, @Chang2017 uses threshold dynamics but adding an innovation that is dependent with the previous state's innovation, and simplifies to a MS model when the threshold dynamic is exogenous and stationary. @Wu2007 creates a half-threshold half-random regime process. There are also unsupervisioned approaches of estimation, that make no assumption on the nature of the latent process, as by @Akioyamen2020, where some clustering model can be used to identify regimes, and later the functional form can be estimated for each regime separately.
+### Variations of the classic models
 
-As I will note in this work, the functional form across regimes and the regime process itself are fairly independent, thus other variations arise from considering more complex functions than the autoregressive one. ARMA models have their RS counterparts [@Brockwell1992]. Not only the mean, but the variance can also be modelled: the ARCH/GARCH family, very relevant for finance, have their regime switching versions ([@Hamilton1994, @Chen2011]). More recently, models such as decision trees have been adapted to the regime switching context, as by @Adam2024. Similarly, there are also models for vectors of times series.
+Moving forward, many variations on the regime variable modeling were created. The threshold variable can have a delay or some transformation; it can be the series itself, an exogenous variable, or even a non-linear combination of variables [@Chen2011]. The probability distributions of MS models were extended to allow different distributions for the time spent in one regime, and dependence on more past values [@Ferguson1980]. The smooth transition function has several options, with common ones being the logistic and the exponential. The models were generalized to any number of regimes, with the STAR model being equivalent to a Neural Network, as described by @Medeiros2000.
+
+Blurring the line between deterministic and stochastic models, @Chang2017 uses threshold dynamics but adds an innovation that is dependent on the previous state's innovation, and simplifies to a MS model when the threshold dynamic is exogenous and stationary. @Wu2007 creates a half-threshold, half-random regime process. There are also unsupervised approaches to estimation, that make no assumption on the nature of the latent process, as by @Akioyamen2020, where some clustering model can be used to identify regimes, and later the functional form can be estimated for each regime separately.
+
+As I will note in this work, the functional form across regimes and the regime process itself are fairly independent, thus other variations arise from considering more complex functions than the autoregressive one. ARMA models have their RS counterparts [@Brockwell1992]. Not only the mean, but the variance can also be modeled: the ARCH/GARCH family, very relevant for finance, have their regime switching versions ([@Hamilton1994, @Chen2011]). More recently, models such as decision trees have been adapted to the regime switching context, as by @Adam2024. Similarly, there are also models for vectors of time series.
 
 General reviews on RS models include [@Tan2025], [@Potter2000], and [@Hamilton2020], while [@Chen2011] focuses on threshold models, [@Dijk2002] in smooth transition, and @Song2021 in Markov switching. Note that RS models are considered in both frequentist and Bayesian frameworks, with the latter inheriting a lot from the SS models estimation literature.
 
@@ -140,11 +149,16 @@ General reviews on RS models include [@Tan2025], [@Potter2000], and [@Hamilton20
 
 There are many research topics in RS performance. I'll focus on (i) important factors that relate to model selection and hyperparametrization, to contextualize the decisions I made in this work; and (ii) comparisons between models, to contextualize the experiments I ran.
 
-While RS models are frequently cited for their superior in-sample fit, which is useful for explaining historical phenomena, @Robert1999 noted that even minor errors in forecasting the future regime state can propagate through the non-linear structure, causing the overall prediction to perform worse than linear alternatives. Furthermore, standard metrics like mean squared error may be ill-suited for evaluating non-linear time series, potentially masking the utility of these models in capturing turning points or specific economic states.
 
-A primary challenge in RS modeling is managing the trade-off between flexibility and overfitting. The most critical decision is on the number of regimes: too few can underfit, while too many might lead to overparametrization. Similarly, allowing, all parameters to switch can help capture complex dynamics and avoid mis-specification, but doing it when unneeded often dilutes out-of-sample power [@Tan2025].
+### Hyperparametrization
 
-Each model also have their own specificities. For Markov Switching models, the estimation method is relevant: for example, EM algorithms have been noted to balance accuracy and speed in high-dimensional settings [@Akbal2024]. Moreover, the translation of soft posterior probabilities into hard regime labels affects accuracy, and different rules have different properties [@Hall2025]. For deterministic models, the challenge lies in variable selection: identifying the correct threshold variable, delay parameter, or non-linear combination of variables remains a significant hurdle for effective specification.
+While RS models are frequently cited for their superior in-sample fit, which is useful for explaining historical phenomena, @Dacco1999 noted that even minor errors in forecasting the future regime state can propagate through the non-linear structure, causing the overall prediction to perform worse than linear alternatives. Furthermore, standard metrics like mean squared error may be ill-suited for evaluating non-linear time series, potentially masking the utility of these models in capturing turning points or specific economic states [@].
+
+A primary challenge in RS modeling is managing the trade-off between flexibility and overfitting. The most critical decision is on the number of regimes: too few can underfit, while too many might lead to overparameterization. Similarly, allowing all parameters to switch can help capture complex dynamics and avoid mis-specification, but doing it when unneeded often dilutes out-of-sample power [@Tan2025].
+
+Each model also has its own specificities. For Markov Switching models, the estimation method is relevant: for example, EM algorithms have been noted to balance accuracy and speed in high-dimensional settings [@Akbal2024]. Moreover, the translation of soft posterior probabilities into hard regime labels affects accuracy, and different rules have different properties [@Hall2025]. For deterministic models, the challenge lies in variable selection: identifying the correct threshold variable, delay parameter, or non-linear combination of variables remains a significant hurdle for effective specification.
+
+### Comparisons between models
 
 Many papers compare the different RS models in many different contexts [@Clements1998], [@Bierbrauer2004], [@Pinson2008], [@Janczura2010], [@Elias2014], [@Chen2014], [@Panopoulou2015], [@Verne2021], [@Aydin2022]. No single model is universally superior, the same context can present a different "best" model depending on the focus (e.g. nowcasting, regime identification, portfolio performance, etc.) [@Akbal2024].
 
@@ -227,9 +241,7 @@ Furthermore, $\Theta_y$ could encode different functional forms for each regime.
 
 To construct a diverse set of DGPs, I combine different RGPs, SGPs, and regime natures. One of the challenges of this work is to choose a comprehensible set of these elements, and analyze their differences in a systematic but manageable way.
 
-In the notation above I omitted the error term. For our purposes, it is more useful to write the DGP as a function that receives a sequence of random errors[^erros], and returns the series and the regimes:
-
-[^erros]: This is a simplification, assuming the same error distribution across regimes.
+In the notation above I omitted the error term inside $f_{\sgp}$. Many distributions are interesting, specially fat-tailed and skewed ones. The parameters $\Theta_y$ can even encode different error distributions across regimes. However, if we constrain the same distribution across regimes, with the possible exception of a multiplicative factor, we can simplify the notation and implementation, writing the DGP as a function that receives a sequence of random errors and returns the series and the regimes:
 
 \begin{equation}
     (y_{1:T},~ r_{1:T}) = \dgp(\varepsilon_{1:T};~ \Theta_r, \Theta_y)
@@ -237,7 +249,7 @@ In the notation above I omitted the error term. For our purposes, it is more use
 
 Consider the notation shorthand $y \coloneqq y_{1:T}$, and similarly for other variables, used for the rest of this work.
 
-Let the set of considered DGPs be $P$ (for 'processes'). These are present in the literature, as discussed in @sec-lit, and will be defined in @sec-cons.
+Let the set of considered DGPs be $P$ (for 'processes'). These are present in the literature, as discussed in @sec-lit, and will be defined in @sec-impl.
 
 
 ## Models {#sec-theory-models}
@@ -250,24 +262,24 @@ Consider a model $\mod$ as a function with (hyper-) parameters $\Theta_m$ that g
 
 Notably, the number of estimated regimes $\hat{S}$ is a parameter in $\Theta_m$, which may or may not be equal to $S$.
 
-Let the set of models be $M$ (for 'models'). Also present in the literature, they will be defined in @sec-cons-sgp.
+Let the set of models be $M$ (for 'models'). Also present in the literature, they will be defined in @sec-impl-sgp.
 
 
-## Metrics {#sec-theory-metrics}
+## Regime conditional metrics {#sec-theory-metrics}
 
-A regime-conditional (RC) metric $c$ is function that receives a vector of series and a vector of regimes, and returns a sequence with one value for each regime. They are used to characterize the distribution of $y_t$ or $(y_t, y_{t-j})$ within each regime.
+A regime-conditional (RC) metric $\met$ is function that receives a vector of series and a vector of regimes, and returns a sequence with one value for each regime. They are used to characterize the distribution of $y_t$ or $(y_t, y_{t-j})$ within each regime.
 
 \begin{equation}
-    c: (y, r) \mapsto \mathbb{R}^{S}
+    \met: (y, r) \mapsto \mathbb{R}^{S}
 \end{equation}
 
-An example is the function that returns, for each regime $s$, the mean of the series weighted by $r^s_t$. This can be done for many common metrics, and is equivalent to mapping $(y, r)$ to the $S$ sets $R_s$ of regimes' observations[^regime_obs_set], then applying the metric to each set. The benefit of the first approach is that it is more general, allowing for non-binary -- i.e. smooth transition -- regimes.
+An example is the function that returns, for each regime $s$, the mean of the series weighted by $r^s_t$. This can be done for many common metrics, and is equivalent to mapping $(y, r)$ to the $S$ sets $R_s$ of regimes' observations[^regime_obs_set], then applying the metric to each set. The benefit of the first approach is that it is more general, allowing for non-binary -- i.e., smooth transition -- regimes.
 
 [^regime_obs_set]: $R_s \coloneqq \{ y_t ~:~ r^s_t = \max\{r_t\} \}$.
 
-For the joint distribution $(y_t, y_{t-j})$, the metrics are more complex, as they must consider only the windows $(y_t, \dots, y_{t-j})$ fully contained in the same regime instance. This is further described in @sec-cons-metrics-app.
+For the joint distribution $(y_t, y_{t-j})$, the metrics are more complex, as they must consider only the windows $(y_t, \dots, y_{t-j})$ fully contained in the same regime instance. This is further described in @sec-app-metrics.
 
-In any case, RC metrics possibly lump together observations from different time windows. For them to describe a well-defined regime distribution, it is required that the series be stationary within each regime. This will impose restrictions on the DGPs that this work will consider.
+In any case, RC metrics may lump together observations from different time windows. For them to describe a well-defined regime distribution, it is required that the series be stationary within each regime. This will impose restrictions on the DGPs that this work will consider.
 
 
 ### Within-regime stationarity
@@ -284,7 +296,7 @@ For the distribution of a regime to be well defined, all datapoints within it mu
 \end{array}
 \end{equation}
 
-As we intent to characterize the distributions with specific metrics, weaker assumptions can be made. If we restrict ourselves to the moments of the (joint) distribution, we can require the weak version. Formally, _within-regime weakly stationarity_ requires[^acf_stationarity], for all $s \in S$, that:
+As we intend to characterize the distributions with specific metrics, weaker assumptions can be made. If we restrict ourselves to the moments of the (joint) distribution, we can require the weak version. Formally, _within-regime weak stationarity_ requires[^acf_stationarity], for all $s \in S$, that:
 
 \begin{equation}
 \begin{array}{cc}
@@ -300,28 +312,31 @@ As we intent to characterize the distributions with specific metrics, weaker ass
 
 [^acf_stationarity]: The ACF condition should be read as "$j$'th autocorrelations between time-points within the same regime instance should always be equal", not as "$j$'th autocorrelations of every time-point in the same regime instance should always be equal", although the latter is true for AR processes with order higher than $j$.
 
-Processes that have a non-binary $r_t$, i.e. smooth transitions don't have truly separated regimes, and thus, generally don't satisfy the conditions above. Thus, the metrics cannot be interpreted as e.g. "the mean of all datapoints in an regime". Still, their information might be useful, as will be studied in this work.
+Processes that have a non-binary $r_t$, i.e., smooth transitions, do not have truly separated regimes, and thus, generally do not satisfy the conditions above. Thus, the metrics cannot be interpreted as, e.g., "the mean of all datapoints in a regime". Still, their information might be useful, as will be studied in this work.
 
+### Aspects of RC metrics usage {#sec-theory-usage}
 
-### Aspects of RC metrics usage
-
-How the metrics will be used is going to be discussed later, but for now, it is important to note there are two aspects of their use. First is wether to use the whole sequence of values for each $s$, or to condensate it into a single value of dispersion across regimes. For example, the average pairwise distance between the RC means, a single value that describes how distant are the levels of the regimes. This is equivalent to composing an dispersion function $d$:
+There are two important aspects of the RC metrics usage. First is whether to use the whole sequence of values for each $s$, or to condense it into a single value of dispersion across regimes. An example of the latter is the 'average pairwise distance between the RC means', a single value that describes how distant the levels of the regimes are. This is equivalent to composing a dispersion function $\disp$:
 
 \begin{equation}
-    d \circ c: (y, r) \mapsto \mathbb{R}^{S} \mapsto \mathbb{R}
+    \disp \circ \met: (y, r) \mapsto \mathbb{R}^{S} \mapsto \mathbb{R}
 \end{equation}
 
-Second, which series to use, the true or estimated ones. One can use the true values $(y, r)$ and get the characteristics of the true DGP, or the estimated values $(\hat{y}, \hat{r})$ and get the characteristics of the estimated model[^dimension]. Another option is to calculate the difference between the former and the latter[^order]. Another option is to calculate the metric of the difference $(y - \hat{y}, r)$ or $(y - \hat{y}, \hat{r})$.
+Second, which series to use: the true or estimated ones. One can use the true values $(y, r)$ and get the characteristics of the true DGP, or the estimated values $(\hat{y}, \hat{r})$ and get the characteristics of the estimated model[^dimension]. Another option is to calculate the difference between the former and the latter[^order]. Another option is to calculate the metric of the difference $(y - \hat{y}, r)$ or $(y - \hat{y}, \hat{r})$.
 
 [^dimension]: Note that the value of $S$ and $\hat{S}$ can be different, and thus, so the dimension of the metric's output.
 
 [^order]: This is only possible if $S = \hat{S}$ and there is an unambiguous way to match the estimated and true regimes.
 
-This framework allows for mixing and matching these options, each being useful to answer different questions. In this work, I focus on the estimated series, as they are the only thing available to the econometrician in practice, and in using the dispersion of RC metrics, as it is more comparable across DGPs and models.
+This framework allows for mixing and matching these options, each being useful to answer different questions. In this work, I focus on the estimated series, as they are the only thing available to the econometrician in practice, and on using the dispersion of RC metrics, as it is more comparable across DGPs and models.
 
 > Não sei se foi uma tangente muito grande falar dessas outras opções que não vou usar, ainda mais porque pode não estar claro pro leitor qual tipo de pergunta cada ajuda a responder. Eu gostaria de informar essa flexibilidade do framework, mas talvez valha mais colocar isso num apêndice.
 
-Let the set of metrics $d \circ c$ be $C$ (for 'criteria'). These will be defined in @sec-cons-metrics, but are mostly based on the moments of $y_t$ and of the pair $(y_t, y_{t-j})$, $j \in \mathbb{N}$, and the performance metrics for the dependent variable.
+Less generally, sometimes there are other possible estimators for the same population RC metric, instead of simply using $(\hat{y}, \hat{r})$. A special case is when the metric is a moment of the (joint) distribution, and the SGP is simple: one can simply plug the estimated parameters into the analytical formula for the moment, and generally have a better estimator. This is further discussed in @sec-app-metrics.
+
+Let the set of metrics $(\disp \circ \met)$ be $C$ (for 'criteria'). These will be defined in @sec-impl-metrics, but are mostly based on the moments of $y_t$ and of the pair $(y_t, y_{t-j})$, $j \in \mathbb{N}$, and the performance metrics for the dependent variable.
+
+One can also be interested in describing the RGP, with information such as the average duration of each regime instance, the transition probabilities and measures derived from it, amongst others. I'll use these as control variables in the regression analysis.
 
 
 
@@ -350,7 +365,7 @@ To obtain more than one prediction per simulation, I simulate a $T - H$-long ser
 The second approach is computationally cheaper, allowing for more simulations and DGPs to be considered. It is the one used in this work, but note that it is less accurate to what would be done in practice, as econometricians often re-estimate their models with new data.
 
 
-## Simulation hyperparameters
+## Simulation hyperparameters {#sec-sim-hyper}
 
 The hyperparameters of the simulation are as follows:
 
@@ -417,66 +432,82 @@ Then, for each model, the dispersion of the RC metrics are calculated and stored
 \end{algorithmic}
 \end{algorithm}
 
-Recall the discussion in @sec-theory-metrics about the two different aspects of RC metrics usage. With different choices regarding the usage of true or estimated series, the function $C_c$ could recieve different inputs. Additionally, the function could return the whole sequence of RC metrics, not a single value, then, each row would be identified by $(p, i, m, s)$.
+Recall the discussion in @sec-theory-metrics about the two different aspects of RC metrics usage. With different choices regarding the usage of true or estimated series, the function $C_c$ could receive different inputs  (e.g. $Y$ and $R$). Additionally, the function could return the whole sequence of RC metrics, not a single value, then, each row would be identified by $(p, i, m, s)$.
 
 The dataset $D$ is already in a friendly format for analyzing the relationship between the performance of each observation and the characteristics of the regimes, as well of considering stratifications by DGP and model.
 
 
 
-# Considered DGPs, models, and metrics {#sec-cons}
+# Implementation {#sec-impl}
 
-## Considered SGPs {#sec-cons-sgp}
+The framework described in the last two sections is very general, and allows for a lot of different exercises. In this specific work, I focus on a specific set of DGPs, models, and metrics. These are described here.
+
+First of all, I focus only on DGPs where there are regime switching (or structural breaks), and specifically two regimes ($S = 2$). More information about the ability of the models to identify regime dynamics with different (or zero) number of regimes is an interesting topic.
+
+The choices of hyperparametrization were made to balance the 'population' of DGPs. Each of the four RGPs have equal representation, each with a symmetric and an asymmetric variation. There are two RNs for each of the three $AR(1)$ parameters, a big and a small change. The related hyperparametrizations were chosen guided by the concept of "regime separation", described in @sec-exp-sep.
+
+The choice of models and their hyperparametrization is more flexible, as they do not affect the 'population' of the experiments. Each of the RGPs' empirical model counterparts is used, with a 'generic' hyperparametrization. But it would be interesting to increase the diversity of models.
+
+The metrics are limited to the most essential descriptors of the regime distributions, the 1st, 2nd moments, and the lag 1 autocorrelation. This is another set that could be expanded easily. Performance and RGP-related metrics were also defined for the regression analysis.
+
+<!-- UPDATE: all -->
+
+Finally, some diagnostics on the series generation and model estimation are included.
+
+
+## Considered SGPs {#sec-impl-sgp}
 
 The functional form of the SGP could be important in its interaction with the other ingredients of the DGP. Additionally, some topics are interested in specific SGPs, such as conditional volatility in finance and GARCH models. For now, however, this does not seem to be the main point of interest. I will consider only an $AR(1)$ process, for its simplicity, popularity, and ease of estimation.
 
-As discussed, it is useful to consider only within-regime weakly stationarity, even though many interesting DGPs are non-stationary. This restricts the absolute value of the $AR(1)$ parameter to $1$. The only SGP functional form considered is the following:
+Additionally, I'll only consider a Gaussian distribution for the error term, ignoring fat-tailed and skewed distributions. The distribution is regime-invariant, except for the multiplicative variance parameter $\sigma$.
+
+As discussed, it is useful to consider only within-regime weak stationarity, even though many interesting DGPs are non-stationary. This restricts the absolute value of the $AR(1)$ parameter to $1$. The only SGP functional form considered is the following:
 
 \begin{equation}
 \begin{array}{ll}
     &f_{\sgp}(. ~;~ (\mu^s, \rho^s_1, \sigma^s)) = \mu^s + \rho^s_1 y_{t-1} + \sigma^s \cdot \varepsilon_t\\
     &\varepsilon_t \sim \mathcal{N}(0, 1)\\
-    &|\rho^s_1| < 1, ~~ \sigma^s > 0
-\end{array} \tag{SGP-AR(1)}
+    &|\rho^s_1| < 1, ~~ \sigma^s > 0, ~~ \forall s \in 1:S
+\end{array}
 \end{equation}
 
-Several others SGP's could be considered, such as ones with transformations of $y_t$ as regressors, non-linear regression forms, or even decision trees, as in the common model Markov-switching Random Forest. Still, the $AR(1)$ is an essencial building block, and its simplicity helps isolating the effects of the other ingredients.
+Several others SGP's could be considered, such as ones with transformations of $y_t$ as regressors, non-linear regression forms, or even decision trees, as in the common model Markov-switching Random Forest. Still, the $AR(1)$ is an essential building block, and its simplicity helps isolate the effects of the other ingredients.
 
 
-## Considered RGPs and models {#sec-cons-rgp}
+## Considered RGPs and models {#sec-impl-rgp}
 
 The next 'ingredient' is the RGP. I will consider the options Self-Exciting Threshold (SET), Smooth-Transition (ST), and Markov-Switching (MS). Structural Break (SB) is included to study how RS models perform in the case of breaks without reocurring regimes.
 
-Each of these RGPs have empirical model counterparts, which are also considered. There is an additional model with an unsupervisioned approach where the regimes are defined by some clustering technique and each regimes' AR is estimated independently afterwards (Clustering + AR, CAR). Finally, a non-RS Random Forest (RF) model is included as a benchmark.
+Each of these RGPs has empirical model counterparts, which are also considered. There is an additional model with an unsupervised approach where the regimes are defined by some clustering technique and each regimes' AR is estimated independently afterwards (Clustering + AR, CAR). Finally, a non-RS Random Forest (RF) model is included as a benchmark.
 
-The formal definition of each RGP/model is presented in the @sec-cons-rgp-app, first the RGP hypothesis, then the empirical model's estimation strategy.
+The formal definition of each RGP/model is presented in @sec-app-cons, first the RGP hypothesis, then the empirical model's estimation strategy.
 
-For all RGPs, it is considered an option with equally likely regimes, and an assymetric variation.
+For all RGPs, an option with equally likely regimes and an asymmetric variation is considered.
 
 - **Structural Breaks:**
     - A single break at $T / 2$, and a single break at $2T / 3$.
 - **Self Exciting Threshold:**
     - Fixed hyperparameters: switching based on $y_{t-1}$. Different lags are often specific to timing-related issues, and not considered here.
-    - A single treshold at $0$, and a single threshold at $0.5$.
+    - A single threshold at $0$, and a single threshold at $0.5$.
 - **Smooth Transition:**
     - Fixed hyperparameters: switching based on $y_{t-1}$, logistic's CDF as transition function.
-    - A single treshold at $0$, and a single threshold at $0.5$.
+    - A single threshold at $0$, and a single threshold at $0.5$.
 - **Markov Switching:**
     - Symmetric matrix, high persistence ($P(s | s) = 0.9$), symmetric matrix, low persistence ($P(s|s) = 0.6$).
     - Asymmetric matrix, high persistence ($P(1 | 1) = 0.9$, $P(1 | 2) = 0.7$), asymmetric matrix, low persistence ($P(1 | 1) = 0.8$, $P(1 | 2) = 0.6$).
 
 <!-- UPDATE -->
-<!-- UC: mean centroid and $L^2$ norm; ?lags, ?transformations, ... -->
 
 > Tem várias outras parametrizações ja feitas no código e com o texto escrito, mas deixei só essas aqui caso algo mude. Alguma sugestão de formatação melhor do que a atual?
 
 For the models, most hyperparameters are as follows:
 
-- All the coefficients are assumed to change across regimes, as this is common assumption, especially in the face of possible mis-specification.
+- All the coefficients are assumed to change across regimes, as this is a common assumption, especially in the face of possible mis-specification.
 - The number of regimes $\hat{S}$ is fixed, not estimated. Models are estimated with 2 regimes. <!-- UPDATE -->
 - The values of model-specific hyperparameters are the same as the related RGP's values.
 
 
-## Considered regime natures {#sec-cons-rn}
+## Considered regime natures {#sec-impl-rn}
 
 The following regime natures are considered, each representing a different way in which the SGP parameters change across regimes:
 
@@ -505,17 +536,17 @@ The following regime natures are considered, each representing a different way i
 Note that the regimes are always ordered increasingly by the parameter of interest. In general, the large vs. small differences will be interesting to analyze in relation to each other. To compare different types of changes, only the large differences will be considered, for simplicity.
 
 
-## Considered metrics {#sec-cons-metrics}
+## Considered metrics {#sec-impl-metrics}
 
-The goal with RC metrics is to capture the change in the series characteristics across regimes. One important option is the estimated parameters of the model for each regime, e.g. $(\hat{\rho}_s)_{s \in \hat{S}}$, $(\hat{\mu}_s)_{s \in \hat{S}}$, etc. One might think that this would outshine all other metrics, but in more complex cases where more than one parameter changes, this becomes less useful. More general metrics generate benefits from their abstraction over the DGP. Additionally, in simple SGPs, there often is a metric that is directly connected to changes in parameters, such as conditional average for changes in intercept.
+The goal with RC metrics is to capture the change in the series characteristics across regimes. One important option is the estimated parameters of the model for each regime, e.g., $(\hat{\rho}_s)_{s \in \hat{S}}$, $(\hat{\mu}_s)_{s \in \hat{S}}$, etc. One might think that this would outshine all other metrics, but in more complex cases where more than one parameter changes, this becomes less useful. More general metrics generate benefits from their abstraction over the DGP. Additionally, in simple SGPs, there often is a metric that is directly connected to changes in parameters, such as the conditional average for changes in intercept.
 
 In this work, I focus on the moments of the distribution of $y_t$ and $(y_t, y_{t-j})$. Specifically, the RC metrics considered are the RC mean, RC standard deviation, and RC autocorrelation of lag 1. Higher lags could be considered, but in the simple $AR(1)$ context this would bring little additional information.
 
 > Talvez o 3ro e 4to momentos sejam interessantes, especialmente o 3ro porque alguns DGPs geram séries assimétricas. <!-- UPDATE: 3 and 4 moments if used -->
 
-As stated before, the RC mean and RC SD are simply the mean and SD of each set $R_s$. The autocorrelation is similar, but must be calculated separately for each concurrent set of observations in $R_s$. The formal definitions are stated in the @sec-cons-metrics-app.
+As stated before, the RC mean and RC SD are simply the mean and SD of each set $R_s$. The autocorrelation is similar, but must be calculated separately for each concurrent set of observations in $R_s$. The formal definitions are stated in the @sec-app-metrics.
 
-As the focus is on the dispersion of RC metrics, two important measures to consider are the standard deviation and the average pairwise absolute difference. For only two regimes, they are very similar and the absolute difference is more intuitive. All the metrics are composed such as all $d \circ c \in C$ return a single real value, and $d(x) = |x_1 - x_2|$.
+As the focus is on the dispersion of RC metrics, two important measures to consider are the standard deviation and the average pairwise absolute difference. For only two regimes, they are very similar and the absolute difference is more intuitive. All the metrics are composed such that all $d \circ c \in C$ return a single real value, and $d(x) = |x_1 - x_2|$.
 
 <!-- UPDATE: update with the chosen dispersion measures, and if more regimes are used -->
 
@@ -530,93 +561,121 @@ The list of considered metrics is as below:
 
 ### Performance and RGP metrics
 
-The performance metrics considered are $R^2$ for fit performance, and RMSE and MAPE for forecasting performance.
+The performance metrics considered are $R^2$ for fit performance, and RMSE and MAPE for forecasting performance. The MSE is not included, following @Dacco1999.
 
-Other metrics pertaining the RGP will be included as controls in the regression analysis: the average duration and number of instances of a regime, and transition probabilities.
+Other metrics pertaining to the RGP will be included as controls in the regression analysis: the number of regime switches divided by $T$, as a measure of switching frequency; the absolute difference between the average duration of regime 1's instances and regime 2's instances, as a measure of regime asymmetry.
 
-<!-- TODO: falar mais -->
+For works with more than two regimes, more complex measures of regime asymmetry can be used, ones that consider the whole matrix of transition probabilities.
 
 
 
-# Simulation implementation {#sec-impl}
-
-## Implementation
+## Simulation implementation
 
 The implementation of the simulations, as well as their analysis in the next sections, is done with the R programming language, and the code can be found in [this paper's repository](https://github.com/ricardo-semiao/article-regime-id-performance). The code is highly modular and fully reproducible, following the intent of setting up an expandable framework.
 
-The error sequences were generated in parallel, using [TRNG](https://www.numbercrunch.de/trng/).
+Following @sec-sim-hyper, the chosen hyperparameters are as below. Some values are lower than they could be due to computational constraints.
+
+- Number of simulations: $I = 500$.
+- Forecast horizon: $H = 10$ predictions of $1$-step ahead values.
+- Total number of observations: $T = 100$.
+- Burn-in period: $B = 5$.
+
+> Os valores finais podem mudar. <!-- UPDATE -->
+
+The error sequences were generated in parallel, using [`rTRNG::rnorm_trng`](https://github.com/cran/rTRNG). The models were estimated with [`mbreaks::dofix`](https://github.com/cran/mbreaks), [`tsDyn::setar`](https://github.com/cran/tsDyn), [`tsDyn::lstar`](https://github.com/cran/tsDyn), [`MSwM::msmFit`](https://github.com/cran/MSwM).
 
 
-## Diagnostics {#sec-impl-diag}
+## Simulation diagnostics {#sec-impl-diag}
 
-The errors should be i.i.d. Gaussian with mean $0$ and should not present any pattern, especially across the parallelization structure. This is guaranteed by the TRNG library, and is checked in @sec-impl-error-app.
+The errors should be i.i.d. Gaussian with mean $0$ and should not present any pattern, especially across the parallelization structure. This is guaranteed by the TRNG library, and is checked in @sec-app-diag.
 
-On top of visualizing the series, to further check for problems in the series generations, the regime-conditional and inconditional moments are estimated and tested against their true values. Additionally, the ANOVA test of equal moment on all regimes is done. The regime-conditional true values are calculated as the standard $AR(1)$ moments. There is only an analytical formula for the unconditional moments of the SB and MS RGP, calculated via iterated expectations.
+On top of visualizing the series, to further check for problems in the series generation, the regime-conditional and unconditional moments are estimated and tested against their true values. The regime-conditional true values are calculated as the standard $AR(1)$ moments. There is only an analytical formula for the unconditional moments of the SB and MS RGP, calculated via iterated expectations.
 
-Table @TODO shows the results. Each group of lines corresponds to the moments of a DGP. The first two columns relate to the values conditional in regime 1 and 2, the third column gives the unconditional values. Each cell has the value of the moment, and in brackets the p-value of the null hypothesis that the moment is equal to its true value. The last column shows the ANOVA p-value.
+The table @TODO in @sec-app-diag shows the results. Each group of lines corresponds to the moments of a DGP. The first two columns relate to the values conditional on regime 1 and 2, the third column gives the unconditional values. Each cell has the value of the moment, and in brackets the p-value of the null hypothesis that the moment is equal to its true value.
 
-> Os valores finais dos diagnósticos podem mudar. Coloco aqui uma tabela de placeholder.
+It is expected that models with the same RGP assumption as the DGP return similar moments, so, to check the models' estimation, a similar analysis as above is done in table @TODO. Both diagnoses are generally consistent with the expectations.
 
-\begin{table}[]
-\begin{tabular}{cc|ccc|ccc|ccc|c}
-\multirow{2}{*}{RGP}  & \multirow{2}{*}{RN} & \multicolumn{3}{c}{s = 1} & \multicolumn{3}{c}{s = 2} & \multicolumn{3}{c}{Incondicional} & \multirow{2}{*}{ANOVA} \\
-    & & $\mu$ & $\rho$ & $\sigma$ & $\mu$ & $\rho$ & $\sigma$ & $\mu$ & $\rho$ & $\sigma$ &   \\\hline\hline
-\multirow{3}{*}{RPG1} & $\Delta$$\mu$  & 9.4* & & & & & &  &  &  & \textless 0.05 \\
-    & $\Delta$$\rho$  &  & & & & & &  &  &  &   \\
-    & $\Delta$$\sigma$  &  & & & & & &  &  &  &   \\
-\multirow{3}{*}{RPG2} & $\Delta$$\mu$  &  & & & & & &  &  &  &   \\
-    & $\Delta$$\rho$  &  & & & & & &  &  &  &   \\
-    & $\Delta$$\sigma$  &  & & & & & &  &  &  &   \\
-\multirow{3}{*}{RPG3} & $\Delta$$\mu$  &  & & & & & &  &  &  &   \\
-    & $\Delta$$\rho$  &  & & & & & &  &  &  &   \\
-    & $\Delta$$\sigma$  &  & & & & & &  &  &  &
-\end{tabular}
-\end{table}
+To target the focus of this work, the forecast performance (RMSE) was regressed agains the index $i$ of the simulation (Equation \ref{eq-rmse-sim}). Table @TODO shows that the coefficient is not statistically different from zero, even with the high power of the test, as expected.
 
-<!-- ```{=tex}
-\input{../../outputs/simulations/table_sgps.tex}
-``` -->
+\begin{equation}
+    rmse_{p, i, m} = \beta_0 + \beta_1 i + \varepsilon_{p, i, m} \label{eq-rmse-sim}
+\end{equation}
 
-<!-- TODO: Table -->
-
-We can see that the results are generally consistent with the expectations. The table is also useful to better understand the difference between the DGPs. Some useful analysies to be done are: as expected, the first moment is often informative about regime natures with changes in intercept, and similarly for the other moments; the RGP and regime nature interact in a non-trivial way, e.g. the TAR regime with higher intercept generates an assymetric process, as its 'hard to escape' that regime; How each DGP differs in terms of separation between their regimes, but more on that in the next section.
-
-To theck the models, it is expected that models with the same RGP assumption as the DGP return similar moments, so a similar analysis as above is done in the @sec-impl-mod-app. The results are generally consistent with the expectations.
+<!-- TODO: table -->
 
 As a final sanity check, the frequency of improbable events were annotated: TODO% of the datapoints generated were $10$ standard deviations away from the relevant mean; and TODO% of the predictions were $10$ standard deviations away from the true value.
 
-
-## Regime separation {#sec-impl-sep}
-
-There are several aspects in which each DGP's generated series differ, and how the hyperparameters contribute to that difference. I propose that one of the most interesting aspects to analyze is the degree of separation of regimes, in terms of the metrics. This could be seen in table TODO, but I argue a better visualization is to graph how the separation progresses across the sample windows $1:2$, $1:3$, $\dots$, $1:T$.
-
-By graphing the latest time-point considered in the calculation of the metrics on the x-axis, and the value of the metric on the y-axis, we can see how the separation evolves across sample size. This is useful because the sample size is one of the most important factos for the models to learn how to separate the regimes.
-
-> Idem. Coloco aqui a análise antiga só para referência.
-
-@fig-sim-m1 shows the metrics for the SB-AR(1) model, with a break at the middle. The left-hand side shows the metrics calculated with the data up to the time on the x-axis, yielding a 'rolling' metric that can be used to analyze convergence. The right-hand side shows the distribution of the metrics calculated with the full series, for all simulations. We can see how the second regime only has information starting from $T/2$. Each row represents a different regime nature, thus a different conditional metric (mean, ACF(1), and SD, respectively).
-
-![SGP metrics of SB-AR(1) model](../../outputs/simulations/stats_sgp-r2_sbreak_mid.png){#fig-sim-m1}
-
-@fig-sim-m2 shows a metric for the RGP itself, for the MS-AR(1). Specifically, the empirical (non-)transition probability for each regime.
-
-![RGP metrics of MS-AR(1) model](../../outputs/simulations/stats_rpg-r2_markov_symm_high.png){#fig-sim-m2}
-
-In a more systematic way, the table below shows the average and standard deviation of the metrics and DGPs, and the columns ANOVA present the p-values of the null hypothesis that the metrics do not vary across regimes. Note that the power of this test is directly related to the number $I$ of simulations.
+<!-- UPDATE -->
 
 
 
-# Exploratory analysis {#sec-expl}
+# Exploratory analysis {#sec-exp}
+
+> Texto de introdução... <!-- TODO -->
+
+
+## Regime separation {#sec-exp-sep}
+
+There are several aspects in which each DGP's generated series differ, and how the hyperparameters contribute to that difference. I propose that one of the most interesting aspects to analyze is the degree of separation of regimes, in terms of the metrics. There is an important interaction between the sample size $T$, the RGP, and the RN that governs that separation, and thus, the models' ability to learn the regime dynamics.
+
+I calculate each metric with the data up to each time-point ($1:2$, $1:3$, $\dots$, $1:T$). By graphing the last time-point considered on the x-axis, and the difference of the RC metric between regimes on the y-axis, we can see how the separation evolves across sample size.
+
+> **Gráfico 1 - separação de regimes e interação com t e hyperparametrização do RGP e RN:** t x valor da média das diferenças da métrica entre R1 e R2. Uma cor para cada variacão do RGP, uma linetype para cada variacão do RN. Um painel (linha) para cada RN, um painel (coluna) para cada metrica. Um Gráfico para cada RGP.
+>
+> _Análise:_ O quão bem separados são os regimes de cada DGP, e como isso dependa da magnitude da diferença definida pela natureza de regime, e da assimetria da ocorrência dos regimes, talvez um pouco também da duração das instâncias (??), e tudo isso interagido com o tamanho amostral T. E como consideramos isso na hora de criar um conjunto diverso de hiperparametrizações de DGP e T
+>
+> **Tabela 1 - análise rápida da separação dos regimes em T:** cada linha um DGP (agrupados por RGP e RN), uma coluna para cada momento, com o valor da medida de diferença/dispersão, sd, e um teste de não zero (ou anova).
+>
+> _Análise:_ Quais os sintomas de cada modelo no que tange a distribuição (momentos) da série.
+
+
+## Regimes and performance {#sec-exp-perf}
+
+> **Gráfico 2 - erros de previsão e acertar regime:** distribuição dos erros de previsão. Cor por acertância. Escolhe variação do RN e RGP. Um painel (linha) para cada RN, um painel (coluna) para cada RGP (talvez tenha que trocar). Um gráfico para cada modelo.
+>
+> _Análise:_ Como acertar o regime importa.
+>
+> Outras análises possíveis (acho que não vão dar frutos interessantes, vou tentar checar):
+
+- Identificação de parametros e como outros são ajustados para compensar misspecification. Eu acho que esse é muito identificação e não vai trazer grandes intuições sobre essa questão de ajuste.
+- Em vez de olhar para o resíduo, dava pra colocar a distribuição do real e do estimado lado a lado (desagregadas por regimes), para ver se existe algum erro sistemático.
+
 
 
 # Systematic analysis {#sec-sys}
+
+> Texto de introdução... <!-- TODO -->
+>
+> **Regressão 1 - dado características, qual modelo vai melhor:** performance ~ sd(momentos), estratificado por modelo. com modelos da série não predita real e regimes reais. + controles
+>
+> _Análise:_ ...
+>
+> **Regressão 2 - em qual característica dar match é mais importante:** perf. ~ diff(sd(carac)), talvez | modelo + controles
+>
+> _Análise:_ ...
+>
+> **Regressão 3 - identificar cenários que indicam pro econometrista que aumentar ou diminuir S era melhor:** pode ser 1. (e talvez 2.) mas com uma interação de sub- e depois sup- estimação
+>
+> _Análise:_ ...
+>
+> Outras análises possíveis (acho que não vão dar frutos interessantes, vou tentar checar):
+
+- RGP/RN/modelo (e combinações) e performance. Informação bem pouco útil. Isto é, efeitos fixos de DGP/modelo (tem algum modelo que só é melhor?).
+- Interação (RGP, RN) * modelo e performance. Análise sobre quais interações dão especialmente certo/errado, qual modelo é aproximador universal.
+- Identificação e learning:
+    - Acertar o r melhor performance?
+    - Acertar características do r (duração média, probabilidades de transição, cutoffs, gamma, …) melhora performance?
+    - Acertar os coeficientes melhora a performance?
+    - Acertar os sintomas melhora a performance? (o modelo captura a caracterização da série?)
+    - Relação fit e performance
+
 
 
 # Conclusion {#sec-conclusion}
 
 Here I start by summarizing the motivation and methodology.
 
-Then, I focus on the main results. First, with the more descriptive findings about properties of the models, then, the practical recommendations of metrics an econometrician should look at when choosing a model[^ai].
+Then, I focus on the main results. First, with the more descriptive findings about properties of the models, then, the practical recommendations of metrics an econometrician should look at when choosing a model.
 
 
 
@@ -639,9 +698,9 @@ AI disclaimer: this work was generated generally without the help of large langu
 \renewcommand{\thesubsection}{\Alph{section}.\arabic{subsection}}
 ```
 
-# Considered DGPs, models, and metrics {#sec-cons-app}
+# DGPs, models, and metrics {#sec-app-cons}
 
-## RGPs and models {#sec-cons-rgp-app}
+## RGPs and models
 
 ### Structural break (SB)
 
@@ -651,7 +710,7 @@ AI disclaimer: this work was generated generally without the help of large langu
 \begin{array}{ll}
     &r^s_t(. ~;~ \tau) = \mathbb{1}(\tau'_{s-1} < t \leq \tau'_s), ~~ \forall s \in \{1, \dots S\}\\
     &\tau \in \mathbb{N}^{S-1}, ~~ \tau_{s} > \tau_{s-1} ~\forall s, ~~ \tau' = (0, \tau, T)\\
-\end{array}\tag{RGP-SB}
+\end{array}
 \end{equation}
 
 **Empirical model:** Given $\tau$, the model estimates $\mu$ and $\rho_1$ via OLS in each regime. $\tau$ is chosen by minimizing the sum of squared residuals over a grid search of breakpoints.
@@ -669,7 +728,7 @@ Similarly defined by @Bai1998. Review of other options by @Casini2018.
 \begin{array}{ll}
     &r^s_t(. ~;~ (\tau, d, g)) = \mathbb{1}(\tau'_{s-1} < g(y)_{t-d} \leq \tau'_s), ~~ \forall s \in \{1, \dots S\}\\
     &\tau \in \mathbb{R}^{S-1}, ~~ \tau_{s} > \tau_{s-1} ~\forall s, ~~ \tau' = (-\infty, \tau, \infty), ~~ d \in \mathbb{N}^*
-\end{array}\tag{RGP-SET}
+\end{array}
 \end{equation}
 
 **Empirical model:** Given $\tau$ and $d$, the model estimates $\mu$ and $\rho_1$ via OLS in each regime. $\tau$ and $d$ are chosen by minimizing the sum of squared residuals over a grid search of breakpoints and lags. One can also leave $d$ fixed. 
@@ -685,7 +744,7 @@ Similarly defined by @Tong1980. Review of other options by @Chen2011.
 \begin{array}{ll}
     &r^1_t(. ~;~ (\tau, d, g)) = g(y_{t - d} - \tau), ~~~ r^2_t(. ~;~ (\tau, d, g)) = 1 - r^1_t(. ~;~ (\tau, d, g))\\
     &\tau \in \mathbb{R}, ~~ d \in \mathbb{N}^*
-\end{array}\tag{RGP-ST}
+\end{array}
 \end{equation}
 
 Often, the function $g$ depends on a smoothness parameter $\gamma$, i.e., when $\gamma \to \infty$, $g \to \mathbb{1}$. This parameter can be jointly estimated with the others.
@@ -703,7 +762,7 @@ Similarly defined by @Terasvirta1994. Review of other options by @Dijk2002
 \begin{array}{ll}
     &r^s_t(. ~;~ \Gamma) \sim P(r^s_t = 1 | r_{t-1}) \eqqcolon \Gamma_{s, r_{t-1}}\\
     &\Gamma \in [0, 1]^{S \times S}, ~~ \sum_{i=1}^S \Gamma_{s, i} = 1 ~\forall s\\
-\end{array}\tag{RGP-MS}
+\end{array}
 \end{equation}
 
 **Empirical model:** There are multiple algorithms, including maximum likelihood estimation, expectation maximization, and Markov chain Monte Carlo methods. The EM algorithm uses Kalman to find smoothed probabilities of $r$, then the conditional probabilities given the current guess of parameters, then the guess of parameters is updated via maximizing the likelihood given the probabilities. These two steps are iterated until convergence.
@@ -721,7 +780,7 @@ Similarly defined by @Hamilton1989. Review of other options by @Song2021.
 \begin{array}{ll}
     &\hat{r}^s_t(. ~;~ (\text{norm}, \text{centroid})) = \mathbb{1}(y_t \in R_s)\\
     &R = \argmin_{R'} \sum_{s=1}^{\hat{S}} \sum_{y_t \in R'_s} \text{norm}(y_t - \text{centroid}(R'_s))
-\end{array}\tag{RGP-UC}
+\end{array}
 \end{equation}
 
 Similarly defined by @Akioyamen2020. More clustering techniques reviewd by @Paparrizos2024.
@@ -734,52 +793,58 @@ Similarly defined by @Akioyamen2020. More clustering techniques reviewd by @Papa
 **Model:** a RF is estimated based on $y_t$, its lags, and rolling moments.
 
 
-## Metrics {#sec-cons-metrics-app}
+## Metrics {#sec-app-metrics}
 
 The estimated conditional mean and standard deviation can be calculated as, respectively:
 
 \begin{align*}
-    \hat{\mu}(y, r | s) & \coloneqq \sum_{t = 1}^T r^s_t \cdot y_t \tag{Metric-$\hat{\mu}$}\\
-    \hat{\sigma}(y, r | s) & \coloneqq \sqrt{\sum_{t = 1}^T r^s_t \cdot (y_t - \hat{\mu}(y, r | s))^2} \tag{Metric-$\hat{\sigma}$}
+    \hat{\mu}(y, r | s) & \coloneqq \sum_{t = 1}^T r^s_t \cdot y_t\\
+    \hat{\sigma}(y, r | s) & \coloneqq \sqrt{\frac{1}{1 - \sum_{t = 1}^T{(r^s_t)^2}}\sum_{t = 1}^T r^s_t \cdot (y_t - \hat{\mu}(y, r | s))^2}
 \end{align*}
+
+Note the bias correction factor in the denominator of the RC SD, which is necessary given the estimated mean.
 
 As noted, in the case of binary $r_t$, only the observations of regime $s$ have non-zero weights, and the formulas are respectively equivalent to:
 
 \begin{align*}
-    &\frac{1}{|R_s|} \sum_{y_t \in R_s} y_t\\
-    &\sqrt{\frac{1}{|R_s|} \sum_{y_t \in R_s} (y_t - \hat{\mu}(y | s))^2}
+    &\frac{1}{|R_s|} \sum_{y_t \in R_s} y_t, &\sqrt{\frac{1}{|R_s| - 1} \sum_{y_t \in R_s} (y_t - \hat{\mu}(y | s))^2}
 \end{align*}
 
-For a regime-conditional moments of ($y_{t}$, $y_{t-j}$), we must define the notion of 'being in the same regime'. Consider $r^s_t \cdot r^s_{t-j}$, which has a correct 'truth table' for binary regimes, but also has an interpretation for continuous ones: closer to $1$ the higher the weight of both $y_t$ and $y_{t-j}$ being in regime $s$. But, this ignores that fact that $y_t$ and $y_{t-j}$ can be in the same regime, but in different regime instances. To account for that, the correct weighting should consider the whole window of $y_{t-j}, \dots, y_t$:
+For a regime-conditional moments of ($y_{t}$, $y_{t-j}$), we must define the notion of 'being in the same regime'. Consider $r^s_t \cdot r^s_{t-j}$, which has a correct 'truth table' for binary regimes, but also has an interpretation for continuous ones: when closer to $1$, the higher the weight of both $y_t$ and $y_{t-j}$ being in regime $s$. But, this ignores that fact that $y_t$ and $y_{t-j}$ can be in the same regime, but in different regime instances. To account for that, the correct weighting should consider the whole window of $y_{t-j}, \dots, y_t$:
 
 \begin{align*}
-    &\hat{\rho}_j(y, r | s) = \frac{\sum_{t = 1 + j}^T \left(\prod_{k = 1}^j r^s_k\right) \cdot (y_t - \hat{\mu}(y, r | s)) \cdot (y_{t-j} - \hat{\mu}(y, r | s))}{\sum_{t = 1}^T \left(\prod_{k = 1}^j r^s_k\right) \cdot (y_{t-j} - \hat{\mu}(y, r | s))^2} \tag{Metric-$\hat{\rho}_j$}
+    &\hat{\rho}_j(y, r | s) = \frac{\sum_{t = 1 + j}^T \left(\prod_{k = 1}^j r^s_k\right) \cdot (y_t - \hat{\mu}(y, r | s)) \cdot (y_{t-j} - \hat{\mu}(y, r | s))}{\sum_{t = 1}^T \left(\prod_{k = 1}^j r^s_k\right) \cdot (y_{t-j} - \hat{\mu}(y, r | s))^2}
 \end{align*}
+
+Note the absence of bias correction. While it could be present, it can generate larger-than-one correlations, and is often omitted.
 
 For binary regimes, this is equivalent to calculating the unweighted autocorrelation of every concurrent window of regime $s$.
 
-Recall that a RC metric returns a sequence with entries for each regime, so also consider the following notation:
+Recall that a RC metric returns a sequence with entries for each regime, so when describing the e.g. RC mean $\mu(y, r)$, I am refering to:
 
-\begin{align*}
-    &\mu(y_t | S) \coloneqq \left(\mu(y_t | S)\right)_{s \in 1:S}
-\end{align*}
+\begin{align}
+    &\mu(y, r) \coloneqq \mu(y, r | S) = \left(\mu(y, r | S)\right)_{s \in 1:S}
+\end{align}
 
 
 ### True moments of the considered DGPs
 
 Given the weakly stationary within regimes assumption, the regime-conditional moments are independent of the RGP, and are the simple $AR(1)$ moments:
 
-\begin{align*}
-    \mu(y_t | s) &\coloneqq E[y_t | y_t \in R_s] = \frac{\mu^s}{1 - \rho^s_1}\\
-    \sigma(y_t | s) &\coloneqq Var[y_t | y_t \in R_s] = \sqrt{\frac{(\sigma^s)^2}{1 - (\rho^s_1)}}\\
-    \rho_j(y_t | s) &\coloneqq Corr[y_t, y_{t-1} | y_t \in R_s] = (\rho^s_1)^j, ~~ j \in \mathbb{N}^*
-\end{align*}
+\begin{equation}
+\begin{array}{ll}
+    \mu(y_t | s) &\equiv E[y_t | y_t \in R_s] = \frac{\mu^s}{1 - \rho^s_1}\\
+    \sigma(y_t | s) &\equiv Var[y_t | y_t \in R_s] = \sqrt{\frac{(\sigma^s)^2}{1 - (\rho^s_1)}}\\
+    \rho_j(y_t | s) &\equiv Corr[y_t, y_{t-1} | y_t \in R_s] = (\rho^s_1)^j, ~~ j \in \mathbb{N}^*
+\end{array} \label{eq-app-ar1moments}
+\end{equation}
+
+As described in @sec-theory-usage, there can be better estimators for populational RC metrics than the ones defined in the above section. One can simply plug in the estimated parameters in equation \ref{eq-app-ar1moments} to get a better estimator of the moments. In this work, I use this approach, which is also more computationally efficient.
 
 
+# Diagnostics {#sec-app-diag}
 
-# Diagnostics {#sec-impl-app}
-
-## Random errors {#sec-impl-error-app}
+## Random errors
 
 The @fig-diag-errors-dependence shows the correlation of the errors across the parallelization structure. A simple visual check shows no evident patterns and an overall low correlation, as expected.
 
@@ -790,8 +855,44 @@ The @fig-diag-errors-distribution shows the distribution of a size 3000 sample o
 ![Errors - Distribution](../../outputs/errors/distribution.png){#fig-diag-errors-distribution height=45%}
 
 
-## Series generation and model estimation {#sec-impl-mod-app}
+## Series generation and model estimation
 
-Table TODO is similar as table TODO, but shows the estimated moments of the model that matched its line's RGP assumption. The values are the average across simulations of the moments calculated with the estimated parameters. Note that the moments don't need to be the exactly the same, since all the models allow for all the parameters to change, a different assumption than of the regime natures.
+The series diagnostics as described in @sec-impl-diag are shown in table @TODO.
 
-<!-- TODO: tables -->
+> **Tabela 1 - séries estão de acordo com momentos analíticos:** cada linha um DGP (agrupados por RGP e RN), um grupo de coluna para cada momento, divididos entre regime 1, 2, e incondicional. Cada célula com o valor do momento e estrelas do teste de igualdade com o momento analítico.
+
+\begin{table}[]
+\begin{tabular}{cc|ccc|ccc|ccc}
+\multirow{2}{*}{RGP}  & \multirow{2}{*}{RN} & \multicolumn{3}{c}{$\mu$} & \multicolumn{3}{c}{$\rho$} & \multicolumn{3}{c}{$\sigma$}\\
+    & & $s = 1$ & $s = 2$ & $\perp s$ & $s = 1$ & $s = 2$ & $\perp s$ & $s = 1$ & $s = 2$ & $\perp s$ \\\hline\hline
+\multirow{3}{*}{RGP1} & $\Delta\mu$  & 9.4* & & & & & &  &  & \\
+    & $\Delta\rho$  &  & & & & & &  &  & \\
+    & $\Delta\sigma$  &  & & & & & &  &  & \\
+\multirow{3}{*}{RGP2} & $\Delta\mu$  &  & & & & & &  &  & \\
+    & $\Delta\rho$  &  & & & & & &  &  & \\
+    & $\Delta\sigma$  &  & & & & & &  &  & \\
+\multirow{3}{*}{RGP3} & $\Delta\mu$  &  & & & & & &  &  & \\
+    & $\Delta\rho$  &  & & & & & &  &  & \\
+    & $\Delta\sigma$  &  & & & & & &  &  &
+\end{tabular}
+\end{table}
+
+Table @TODO is similar as table @TODO, but shows the estimated moments of the model that matched its line's RGP assumption. The values are the average across simulations of the moments calculated with the estimated parameters. Note that the moments don't need to be exactly the same, since all the models allow for all the parameters to change, a different assumption than that of the regime natures.
+
+\begin{table}[]
+\begin{tabular}{cc|ccc|ccc|ccc}
+\multirow{2}{*}{RGP}  & \multirow{2}{*}{RN} & \multicolumn{3}{c}{$\mu$} & \multicolumn{3}{c}{$\rho$} & \multicolumn{3}{c}{$\sigma$}\\
+    & & $s = 1$ & $s = 2$ & $\perp s$ & $s = 1$ & $s = 2$ & $\perp s$ & $s = 1$ & $s = 2$ & $\perp s$ \\\hline\hline
+\multirow{3}{*}{RGP1} & $\Delta\mu$  & 9.4* & & & & & &  &  & \\
+    & $\Delta\rho$  &  & & & & & &  &  & \\
+    & $\Delta\sigma$  &  & & & & & &  &  & \\
+\multirow{3}{*}{RGP2} & $\Delta\mu$  &  & & & & & &  &  & \\
+    & $\Delta\rho$  &  & & & & & &  &  & \\
+    & $\Delta\sigma$  &  & & & & & &  &  & \\
+\multirow{3}{*}{RGP3} & $\Delta\mu$  &  & & & & & &  &  & \\
+    & $\Delta\rho$  &  & & & & & &  &  & \\
+    & $\Delta\sigma$  &  & & & & & &  &  &
+\end{tabular}
+\end{table}
+
+> Os valores finais dos diagnósticos podem mudar. <!-- UPDATE -->
