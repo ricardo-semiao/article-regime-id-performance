@@ -44,8 +44,8 @@ dgp_names <- expand_grid(
   ),
   rgp = c(
       #"r2_multinomial_equal", "r2_multinomial_reg1",
-    "r2_markov_symm_high", "r2_markov_symm_low",
-    #"r2_markov_asymm_high", "r2_markov_asymm_low",
+    "r2_markov_symm_high", "r2_markov_asymm_high",
+    #"r2_markov_symm_low", "r2_markov_asymm_low",
     "r2_sbreak_mid", "r2_sbreak_end",
     "r2_threshold_x_0", "r2_threshold_x_05",
     #"r2_threshold_abs_05", "r2_threshold_abs_2",
@@ -402,22 +402,141 @@ if (FALSE) cat(gt::as_latex(.tab), file = "outputs/estimations/table_residuals.t
 
 # Metrics ----------------------------------------------------------------------
 
-# data_s = simulations_data; data_e = estimations_data; data_m = estimations_meta
-data_models_final <- metrics$get_data_final(
-  simulations_data, estimations_data, estimations_meta, "models",
-  n_t = n_t, n_warm = n_burn + n_l + 1, n_h = n_h, model_names = model_names
-)
-data_models_final
+simulations_meta <- params$sgps[unique(dgp_names$sgp)] |>
+  map(\(xsgp) {
+    map(xsgp$args, \(x) {
+      x$mu <- as.integer(x$mu || 0)
+      x$vol <- as.integer(x$vol || 1)
+      unlist(x)
+    }) |>
+      do.call(cbind, args = _) |>
+      `colnames<-`(c("R1", "R2"))
+  }) |>
+  map(~ list(coefs = .x)) %>%
+  {tibble(sgp = names(.), meta = .)} |>
+  full_join(sim_names, by = "sgp")
+
 if (FALSE) {
-  write_rds(data_models_final, "data/data_models_final.rds") %>%
-    {cli$cli_alert_success("Final models data saved to {.file data/data_models_final.rds}")}  
+  estimations_meta$meta <- map(estimations_meta$meta, \(meta) {
+    meta$coefs <- rbind(meta$coefs, "vol" = rnorm(2, 1, 0.1))
+    meta
+  })
 }
 
-data_regimes_final <- metrics$get_data_final(
-  simulations_data, estimations_data, simulations_data, estimations_meta, "regimes",
+# data_s = simulations_data; data_e = estimations_data; data_m = estimations_meta
+data_models_final <- metrics$get_data_final(
+  simulations_data, estimations_data, simulations_meta, estimations_meta,
   n_t = n_t, n_warm = n_burn + n_l + 1, n_h = n_h, model_names = model_names
 )
-data_regimes_final
+
+if (FALSE) {
+  write_rds(data_models_final, "data/data_models_final.rds") %>%
+    {cli$cli_alert_success("Final models data saved to {.file data/data_models_final.rds}")}
+  data_models_final <- read_rds("data/data_models_final.rds")
+}
+
+
+
+# Testing grounds ==============================================================
+
+
+# Comparisons 2 ----------------------------------------------------------------
+
+trimmed_sd <- function(x, trim = 0.01) {
+  idx <- x >= quantile(x, trim, na.rm = TRUE) & x <= quantile(x, 1 - trim, na.rm = TRUE)
+  sd(x[idx], na.rm = TRUE)
+}
+
+data_reg <- data_models_final |>
+  mutate(across(where(is.numeric), ~ ifelse(is.finite(.x), .x, NA_real_))) |>
+  mutate(across(where(is.numeric), ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_))) |>
+  mutate(across(where(is.numeric), ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)))
+
+
+## Taking a step back:
+
+# Diagnosticos:
+lm(rmse ~ sim, data_reg) |> summary()
+#lm(mape ~ sim, data_reg) |> summary()
+
+
+# Models FE:
+lm(rmse ~ model - 1, data_reg) |> summary()
+#lm(mape ~ model - 1, data_reg) |> summary()
+
+
+# Models misspecifications:
+reg1 <- lm(
+  rmse ~ model*rgp - 1,
+  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
+) |> summary()
+
+reg12 <- lm( # Adding assymmetry to the mix:
+  rmse ~ model*rgp - 1,
+  filter(data_reg, rgp %in% c("r2_markov_symm_low", "r2_sbreak_end", "r2_threshold_x_05", "r2_stransition_l05"))
+) |> summary()
+# Esses dois deveriam ser matrizes, mas uma coisa de cada vez
+
+reg1$coefficients[8:16, 1] - reg12$coefficients[8:16, 1]
+
+reg13 <- lm( # Adding RN to the mix:
+  rmse ~ model*rgp - 1,
+  filter(data_reg,
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    grepl("2$", sgp)
+  )
+) |> summary()
+
+reg1$coefficients[8:16, 1] - reg13$coefficients[8:16, 1]
+
+
+# Now with the metrics instead of RGP:
+lm(
+  rmse ~ model*(avg_est + acf_est + vol_est) - 1,
+  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
+) |> summary()
+# And also with cross metric interactions, but later
+
+
+# What is best to match?
+
+reg1 <- lm(
+  mape ~ r2 + regimes_me +
+    switches_diff + duration_diff +
+    #avg_diff + acf_diff + vol_diff +
+    mu_diff + rho1_diff + sigma_diff +
+    NULL,
+  data = data_models_final
+) |> summary()
+
+reg1$coefficients[order(abs(reg1$coefficients[, 1]), decreasing = TRUE), ]
+
+lm(
+  mape ~
+    avg_diff + acf_diff + vol_diff +
+    #mu_diff + rho1_diff + sigma_diff +
+    NULL,
+  data = filter(data_models_final, model == "r2_threshold_x")
+) |> summary()
+
+lm(
+  mape ~
+    sgp + rgp + model +
+    avg_diff * acf_diff * vol_diff +
+    #mu_diff + rho1_diff + sigma_diff +
+    NULL,
+  data = data_models_final
+) |> summary()
+
+reg1_cor <- cor(
+  select(data_models_final, rmse, r2, regimes_me,
+  switches_diff, duration_diff,
+  avg_diff, acf_diff, vol_diff, mu_diff, rho1_diff, sigma_diff),
+  use = "complete.obs"
+)
+
+reg1_cor[upper.tri(reg1_cor, diag = TRUE)] <- 0
+reg1_cor >= 0.8
 
 
 
@@ -426,7 +545,7 @@ data_regimes_final
 # Do for both data_models_final and data_regimes_final. Regimes has an extra
 # regime variable
 
-colnames(reg_data)
+colnames(data_models_final)
 
 # Adjusting factor levels:
 map(data_models_final[c("rgp", "sgp", "model")], levels)
@@ -453,6 +572,7 @@ reg_data <- filter(reg_data, rmse < 10)
 # Basic regressions:
 lm(rmse ~ sim, reg_data) |> summary()
 lm(rmse ~ sgp * rgp, reg_data) |> summary()
+lm(rmse ~ model * rgp, hi) |> summary()
 lm(rmse ~ model * rgp + sgp * rgp, reg_data) |> summary()
 
 

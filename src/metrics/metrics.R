@@ -85,6 +85,16 @@ if (FALSE) {
 # All receive y, y_true, n_h, n_t, and additional hyperparameters if needed,
 # and return a single numeric value
 
+#' Metrics - performance: R squared
+#' @export
+performance_r2 <- function(y, y_true, n_h, n_t, t = 1:length(y), ...) {
+  idx <- t %in% 1:(n_t - n_h) # TODO: maybe (max(t, 1):min(t, n_t - n_h))?
+  ss_res <- sum((y[idx] - y_true[idx])^2)
+  ss_tot <- sum((y_true[idx] - mean(y_true[idx], ...))^2)
+  1 - (ss_res / ss_tot)
+}
+
+
 #' Metrics - performance: RMSE
 #' @export
 performance_rmse <- function(y, y_true, n_h, n_t, t = 1:length(y), ...) {
@@ -138,6 +148,37 @@ series_sign_prop <- function(y, r, n_r = length(unique(r)), ...) {
 series_volatility <- function(y, r, n_r = length(unique(r)), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
     sd(y[r == s], ...)
+  })
+}
+
+
+
+# Analytical Metrics -----------------------------------------------------------
+
+# All receive the model's parameters, n_r, and return a vector of length n_r
+
+#' Metrics - series: Conditional average
+#' @export
+analytical_average <- function(coefs, n_r = length(unique(r))) {
+  apply(coefs, 2, \(coef_s) {
+    coef_s[1] / (1 - coef_s[2])
+  })
+}
+
+#' Metrics - series: Conditional ACF
+#' @param n [`integer(1)`] Lag order.
+#' @export
+analytical_autocorr <- function(coefs, n_r = length(unique(r)), lag = 1) {
+  apply(coefs, 2, \(coef_s) {
+    coef_s[2]^lag
+  })
+}
+
+#' Metrics - series: Conditional SD
+#' @export
+analytical_volatility <- function(coefs, n_r = length(unique(r))) {
+  apply(coefs, 2, \(coef_s) {
+    sqrt(coef_s[3]^2 / (1 - coef_s[2]^2))
   })
 }
 
@@ -210,3 +251,27 @@ regimes_thresholds <- function(y, r, n_r = length(unique(r)), ...) {
   })
 }
 # Todo: consider `... else NA`; sanitize
+
+
+
+# RGP descriptors --------------------------------------------------------------
+
+#' @export
+average_switches <- function(y, r, n_r = length(unique(r)), ...) {
+  sum(diff(r) != 0) / length(y)
+}
+
+#' @export
+duration_diff <- function(y, r, n_r = length(unique(r)), ...) {
+  durations <- regimes_duration(y, r, n_r, ...)
+  abs(durations[1] - durations[2])
+} # TODO: genralize for n_r > 2
+
+
+
+# Dispesion measures -----------------------------------------------------------
+
+#' @export
+diff_p <- function(x, p = 1) {
+  abs(x[1] - x[2])^p
+} # TODO: genralize for n_r > 2
