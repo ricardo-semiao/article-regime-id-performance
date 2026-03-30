@@ -280,7 +280,7 @@ table_residuals <- function(
   data_metrics <- data |> 
     group_by(sgp, rgp, sim) %>%
     reframe(
-      sgp_metric = metrics$series_average(y, r, ...),
+      sgp_metric = metrics$series_avg(y, r, ...),
       r = 1:n_r
     )
 

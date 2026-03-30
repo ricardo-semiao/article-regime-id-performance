@@ -83,10 +83,6 @@ theme_set(
     )
 )
 
-#' Arrow for plotting
-#' @export
-arrow1 <- arrow(length = unit(0.02, "npc"), type = "closed")
-
 
 
 # Infrastructure Helpers -------------------------------------------------------
@@ -125,13 +121,31 @@ test_conditions <- function(..., call = caller_env()) {
 
 #' Helper: Custom [cli::cli_alert()]
 #' @export
-cli_alert_items <- function(failed_items) {
+cli_alert_items <- function(failed_items, flatten = FALSE) {
+  if (flatten) failed_items <- list_flatten(failed_items)
+
   if (length(failed_items) == 0) {
     cli$cli_alert_success("No errors found.")
-  } else {
-    cli$cli_alert_danger("{length(failed_items)} items with errors: \\
-    {.val {failed_items}}")
+    return(invisible(NULL))
   }
+
+  items_unique <- unique(failed_items)
+
+  cli$cli_alert_danger("There were {.val {length(items_unique)}} across \\
+  {.val {length(failed_items)}} items.")
+
+  cli$cli_rule()
+  cli$cli_h3("Errors:")
+
+  iwalk(unique(failed_items), \(error, i) {
+    is_of_error <- map_lgl(failed_items, ~ identical(.x, error))
+
+    cli$cli_li("Error {.val {i}}:")
+    cli$cli_text("Occurances: {.val {sum(is_of_error)}}. On items: \\
+    {.val {names(failed_items[is_of_error])}}.")
+    print(error)
+    cli$cli_par()
+  })
 }
 
 #' Helper: list2 with tibble-like self referencing
@@ -163,17 +177,31 @@ list3 <- function(...) {
 #'
 #' @param filename [`character(1)`] Output file path.
 #' @param width, height [`numeric(1)`] Plot dimensions.
+#' @param ratio [`numeric(1)`] Aspect ratio (height/width).
 #' @param ... Additional arguments passed to [ggplot::ggsave()].
-#' @param units [`character(1)`] Units for width and height.
 #'
 #' @returns [`invisible(NULL)`].
 #' @export
-ggsave2 <- function(filename, width, height, ..., units = "cm") {
+ggsave2 <- function(filename, width = NA, ratio = 1, scale = 1, ...) {
   env <- caller_env()
   ggsave(
     glue(filename, .envir = env),
-    width = width, height = height, ..., units = units
+    width = width, height = width * ratio, scale = scale, ...
   )
+}
+
+#' Helper: write_rds wrapper with success message
+#'
+#' @param x An R object to be saved to file.
+#' @param file [`character(1)`] Path to the file where the object will be
+#'   saved.
+#' @param ... Additional arguments passed to [readr::write_rds()].
+#'
+#' @returns [`invisible(NULL)`].
+#' @export
+write_rds2 <- function(x, file, ...) {
+  write_rds(x, file, ...)
+  cli$cli_alert_success("File saved: {.file {file}}")
 }
 
 #' Helper: updates a function body to be safely

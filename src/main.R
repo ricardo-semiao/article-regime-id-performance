@@ -1,6 +1,14 @@
 
 # Setup: Modules and Parameters ------------------------------------------------
 
+# Debug:
+if (FALSE) {
+  #save.image("data/workspace.RData")
+  load("data/workspace.RData")
+}
+
+
+# Modules:
 box::purge_cache()
 box::use(
   src/utils[...],
@@ -19,13 +27,6 @@ n_h <- 10L # Number of periods to predict
 n_t <- 100L + n_burn + n_h # Number of time periods
 
 
-# Debug:
-if (FALSE) {
-  #save.image("personal/workspace.RData")
-  load("personal/workspace.RData")
-}
-
-
 
 # Simulation: Considered Options -----------------------------------------------
 
@@ -36,14 +37,14 @@ dgp_names <- expand_grid(
   sgp = c(
     "r2_ar1_mu1", "r2_ar1_mu2",
     "r2_ar1_rho1", "r2_ar1_rho2",
-      #"r2_ar1_sign1", "r2_ar1_sign2",
-      #"r2_ar2_pos1", "r2_ar2_pos2",
-      #"r2_ar2_neg1", "r2_ar2_neg2",
-    "r2_ar1_vol1", "r2_ar1_vol2",
-    NULL
+    #"r2_ar1_sign1", "r2_ar1_sign2",
+    #"r2_ar2_pos1", "r2_ar2_pos2",
+    #"r2_ar2_neg1", "r2_ar2_neg2",
+    "r2_ar1_sigma1", "r2_ar1_sigma2",
+    NULL  # To correct trailing comma
   ),
   rgp = c(
-      #"r2_multinomial_equal", "r2_multinomial_reg1",
+    #"r2_multinomial_equal", "r2_multinomial_reg1",
     "r2_markov_symm_high", "r2_markov_asymm_high",
     #"r2_markov_symm_low", "r2_markov_asymm_low",
     "r2_sbreak_mid", "r2_sbreak_end",
@@ -51,8 +52,8 @@ dgp_names <- expand_grid(
     #"r2_threshold_abs_05", "r2_threshold_abs_2",
     #"r2_threshold_diff_05", "r2_threshold_diff_2",
     "r2_stransition_l0", "r2_stransition_l05",
-      #"r2_stransition_e0", "r2_stransition_e05",
-    NULL # To correct trailing comma
+    #"r2_stransition_e0", "r2_stransition_e05",
+    NULL
   )
 ) |>
   mutate(dgp = str_c(sgp, "-", rgp))
@@ -62,22 +63,38 @@ n_p <- nrow(dgp_names)
 sim_names <- expand_grid(dgp_names, sim = 1:n_s) |>
   mutate(dgp_sim = str_c(dgp, "-", sim))
 
+simulations_meta <- params$sgps[unique(dgp_names$sgp)] |>
+  map(\(xsgp) {
+    map(xsgp$args, \(x) {
+      x$mu <- x$mu %||% 0
+      x$sigma <- x$sigma %||% 1
+      unlist(x)
+    }) |>
+      do.call(rbind, args = _) |>
+      `rownames<-`(c("R1", "R2"))
+  }) |>
+  map(~ list(coefs = .x)) %>%
+  {tibble(sgp = names(.), meta = .)} |>
+  full_join(select(sim_names, sgp, rgp, sim), by = "sgp")
+
 
 
 # Simulation: Errors -----------------------------------------------------------
 
-# Error generation:
+# Generation:
 errors_raw <- rnorm_trng(n_t * n_p * n_s, parallelGrain = 100)
-
-diagnostics$errors$errors_dependence(errors_raw)
-if (FALSE) ggsave2("outputs/errors/dependence.png", 17, 14)
-
-diagnostics$errors$errors_distribution(errors_raw)
-if (FALSE) ggsave2("outputs/errors/distribution.png", 28, 14)
 
 errors <- errors_raw |>
   matrix(nrow = n_t, ncol = n_p * n_s) |>
   `colnames<-`(sim_names$dgp_sim)
+
+
+# Diagnostics:
+diagnostics$errors$errors_dependence(errors_raw)
+if (FALSE) ggsave2("outputs/diagnostics/error_dependence.png", 17, 0.8)
+
+diagnostics$errors$errors_distribution(errors_raw)
+if (FALSE) ggsave2("outputs/diagnostics/error_distribution.png", 28, 0.5)
 
 
 
@@ -94,7 +111,7 @@ sim_inputs <- pmap(sim_names, \(sgp, rgp, dgp, sim, dgp_sim) {
   set_names(sim_names$dgp_sim)
 
 # Simulation function:
-# Example: `input <- sim_inputs[["r2_ar1_vol2-r2_lstar_05-14"]]`
+# Example: `input <- sim_inputs[["r2_ar1_sigma2-r2_lstar_05-14"]]`
 simulate_serie <- function(input) {
   sfun <- input$sgp$fun
   rfun <- input$rgp$fun
@@ -115,7 +132,7 @@ simulate_serie <- function(input) {
     y[t] <- sfun(y, r, t)
   }
 
-  list(r = r, y = y) # Todo: summarize r into vector might be needed for memory
+  list(r = r, y = y)
 }
 
 # Running simulations:
@@ -129,14 +146,13 @@ simulations <- map_parallel(
 
 # Saving results:
 if (FALSE) {
-  write_rds(simulations, "data/simulations.rds") %>%
-    {cli$cli_alert_success("Simulations saved to {.file data/simulations.rds}")}
+  #write_rds2(simulations, "data/simulations.rds")
   simulations <- read_rds("data/simulations.rds")
 }
 
 # Checking errors:
 if (safe) {
-  names(compact(map(simulations, "error"))) |> cli_alert_items()
+  compact(map(simulations, "error")) |> cli_alert_items()
   simulations <- map(simulations, "result")
 }
 
@@ -154,60 +170,6 @@ simulations_data <- imap(simulations, \(res, sim_name) {
     across(c(sgp, rgp), fct),
     across(c(sim, r), as.integer)
   )
-
-
-
-# Simulation: Diagnostics ------------------------------------------------------
-
-# Setup:
-sims_sample <- sample(n_s, 10)
-
-dgp_names_main <- dgp_names |>
-  filter(
-    str_detect(sgp, "2$"),
-    str_detect(rgp, "_high$|_0$|_mid$|_l0$")
-  ) |>
-  distinct(sgp, rgp, .keep_all = TRUE)
-# Example: `list2env(dgp_names_main[3, ], globalenv())`
-
-
-# Simulations panel for each RGP (each with all SGPs within):
-pwalk(distinct(dgp_names_main, rgp), \(rgp) {
-  plot_sgps_sim(
-    simulations_data, diagnostics$simulations$panel_simulations,
-    unique(dgp_names_main$sgp), rgp, n_burn = n_burn, lims = c(0, 0.4)
-  )
-  ggsave2("outputs/simulations/values-{rgp}.png", 28, 14)
-})
-
-
-# Stats panels for each SPG and RGP combination:
-pwalk(dgp_names_main, \(sgp, rgp, dgp) {
-  plot_sgps_sim(
-    simulations_data, diagnostics$simulations$panel_stats,
-    unique(dgp_names_main$sgp), rgp,
-    dimension = "sgp", option = sgp, sims = sims_sample[1:5], n_burn = n_burn,
-    regime_aligned = TRUE, lims = c(0, 3)
-  )
-  ggsave2("outputs/simulations/stats_sgp-{rgp}.png", 28, 14)
-
-  plot_sgps_sim(
-    simulations_data, diagnostics$simulations$panel_stats,
-    unique(dgp_names_main$sgp), rgp,
-    dimension = "rgp", option = rgp, sims = sims_sample[1:5], n_burn = n_burn,
-    regime_aligned = !grepl("threshold", rgp), lims = c(0, 15)
-  ) & ylim(0, 1)
-  ggsave2("outputs/simulations/stats_rpg-{rgp}.png", 28, 14)
-})
-
-
-# Table of statistics:
-.tab <- diagnostics$simulations$table_sgps(simulations_data, dgp_names_main$dgp)
-if (FALSE) cat(gt::as_latex(.tab), file = "outputs/simulations/table_sgps.tex")
-
-.tab <- diagnostics$simulations$table_rgps(simulations_data, dgp_names_main$dgp)
-if (FALSE) cat(gt::as_latex(.tab), file = "outputs/simulations/table_rgps.tex")
-rm(.tab)
 
 
 
@@ -233,9 +195,12 @@ model_names <- expand_grid(
 n_l <- 1 # Can be arbitrarily large, must be at least the max n_l used in models
 n_m <- length(unique(model_names$model))
 
+
 # Estimation inputs:
-est_inputs <- map(simulations, \(sim) list(y = sim$y))
-#est_inputs <- keep_at(est_inputs, ~ grepl("-[1-2]$", .x))
+est_inputs <- map2(simulations, get_varying_param(names(simulations)), \(sim, rn_par) {
+  list(y = sim$y, rn_par = rn_par)
+})
+
 
 # Estimation function:
 # Example: `input <- est_inputs[["r2_ar1_rho2-r2_threshold_x_0-2"]]`
@@ -246,36 +211,37 @@ estimate_models <- function(input) {
   names(results) <- names(mods)
 
   for (mod_name in names(mods)) {
-    results[[mod_name]] <- mods[[mod_name]](data, n_t, n_h, n_burn)
+    results[[mod_name]] <- mods[[mod_name]](data, n_t, n_h, n_burn, rn_par = input$rn_par)
   }
 
-  results # Todo: transpose?
+  results
 }
 
 # Running estimations:
 safe <- TRUE
 considered_models <- options$models[unique(model_names$model)]
 if (safe) considered_models <- map(considered_models, safely_modify)
+test <- sample(24000, 100)
 
 estimations <- map_parallel(
-  est_inputs, estimate_models,
+  est_inputs[test], estimate_models,
   mods = considered_models, data_lags = data_lags,
   n_burn = n_burn, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m,
   parallel = TRUE, safe = FALSE
 )
 
-
 # Saving results:
 if (FALSE) {
-  write_rds(estimations, "data/estimations.rds") %>%
-    {cli$cli_alert_success("Estimations saved to {.file data/estimations.rds}")}
+  #write_rds2(estimations, "data/estimations.rds")
   estimations <- read_rds("data/estimations.rds")
 }
 
+
 # Checking errors:
 if (safe) {
-  names(compact(map(estimations, ~ compact(map(.x, "error"))))) |>
-    cli_alert_items()
+  compact(map(estimations, ~ compact(map(.x, "error")))) |>
+    cli_alert_items(flatten = TRUE)
+  #estimations$`r2_ar1_rho2-r2_threshold_x_0-415` |> map("error")
   estimations <- map(estimations, ~ compact(map(.x, "result")))
 }
 
@@ -285,8 +251,8 @@ check_n_regimes <- imap_dfr(estimations, \(sim, name) {
 }) |>
   pivot_longer(-name, names_to = "model") |>
   filter(value != 2)
-table(check_n_regimes$model)
 
+table(check_n_regimes$model, check_n_regimes$value)
 for (l in split(check_n_regimes, 1:nrow(check_n_regimes))) {
   estimations[[l$name]][[l$model]] <- NULL
 }
@@ -295,230 +261,50 @@ rm(check_n_regimes, l)
 
 
 # Collecting results:
-estimations_data <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
-  imap(\(res, sim_name) {
-    sim_opts <- str_split_1(sim_name, "-")
-    ord <- regimes_order(res$meta$coefs, sim_opts[1])
+estimations_flat <- list_flatten(estimations, name_spec = "{outer}-{inner}")
 
-    list(
-      sgp = sim_opts[1], rgp = sim_opts[2], sim = sim_opts[3],
-      model = sim_opts[4], t = 1:n_t, y = res$y, r = ord[res$r]
-    )
-  }) |>
+estimations_meta <- estimations_flat |>
+  purrr::imap(~ c(dgp_sim_model = .y, meta = list(list(.x$meta)))) |>
   bind_rows() |>
+  separate_wider_delim(
+    dgp_sim_model, delim = "-",
+    names = c("sgp", "rgp", "sim", "model")
+  ) |>
+  mutate(
+    across(c(sgp, rgp, model), fct),
+    across(c(sim), as.integer)
+  )
+
+estimations_data <- estimations_flat |>
+  purrr::imap(~ c(dgp_sim_model = .y, t = list(1:n_t), .x[c("y", "r")][])) |>
+  bind_rows() |>
+  separate_wider_delim(
+    dgp_sim_model, delim = "-",
+    names = c("sgp", "rgp", "sim", "model")
+  ) |>
   mutate(
     across(c(sgp, rgp, model), fct),
     across(c(sim, r), as.integer)
   )
 
-estimations_meta <- list_flatten(estimations, name_spec = "{outer}-{inner}") |>
-  imap(\(res, sim_name) {
-    sim_opts <- str_split_1(sim_name, "-")
-    meta <- res$meta
-
-    ord <- regimes_order(meta$coefs, sim_opts[1])
-    meta$coefs <- meta$coefs[ord, ]
-    dimnames(meta$coefs) <- list(
-      colnames = c("mu", paste0("rho", 1:n_l)),
-      rownames = paste0("R", 1:nrow(meta$coefs))
-    )
-
-    list(
-      sgp = sim_opts[1], rgp = sim_opts[2], sim = sim_opts[3],
-      model = sim_opts[4], meta = list(meta)
-    )
-  }) |>
-  bind_rows() |>
-  mutate(
-    across(c(sgp, rgp, model), fct),
-    across(c(sim), as.integer)
-  )
-# Todo: other metas also need to be ordered
 
 
+# Estimation: Metrics ----------------------------------------------------------
 
-# Estimation: Diagnostics ------------------------------------------------------
-
-# Setup:
-model_names_main <- model_names |>
-  filter(
-    str_detect(sgp, "2$"),
-    str_detect(rgp, "_high$|_0$|_mid$|_l0$")
-  ) |>
-  distinct(sgp, rgp, .keep_all = TRUE)
-# Example: `list2env(model_names_main[1, ], globalenv())`
-
-
-# Example of true vs fitted plot:
-{
-  sgp <- "r2_ar1_rho2"; rgp <- "r2_markov_symm_high"; model <- "r2_markov"
-  sgp <- "r2_ar1_mu2"; rgp <- "r2_threshold_x_05"; model <- "r2_threshold_x"
-  diagnostics$estimations$panel_estimations(
-    subset_results(simulations_data, sgps = sgp, rgps = rgp, model = model),
-    subset_results(estimations_data, sgps = sgp, rgps = rgp, model = model),
-    n_burn = n_burn, n_t = n_t, n_h = n_h,
-    title = glue("SGP: {dicts$sgps[sgp]}\nRGP: {dicts$rgps[rgp]}\nModel: {dicts$models[model]}")
-  )
-  ggsave2("outputs/estimations/fit-{rgp}-{model}.png", 28, 14)
-}
-
-
-# Residuals panel for each RGP-Model pair (each with all SGPs within):
-pwalk(distinct(model_names_main, rgp, model), \(rgp, model, ...) {
-  plot_sgps_est(
-    estimations_data, simulations_data, diagnostics$estimations$panel_residuals,
-    sgps = unique(model_names_main$sgp), rgp = rgp, model = model,
-    n_burn = n_burn, n_t = n_t, n_h = n_h,
-    regime_aligned = FALSE, hline = 0, title = NULL, lims = c(0, 0.4)
-  ) +
-    plot_annotation(
-      title = glue("RGP: {dicts$rgps[rgp]};  Model: {dicts$models[model]}")
-    )
-  ggsave2("outputs/estimations/residuals-{rgp}-{model}-na.png", 28, 14)
-})
-
-
-# Residuals panel for each RGP-Model pair (each with all SGPs within):
-pwalk(distinct(model_names, rgp, sim, model), \(rgp, model, ...) {
-  data <- subset_results(
-    estimations_meta, rgps = rgp, model = model
-  )
-  diagnostics$estimations$coefs_distribution(
-    data, params, model_names
-  )
-  if (FALSE) ggsave2("outputs/estimations/coefs-{rgp}-{model}.png", 26, 16)
-})
-
-
-# Table of statistics:
-.tab <- diagnostics$estimations$table_residuals(
-  simulations_data, estimations_data, TRUE,
-  dgp_names_main$dgp, na.rm = TRUE, n_burn = n_burn
-)
-if (FALSE) cat(gt::as_latex(.tab), file = "outputs/estimations/table_residuals.tex")
-# Todo: table across regime correctness
-
-
-
-# Metrics ----------------------------------------------------------------------
-
-simulations_meta <- params$sgps[unique(dgp_names$sgp)] |>
-  map(\(xsgp) {
-    map(xsgp$args, \(x) {
-      x$mu <- as.integer(x$mu || 0)
-      x$vol <- as.integer(x$vol || 1)
-      unlist(x)
-    }) |>
-      do.call(cbind, args = _) |>
-      `colnames<-`(c("R1", "R2"))
-  }) |>
-  map(~ list(coefs = .x)) %>%
-  {tibble(sgp = names(.), meta = .)} |>
-  full_join(sim_names, by = "sgp")
-
-if (FALSE) {
-  estimations_meta$meta <- map(estimations_meta$meta, \(meta) {
-    meta$coefs <- rbind(meta$coefs, "vol" = rnorm(2, 1, 0.1))
-    meta
-  })
-}
-
-# data_s = simulations_data; data_e = estimations_data; data_m = estimations_meta
-data_models_final <- metrics$get_data_final(
+data_metrics <- metrics$get_metrics_data(
   simulations_data, estimations_data, simulations_meta, estimations_meta,
-  n_t = n_t, n_warm = n_burn + n_l + 1, n_h = n_h, model_names = model_names
+  n_t = n_t, n_burn = n_burn + n_l + 1, n_h = n_h
 )
+# TODO: load only the needed symbols from metrics (and others)
 
 if (FALSE) {
-  write_rds(data_models_final, "data/data_models_final.rds") %>%
-    {cli$cli_alert_success("Final models data saved to {.file data/data_models_final.rds}")}
-  data_models_final <- read_rds("data/data_models_final.rds")
+  #write_rds2(data_metrics, "data/data_metrics.rds")
+  data_metrics <- read_rds("data/data_metrics.rds")
 }
 
 
 
-# Comparisons ------------------------------------------------------------------
-
-# Do for both data_models_final and data_regimes_final. Regimes has an extra
-# regime variable
-
-colnames(data_models_final)
-
-# Adjusting factor levels:
-map(data_models_final[c("rgp", "sgp", "model")], levels)
-reg_data <- data_models_final |>
-  mutate(
-    sgp = str_remove(sgp, "[^_]$"),
-    rgp = str_remove(rgp, "_[^_]+$"),
-  )
-map(reg_data[c("rgp", "sgp", "model")], unique)
-
-
-# Removing extreme outliers:
-reg_data$rmse |> cut(breaks = c(0, 5, 10, 25, 50, 100, 1000, Inf)) |> table()
-reg_data$mape |> cut(breaks = c(0, 5, 10, 25, 50, 100, 1000, Inf)) |> table()
-# Todo: histogram with log_x
-reg_data <- filter(reg_data, rmse < 10)
-
-
-# First step:
-# Add regressions on the identification of regime variable and metrics
-# themselves
-
-
-# Basic regressions:
-lm(rmse ~ sim, reg_data) |> summary()
-lm(rmse ~ sgp * rgp, reg_data) |> summary()
-lm(rmse ~ model * rgp, hi) |> summary()
-lm(rmse ~ model * rgp + sgp * rgp, reg_data) |> summary()
-
-
-# Metrics must be separated by the relevant factor (SGP metrics run separately
-# for each SGP, same for RGP)
-lm(rmse ~ model*rgp + rgp + sgp_metric_est, filter(reg_data, sgp == "r2_ar1_vol")) |> summary()
-lm(rmse ~ model*rgp + rgp + sgp_metric_diff, filter(reg_data, sgp == "r2_ar1_vol")) |> summary()
-lm(rmse ~ model*rgp + rgp + model*sgp_metric_est, reg_data) |> summary()
-
-lm(rmse ~ model*rgp + rgp + mu_diff, filter(reg_data, sgp == "r2_ar1_mu")) |> summary()
-
-
-# Graphs:
-reg_data$rmse |> cut(breaks = c(5, 10, 25, 50, 100, 1000)) |> table()
-(reg_data$rmse > 5) |> table()
-
-plot_results <- function(
-  data, x,
-  logx = FALSE, logy = FALSE, smooth = TRUE, n = 3000
-) {
-  data |>
-    slice_sample(n = n) |>
-    ggplot(aes({{x}}, rmse)) +
-    geom_point(aes(color = model, shape = model), alpha = 0.5) +
-    ggh4x::facet_grid2(vars(rgp), vars(sgp), scales = "free", independent = "all") +
-    list(
-      if (logx) scale_x_log10(),
-      if (logy) scale_y_log10(),
-      if (smooth) geom_smooth(aes(color = model), method = "lm", fill = NA)
-    )
-}
-
-plot_results(reg_data, mape, logx = TRUE)
-
-plot_results(reg_data, sgp_metric_est)
-plot_results(reg_data, sgp_metric_true)
-plot_results(reg_data, sgp_metric_diff)
-
-plot_results(reg_data, mu_est)
-plot_results(reg_data, mu_diff)
-
-plot_results(reg_data, rho1_est)
-plot_results(reg_data, rho1_diff)
-
-
-
-# New analysis =================================================================
-
-# Diagnostics ------------------------------------------------------------------
+# Results: Diagnostics ---------------------------------------------------------
 
 box::use(gt[...])
 
@@ -534,51 +320,50 @@ glue_mean <- function(x, n = 2, random_stars = FALSE) {
 diag_t1_a <- simulations_data |>
   filter(
     rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2")
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2")
   ) |>
   group_by(sgp, rgp, sim, r) |>
-
   summarise(
     avg = mean(y, na.rm = TRUE),
-    acf = tryCatch(cor(y[-n()], y[-1], use = "complete.obs"), error = \(e) NA_real_),
-    vol = sd(y, na.rm = TRUE)
+    acf = cor(y[-n()], y[-1], use = "na.or.complete"),
+    sd = sd(y, na.rm = TRUE)
   ) |>
   group_by(sgp, rgp, r) |>
   summarise(
     avg = glue_mean(avg),
     acf = glue_mean(acf),
-    vol = glue_mean(vol)
+    sd = glue_mean(sd)
   )
 
 diag_t1_b <- simulations_data |>
   filter(
     rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2")
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2")
   ) |>
   group_by(sgp, rgp, sim) |>
   summarise(
     avg = mean(y, na.rm = TRUE),
-    acf = tryCatch(cor(y[-n()], y[-1], use = "complete.obs"), error = \(e) NA_real_),
-    vol = sd(y, na.rm = TRUE)
+    acf = cor(y[-n()], y[-1], use = "na.or.complete"),
+    sd = sd(y, na.rm = TRUE)
   ) |>
   group_by(sgp, rgp) |>
   summarise(
     avg = glue_mean(avg),
     acf = glue_mean(acf),
-    vol = glue_mean(vol)
+    sd = glue_mean(sd)
   ) |>
   mutate(r = 0)
 
 fmt_cols <- c(
   "avg_1", "avg_2", "avg_0",
   "acf_1", "acf_2", "acf_0",
-  "vol_1", "vol_2", "vol_0"
+  "sd_1", "sd_2", "sd_0"
 )
 
 bind_rows(diag_t1_a, diag_t1_b) |>
   pivot_wider(
     names_from = r,
-    values_from = c(avg, acf, vol),
+    values_from = c(avg, acf, sd),
   ) |>
   relocate(rgp, sgp) |>
   arrange(rgp, sgp) |>
@@ -598,8 +383,8 @@ bind_rows(diag_t1_a, diag_t1_b) |>
       "r2_ar1_mu2" = "μ, (0, 2)",
       "r2_ar1_rho1" = "ρ, (0.1, 0.9)",
       "r2_ar1_rho2" = "ρ, (0.4, 0.6)",
-      "r2_ar1_vol1" = "σ, (1, 2)",
-      "r2_ar1_vol2" = "σ, (1, 4)"
+      "r2_ar1_sigma1" = "σ, (1, 2)",
+      "r2_ar1_sigma2" = "σ, (1, 4)"
     ))
   ) |>
   gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
@@ -612,14 +397,14 @@ bind_rows(diag_t1_a, diag_t1_b) |>
     acf_1 = "s = 1",
     acf_2 = "s = 2",
     acf_0 = "⫠s",
-    vol_1 = "s = 1",
-    vol_2 = "s = 2",
-    vol_0 = "⫠s",
+    sd_1 = "s = 1",
+    sd_2 = "s = 2",
+    sd_0 = "⫠s",
   ) |>
   tab_spanner(label = "DGP", columns = c("rgp", "sgp")) |>
   tab_spanner(label = "Average", columns = c("avg_1", "avg_2", "avg_0")) |>
   tab_spanner(label = "ACF", columns = c("acf_1", "acf_2", "acf_0")) |>
-  tab_spanner(label = "Volatility", columns = c("vol_1", "vol_2", "vol_0")) |>
+  tab_spanner(label = "SD", columns = c("sd_1", "sd_2", "sd_0")) |>
   cols_align(align = "left", columns = fmt_cols) |>
   fmt(columns = fmt_cols, fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x)) |>
   gtsave("outputs/table_dgp.tex")
@@ -632,7 +417,7 @@ bind_rows(diag_t1_a, diag_t1_b) |>
 diag_t2_a <- estimations_data |>
   filter(
     rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
     (rgp == "r2_markov_symm_high" & model == "r2_markov") |
       (rgp == "r2_sbreak_mid" & model == "r2_sbreak") |
       (rgp == "r2_threshold_x_0" & model == "r2_threshold_x") |
@@ -642,20 +427,20 @@ diag_t2_a <- estimations_data |>
   group_by(sgp, rgp, sim, r) |>
   summarise(
     avg = mean(y, na.rm = TRUE),
-    acf = tryCatch(cor(y[-n()], y[-1], use = "complete.obs"), error = \(e) NA_real_),
-    vol = sd(y, na.rm = TRUE)
+    acf = cor(y[-n()], y[-1], use = "na.or.complete"),
+    sd = sd(y, na.rm = TRUE)
   ) |>
   group_by(sgp, rgp, r) |>
   summarise(
     avg = glue_mean(avg),
     acf = glue_mean(acf),
-    vol = glue_mean(vol)
+    sd = glue_mean(sd)
   )
 
 diag_t2_b <- estimations_data |>
   filter(
     rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
     (rgp == "r2_markov_symm_high" & model == "r2_markov") |
       (rgp == "r2_sbreak_mid" & model == "r2_sbreak") |
       (rgp == "r2_threshold_x_0" & model == "r2_threshold_x") |
@@ -665,21 +450,21 @@ diag_t2_b <- estimations_data |>
   group_by(sgp, rgp, sim) |>
   summarise(
     avg = mean(y, na.rm = TRUE),
-    acf = tryCatch(cor(y[-n()], y[-1], use = "complete.obs"), error = \(e) NA_real_),
-    vol = sd(y, na.rm = TRUE)
+    acf = cor(y[-n()], y[-1], use = "na.or.complete"),
+    sd = sd(y, na.rm = TRUE)
   ) |>
   group_by(sgp, rgp) |>
   summarise(
     avg = glue_mean(avg),
     acf = glue_mean(acf),
-    vol = glue_mean(vol)
+    sd = glue_mean(sd)
   ) |>
   mutate(r = 0)
 
 bind_rows(diag_t2_a, diag_t2_b) |>
   pivot_wider(
     names_from = r,
-    values_from = c(avg, acf, vol),
+    values_from = c(avg, acf, sd),
   ) |>
   relocate(rgp, sgp) |>
   arrange(rgp, sgp) |>
@@ -699,8 +484,8 @@ bind_rows(diag_t2_a, diag_t2_b) |>
       "r2_ar1_mu2" = "μ, (0, 2)",
       "r2_ar1_rho1" = "ρ, (0.1, 0.9)",
       "r2_ar1_rho2" = "ρ, (0.4, 0.6)",
-      "r2_ar1_vol1" = "σ, (1, 2)",
-      "r2_ar1_vol2" = "σ, (1, 4)"
+      "r2_ar1_sigma1" = "σ, (1, 2)",
+      "r2_ar1_sigma2" = "σ, (1, 4)"
     ))
   ) |>
   gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
@@ -713,14 +498,14 @@ bind_rows(diag_t2_a, diag_t2_b) |>
     acf_1 = "s = 1",
     acf_2 = "s = 2",
     acf_0 = "⫠s",
-    vol_1 = "s = 1",
-    vol_2 = "s = 2",
-    vol_0 = "⫠s",
+    sd_1 = "s = 1",
+    sd_2 = "s = 2",
+    sd_0 = "⫠s",
   ) |>
   tab_spanner(label = "DGP", columns = c("rgp", "sgp")) |>
   tab_spanner(label = "Average", columns = c("avg_1", "avg_2", "avg_0")) |>
   tab_spanner(label = "ACF", columns = c("acf_1", "acf_2", "acf_0")) |>
-  tab_spanner(label = "Volatility", columns = c("vol_1", "vol_2", "vol_0")) |>
+  tab_spanner(label = "SD", columns = c("sd_1", "sd_2", "sd_0")) |>
   cols_align(align = "left", columns = fmt_cols) |>
   fmt(columns = fmt_cols, fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x)) |>
   gtsave("outputs/table_dgp2.tex")
@@ -751,7 +536,7 @@ left_join(
 
 
 
-# Exploratory analysis ---------------------------------------------------------
+# Results: Exploratory Analysis ------------------------------------------------
 
 # Metrics separation in T:
 simulations_data |>
@@ -760,9 +545,9 @@ simulations_data |>
   ) |>
   group_by(sgp, rgp) |>
   summarise(
-    avg = metrics$series_average(y, r) |> metrics$diff_p() |> round(2),
-    acf = metrics$series_autocorr(y, r) |> metrics$diff_p() |> round(2),
-    vol = metrics$series_volatility(y, r) |> metrics$diff_p() |> round(2)
+    avg = metrics$series_avg(y, r) |> metrics$diff_k_2() |> round(2),
+    acf = metrics$series_acf(y, r) |> metrics$diff_k_2() |> round(2),
+    sd = metrics$series_sd(y, r) |> metrics$diff_k_2() |> round(2)
   ) |>
   relocate(rgp, sgp) |>
   arrange(rgp, sgp) |>
@@ -783,15 +568,15 @@ simulations_data |>
       "r2_ar1_mu2" = "μ",
       "r2_ar1_rho1" = "ρ",
       "r2_ar1_rho2" = "ρ",
-      "r2_ar1_vol1" = "σ",
-      "r2_ar1_vol2" = "σ"
+      "r2_ar1_sigma1" = "σ",
+      "r2_ar1_sigma2" = "σ"
     ))
   ) |>
-  pivot_wider(names_from = big_rn, values_from = c(avg, acf, vol)) |>
+  pivot_wider(names_from = big_rn, values_from = c(avg, acf, sd)) |>
   gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
   tab_spanner(label = "avg", columns = c("avg_small", "avg_big")) |>
   tab_spanner(label = "acf", columns = c("acf_small", "acf_big")) |>
-  tab_spanner(label = "vol", columns = c("vol_small", "vol_big")) |>
+  tab_spanner(label = "sd", columns = c("sd_small", "sd_big")) |>
   cols_label(
     rgp = "RGP",
     sgp = "SGP"
@@ -802,16 +587,16 @@ simulations_data |>
 
 stats <- function(y, r) {
   c(
-    avg = metrics$series_average(y, r, na.rm = TRUE) |> metrics$diff_p(),
-    acf = metrics$series_autocorr(y, r, use = "complete.obs") |> metrics$diff_p(),
-    vol = metrics$series_volatility(y, r, na.rm = TRUE) |> metrics$diff_p()
+    avg = metrics$series_avg(y, r, na.rm = TRUE) |> metrics$diff_k_2(),
+    acf = metrics$series_acf(y, r, use = "na.or.complete") |> metrics$diff_k_2(),
+    sd = metrics$series_sd(y, r, na.rm = TRUE) |> metrics$diff_k_2()
   )
 }
 
 
 # Metrics separation across t:
 hi = simulations_data |>
-  filter(sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2")) |>
+  filter(sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2")) |>
   filter(sim %in% sample(n_s, 8)) |>
   group_by(rgp, sgp, sim) |>
   reframe(
@@ -822,9 +607,9 @@ hi = simulations_data |>
 hi2 = hi |>
   group_by(rgp, sgp, t) |>
   reframe(
-    across(c(avg, acf, vol), list(avg = ~ mean(.x, na.rm = TRUE), sd = ~ sd(.x, na.rm = TRUE)))
+    across(c(avg, acf, sd), list(avg = ~ mean(.x, na.rm = TRUE), sd = ~ sd(.x, na.rm = TRUE)))
   ) |>
-  pivot_longer(matches("^avg|^acf|^vol"), names_to = c("stat", ".value"), values_to = "value", names_sep = "_") |>
+  pivot_longer(matches("^avg|^acf|^sd"), names_to = c("stat", ".value"), values_to = "value", names_sep = "_") |>
   mutate(
     big_rn = c("big", "small")[grepl("2$", sgp) + 1],
     sym_rgp = c(
@@ -835,16 +620,16 @@ hi2 = hi |>
       "r2_ar1_mu2" = "μ",
       "r2_ar1_rho1" = "ρ",
       "r2_ar1_rho2" = "ρ",
-      "r2_ar1_vol1" = "σ",
-      "r2_ar1_vol2" = "σ"
+      "r2_ar1_sigma1" = "σ",
+      "r2_ar1_sigma2" = "σ"
     )) |>
       fct(c("μ", "ρ", "σ")),
     stat = str_replace_all(stat, c(
       "avg" = "RC average",
       "acf" = "RC ACF",
-      "vol" = "RC volatility"
+      "sd" = "RC SD"
     )) |>
-      fct(c("RC average", "RC ACF", "RC volatility"))
+      fct(c("RC average", "RC ACF", "RC SD"))
   )
 
 ggplot(filter(hi2, rgp %in% c("r2_threshold_x_0", "r2_threshold_x_05")), aes(t, avg)) +
@@ -889,7 +674,7 @@ hello = estimations_data |>
   filter(
     t >= t - n_h,
     rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
   ) |>
   left_join(
     simulations_data,
@@ -903,8 +688,8 @@ hello = estimations_data |>
       "r2_ar1_mu2" = "μ",
       "r2_ar1_rho1" = "ρ",
       "r2_ar1_rho2" = "ρ",
-      "r2_ar1_vol1" = "σ",
-      "r2_ar1_vol2" = "σ"
+      "r2_ar1_sigma1" = "σ",
+      "r2_ar1_sigma2" = "σ"
     )) |>
       fct(c("μ", "ρ", "σ")),
     rgp = str_replace_all(rgp, c(
@@ -959,13 +744,13 @@ ola = left_join(
 
 ola2 <- ola |>
   left_join(
-    select(data_models_final, sgp, rgp, sim, rmse),
+    select(data_metrics, sgp, rgp, sim, rmse),
     by = c("sgp", "rgp", "sim")
   ) |>
   pivot_longer(matches("^error_"), names_to = "coef", values_to = "error") |>
   filter(
     rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
   )
 
 ola3 <- ola2 |>
@@ -981,8 +766,8 @@ ola3 <- ola2 |>
       "r2_ar1_mu2" = "RN: μ",
       "r2_ar1_rho1" = "RN: ρ",
       "r2_ar1_rho2" = "RN: ρ",
-      "r2_ar1_vol1" = "RN: σ",
-      "r2_ar1_vol2" = "RN: σ"
+      "r2_ar1_sigma1" = "RN: σ",
+      "r2_ar1_sigma2" = "RN: σ"
     )) |>
       fct(c("RN: μ", "RN: ρ", "RN: σ")),
     rgp = str_replace_all(rgp, c(
@@ -998,7 +783,7 @@ ola3 <- ola2 |>
     coef = str_replace_all(coef, c(
       "error_mu" = "Coef.: μ",
       "error_rho" = "Coef.: ρ",
-      "error_vol" = "Coef.: σ"
+      "error_sigma" = "Coef.: σ"
     ))
   )
 
@@ -1025,16 +810,14 @@ ggsave2("outputs/metrics/scatter_stransition.png", 28, 20)
 
 
 
-# Regressions ------------------------------------------------------------------
-
-box::use(gtsummary[...])
+# Results: Systematic Analysis -------------------------------------------------
 
 trimmed_sd <- function(x, trim = 0.01) {
   idx <- x >= quantile(x, trim, na.rm = TRUE) & x <= quantile(x, 1 - trim, na.rm = TRUE)
   sd(x[idx], na.rm = TRUE)
 }
 
-data_reg <- data_models_final |>
+data_reg <- data_metrics |>
   mutate(across(where(is.numeric), ~ ifelse(is.finite(.x), .x, NA_real_))) |>
   mutate(across(where(is.numeric), ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_))) |>
   mutate(across(where(is.numeric), ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)))
@@ -1096,7 +879,7 @@ glue("{round(reg13$coefficients[8:16, 1], 3)} ({round(reg13$coefficients[8:16, 1
 
 # Now with the metrics instead of RGP:
 reg2 <- lm(
-  rmse ~ model*(avg_est + acf_est + vol_est) - 1,
+  rmse ~ model*(avg_est + acf_est + sd_est) - 1,
   filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
 ) |> summary()
 # And also with cross metric interactions, but later
@@ -1109,7 +892,7 @@ glue("{round(reg2$coefficients[8:16, 1], 3)} ({round(reg2$coefficients[8:16, 1],
 
 
 reg22 <- lm(
-  rmse ~ model*(avg_est * acf_est * vol_est) - 1,
+  rmse ~ model*(avg_est * acf_est * sd_est) - 1,
   filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
 ) |> summary()
 # And also with cross metric interactions, but later
@@ -1122,9 +905,9 @@ glue("{round(reg22$coefficients[8:16, 1], 3)} ({round(reg22$coefficients[8:16, 1
 # What is best to match?
 
 reg3 <- lm(
-  rmse ~ r2 + regimes_me +
+  rmse ~ r2 + regimes_bme +
     #switches_diff + duration_diff +
-    #avg_diff + acf_diff + vol_diff +
+    #avg_diff + acf_diff + sd_diff +
     mu_diff + rho1_diff + sigma_diff +
     NULL,
   data = data_reg
@@ -1136,7 +919,7 @@ reg3 |> stargazer::stargazer(single.row = TRUE)
 
 reg4 <- lm(
   rmse ~
-    model:(avg_diff + acf_diff + vol_diff) - 1 - model +
+    model:(avg_diff + acf_diff + sd_diff) - 1 - model +
     #mu_diff + rho1_diff + sigma_diff +
     NULL,
   data = data_reg
@@ -1152,10 +935,10 @@ reg4 |> stargazer::stargazer(single.row = TRUE)
 
 # Check:
 reg1_cor <- cor(
-  select(data_models_final, rmse, r2, regimes_me,
+  select(data_metrics, rmse, r2, regimes_bme,
   switches_diff, duration_diff,
-  avg_diff, acf_diff, vol_diff, mu_diff, rho1_diff, sigma_diff),
-  use = "complete.obs"
+  avg_diff, acf_diff, sd_diff, mu_diff, rho1_diff, sigma_diff),
+  use = "na.or.complete"
 )
 
 reg1_cor[upper.tri(reg1_cor, diag = TRUE)] <- 0

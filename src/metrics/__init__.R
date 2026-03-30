@@ -1,6 +1,6 @@
 
 #' @export
 box::use(
-  ./metrics[...],
-  ./get_data[...]
+  ./metrics_definitions[...],
+  ./get_metrics_data[...]
 )

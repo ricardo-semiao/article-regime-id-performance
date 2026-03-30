@@ -16,17 +16,17 @@ box::use(
 #'
 #' @param mu [`double(1)`] Mean parameter.
 #' @param ... [`double(1)` each] AR coefficients.
-#' @param vol [`double(1)`] Volatility parameter.
+#' @param sigma [`double(1)`] Volatility parameter.
 #'
 #' @returns  [`expression()`] Expression for AR calculation.
 #' @export
-ar <- function(mu = 0, ..., vol = 1) {
+ar <- function(mu = 0, ..., sigma = 1) {
   rhos <- list2(...)
-  walk(list(mu, rhos, vol), force)
+  walk(list(mu, rhos, sigma), force)
 
   test_conditions(
     "All arguments must be bare numeric scalars and finite" = all(
-      map_lgl(c(mu, rhos, vol), \(x) is_bare_numeric(x, 1) && is.finite(x))
+      map_lgl(c(mu, rhos, sigma), \(x) is_bare_numeric(x, 1) && is.finite(x))
     )
   )
 
@@ -34,6 +34,6 @@ ar <- function(mu = 0, ..., vol = 1) {
   n_rho <- length(rhos)
 
   expr({
-    !!mu + sum(!!rhos * y[(t - 1):(t - !!n_rho)]) + !!vol * y[t]
+    !!mu + sum(!!rhos * y[(t - 1):(t - !!n_rho)]) + !!sigma * y[t]
   })
 }

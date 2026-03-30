@@ -322,7 +322,7 @@ There are two important aspects of the RC metrics usage. First is whether to use
     \disp \circ \met: (y, r) \mapsto \mathbb{R}^{S} \mapsto \mathbb{R}
 \end{equation}
 
-Second, which series to use: the true or estimated ones. One can use the true values $(y, r)$ and get the characteristics of the true DGP, or the estimated values $(\hat{y}, \hat{r})$ and get the characteristics of the estimated model[^dimension]. Another option is to calculate the difference between the former and the latter[^order]. Another option is to calculate the metric of the difference $(y - \hat{y}, r)$ or $(y - \hat{y}, \hat{r})$.
+Second, which series to use: the true or estimated ones. One can use the true values $(y, r)$ to get the characteristics of the true DGP, and the estimated values $(\hat{y}, \hat{r})$ or $(y, \hat{r})$ to get the characteristics of the estimated model[^dimension]. Another option is to calculate the difference between the former and the latter[^order]. Another option is to calculate the metric of the difference $(y - \hat{y}, r)$ or $(y - \hat{y}, \hat{r})$.
 
 [^dimension]: Note that the value of $S$ and $\hat{S}$ can be different, and thus, so the dimension of the metric's output.
 
@@ -533,7 +533,7 @@ The following regime natures are considered, each representing a different way i
 
 <!-- > Idem, existem outras opções. Alguma sugestão de formatação melhor do que a atual? -->
 
-Note that the regimes are always ordered increasingly by the parameter of interest. In general, the large vs. small differences will be interesting to analyze in relation to each other. To compare different types of changes, only the large differences will be considered, for simplicity.
+Note that the regimes are always ordered increasingly by the parameter of interest. In general, the large vs. small differences will be interesting to analyze in relation to each other. To compare different types of changes, only the large differences will be considered, for simplicity. In the asymmetric RGPs, the rarer regime is always the second one, with the higher value of the relevant parameter.
 
 
 ## Considered metrics {#sec-impl-metrics}

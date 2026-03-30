@@ -44,11 +44,11 @@ unconditional_sgp <- function(funs, args) {
 
 #' Internal: Standardize SGP parameters by adding missing defaults
 #'
-#' Currently based on `create_sgp$ar` defaults, i.e. `mu = 0` and `vol = 1`.
+#' Currently based on `create_sgp$ar` defaults, i.e. `mu = 0` and `sigma = 1`.
 standardize_params_sgp <- function(args) {
   imap(args, \(arg, s) {
     arg <- if (!"mu" %in% names(arg)) c(mu = 0, arg[]) else arg
-    arg <- if (!"vol" %in% names(arg)) c(arg[], vol = 1) else arg
+    arg <- if (!"sigma" %in% names(arg)) c(arg[], sigma = 1) else arg
     arg
   })
 }
@@ -70,8 +70,8 @@ dict <- c(
   r2_ar2_pos2  = "New positive lag (big)",
   r2_ar2_neg1  = "New negative lag (small)",
   r2_ar2_neg2  = "New negative lag (big)",
-  r2_ar1_vol1  = "\u03C3 (small change)",
-  r2_ar1_vol2  = "\u03C3 (big change)"
+  r2_ar1_sigma1  = "\u03C3 (small change)",
+  r2_ar1_sigma2  = "\u03C3 (big change)"
 )
 
 
@@ -125,14 +125,14 @@ params <- list(
     n_r = 2, sgp = "ar",
     args = list(list(rho1 = 0.5, rho2 = -0.5), list(rho1 = 0.5))
   ),
-  # AR vol:
-  r2_ar1_vol1 = list3(
+  # AR sigma:
+  r2_ar1_sigma1 = list3(
     n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5), list(rho1 = 0.5, vol = 2))
+    args = list(list(rho1 = 0.5), list(rho1 = 0.5, sigma = 2))
   ),
-  r2_ar1_vol2 = list3(
+  r2_ar1_sigma2 = list3(
     n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5), list(rho1 = 0.5, vol = 4))
+    args = list(list(rho1 = 0.5), list(rho1 = 0.5, sigma = 4))
   )
 )
 

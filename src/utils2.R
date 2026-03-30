@@ -48,25 +48,11 @@ subset_results <- function(
     )
 }
 
-#' Helper: Order regimes by a varying parameter
-#' Todo: document and think where to put
-#' @export
-regimes_order <- function(coefs, sgp_name) {
-  param_varying <- params$sgp[[sgp_name]]$args |>
-    list_transpose() |>
-    map_lgl(~ length(unique(.x)) != 1) |>
-    which()
-
-  col <- case_when(
-    grepl("^rho[0-9]+$", names(param_varying)) ~ 2, # if any rho varies, use rho1
-    "mu" == names(param_varying) ~ 1,
-    "vol" == names(param_varying) ~ 2, # vol is not estimated, doesn't matter
-    TRUE ~ NA
-  )
-  if (is.na(col)) cli_abort("Varying parameter {.val {names(param_varying)}} \\
-  recognized.")
-
-  order(coefs[, col], decreasing = TRUE)
+get_varying_param <- function(dgp_names) {
+  dgp_names |>
+    str_split_i("-", 1) |>
+    gsub(".+_([a-z]+)[0-9]+", "\\1", x = _) %>%
+    {if_else(. == "rho", "rho1", .)}
 }
 
 #' Helper: Get correct parameters from params list

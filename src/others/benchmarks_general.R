@@ -8,7 +8,7 @@ box::use(
 )
 
 box::use(
-  src/metrics/metrics
+  src/metrics/metrics_definitions
 )
 
 # Models modules:
@@ -20,6 +20,22 @@ box::use(
   mstest = MSTest,
   mswm = MSwM
 )
+
+
+
+# t in ... ---------------------------------------------------------------------
+
+t1 <- 1:100
+t2 <- 1:1000
+
+mark(
+  check = FALSE,
+  t1 %in% (7:83),
+  t1 == max(t1, 7):min(t1, 83),
+  t2 %in% (7:83),
+  t2 == max(t2, 7):min(t2, 83)
+)
+
 
 
 
@@ -38,8 +54,6 @@ data_tmp <- imap(simulations_tmp[sample(length(simulations_tmp), 5000)], \(res, 
   )
 }) |>
   bind_rows()
-
-
 
 mark(
   check = FALSE,
@@ -85,7 +99,6 @@ n_r <- length(unique(r))
 
 r_diff <- c(0, diff(r))
 idxs <- which(r_diff != 0)
-
 
 bench::mark(
   check = FALSE,
@@ -182,7 +195,6 @@ res <- mirai_map(
 
 res
 
-
 # Mirai and closure env:
 e1 <- new_environment(list(AAA = 1), pkg_env("base"))
 f1 <- new_function(exprs(i = ), expr(i + AAA), env = e1)
@@ -222,7 +234,6 @@ mirai_map(0:4, f3, XXX = "aqui") |> collect_mirai()
 # passed to the workers, it being the first search path and having priority over
 # values in ...
 
-
 # Mirai and errors:
 daemons(4)
 mirai_map(exprs(1, stop("err")), eval) |> collect_mirai()
@@ -254,7 +265,6 @@ n_p <- 1
 n_t <- 100
 n_h <- 1
 n_coef <- n_p + 1
-
 
 # Structural breaks:
 models <- exprs(
@@ -294,7 +304,6 @@ bench <- inject(mark(
 ))
 bench
 
-
 # Threshold:
 models <- exprs(
   tsdyn = tsdyn$setar(
@@ -308,7 +317,6 @@ inject(mark(
   !!!models,
   check = FALSE, , min_iterations = 2
 ))
-
 
 # Smooth transition:
 models <- exprs(
@@ -337,7 +345,6 @@ inject(mark(
   check = FALSE, , min_iterations = 2
 ))
 
-
 # Markov switching:
 models <- exprs(
   mswm = mswm$msmFit(
@@ -354,6 +361,34 @@ inject(mark(
 
 
 # Metrics ----------------------------------------------------------------------
+
+mean_pairwise_dist <- function(x, ...) {
+  mean(dist(x, ...))
+}
+
+diff_k_2 <- function(x, p = 1) {
+  abs(x[1] - x[2])^p
+}
+
+mean_pairwise_dist2 <- function(x, k, ...) {
+  mean(abs(dist(x, ...))^k)
+}
+
+mean_pairwise_dist3 <- function(x, k, ...) {
+  if (k %% 2 == 0) {
+    mean(dist(x, ...)^k)
+  } else {
+    mean(abs(dist(x, ...))^k)
+  }
+}
+
+mark(
+  check = FALSE,
+  diff_k_2(1:5, p = 2),
+  mean_pairwise_dist2(1:5, k = 2),
+  mean_pairwise_dist3(1:5, k = 2)
+)
+
 
 a[[1]]
 y <- a[[1]]$y
@@ -376,7 +411,6 @@ mark(
   })
 )
 
-
 mark(
   check = FALSE,
   vapply(1:n_r_hat, FUN.VALUE = numeric(1), FUN = \(s) {
@@ -387,7 +421,6 @@ mark(
   })
 )
 expression(abs(c(0, diff(r))) |> cumsum() |> _[r == s] |> table() |> mean())
-
 
 mark(
   check = FALSE, min.iterations = 2,
