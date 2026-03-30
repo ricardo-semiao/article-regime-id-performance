@@ -130,10 +130,30 @@ series_average <- function(y, r, n_r = length(unique(r)), ...) {
 #' @param n [`integer(1)`] Lag order.
 #' @export
 series_autocorr <- function(y, r, n_r = length(unique(r)), n = 1, ...) {
+  t <- 1:length(y)
+
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
-    cor(y[r == s][-(1:n)], lag(y[r == s], n)[-(1:n)], ...)
+    instances <- split(y[r == s], cumsum(c(1, diff(t[r == s]) == 1)))
+
+    cors <- purrr::map_dbl(instances, \(yi) {
+      if (length(yi) <= n + 1) return(0)
+      tryCatch(cor(yi[-(1:n)], lag(yi, n)[-(1:n)], ...), error = \(e) NA)
+    })
+
+    weigths <- purrr::map2_dbl(instances, cors, \(yi, cori) {
+      if (length(yi) <= n + 1 | is.na(cori)) return(0)
+      length(yi) - n
+    })
+
+    sum(cors * weigths, na.rm = TRUE) / sum(weigths)
   })
 }
+
+series_autocorr(y = rnorm(100), r = sample(1:2, 100, replace = TRUE))
+
+a = (1:100)[sample(1:2, 100, replace = TRUE) == 1] 
+
+
 
 #' Metrics - series: Conditional ACF
 #' @export

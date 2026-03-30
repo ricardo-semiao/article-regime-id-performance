@@ -437,109 +437,6 @@ if (FALSE) {
 
 
 
-# Testing grounds ==============================================================
-
-
-# Comparisons 2 ----------------------------------------------------------------
-
-trimmed_sd <- function(x, trim = 0.01) {
-  idx <- x >= quantile(x, trim, na.rm = TRUE) & x <= quantile(x, 1 - trim, na.rm = TRUE)
-  sd(x[idx], na.rm = TRUE)
-}
-
-data_reg <- data_models_final |>
-  mutate(across(where(is.numeric), ~ ifelse(is.finite(.x), .x, NA_real_))) |>
-  mutate(across(where(is.numeric), ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_))) |>
-  mutate(across(where(is.numeric), ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)))
-
-
-## Taking a step back:
-
-# Diagnosticos:
-lm(rmse ~ sim, data_reg) |> summary()
-#lm(mape ~ sim, data_reg) |> summary()
-
-
-# Models FE:
-lm(rmse ~ model - 1, data_reg) |> summary()
-#lm(mape ~ model - 1, data_reg) |> summary()
-
-
-# Models misspecifications:
-reg1 <- lm(
-  rmse ~ model*rgp - 1,
-  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
-) |> summary()
-
-reg12 <- lm( # Adding assymmetry to the mix:
-  rmse ~ model*rgp - 1,
-  filter(data_reg, rgp %in% c("r2_markov_symm_low", "r2_sbreak_end", "r2_threshold_x_05", "r2_stransition_l05"))
-) |> summary()
-# Esses dois deveriam ser matrizes, mas uma coisa de cada vez
-
-reg1$coefficients[8:16, 1] - reg12$coefficients[8:16, 1]
-
-reg13 <- lm( # Adding RN to the mix:
-  rmse ~ model*rgp - 1,
-  filter(data_reg,
-    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    grepl("2$", sgp)
-  )
-) |> summary()
-
-reg1$coefficients[8:16, 1] - reg13$coefficients[8:16, 1]
-
-
-# Now with the metrics instead of RGP:
-lm(
-  rmse ~ model*(avg_est + acf_est + vol_est) - 1,
-  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
-) |> summary()
-# And also with cross metric interactions, but later
-
-
-# What is best to match?
-
-reg1 <- lm(
-  mape ~ r2 + regimes_me +
-    switches_diff + duration_diff +
-    #avg_diff + acf_diff + vol_diff +
-    mu_diff + rho1_diff + sigma_diff +
-    NULL,
-  data = data_models_final
-) |> summary()
-
-reg1$coefficients[order(abs(reg1$coefficients[, 1]), decreasing = TRUE), ]
-
-lm(
-  mape ~
-    avg_diff + acf_diff + vol_diff +
-    #mu_diff + rho1_diff + sigma_diff +
-    NULL,
-  data = filter(data_models_final, model == "r2_threshold_x")
-) |> summary()
-
-lm(
-  mape ~
-    sgp + rgp + model +
-    avg_diff * acf_diff * vol_diff +
-    #mu_diff + rho1_diff + sigma_diff +
-    NULL,
-  data = data_models_final
-) |> summary()
-
-reg1_cor <- cor(
-  select(data_models_final, rmse, r2, regimes_me,
-  switches_diff, duration_diff,
-  avg_diff, acf_diff, vol_diff, mu_diff, rho1_diff, sigma_diff),
-  use = "complete.obs"
-)
-
-reg1_cor[upper.tri(reg1_cor, diag = TRUE)] <- 0
-reg1_cor >= 0.8
-
-
-
 # Comparisons ------------------------------------------------------------------
 
 # Do for both data_models_final and data_regimes_final. Regimes has an extra
@@ -616,3 +513,650 @@ plot_results(reg_data, mu_diff)
 
 plot_results(reg_data, rho1_est)
 plot_results(reg_data, rho1_diff)
+
+
+
+# New analysis =================================================================
+
+# Diagnostics ------------------------------------------------------------------
+
+box::use(gt[...])
+
+glue_mean <- function(x, n = 2, random_stars = FALSE) {
+  stars <- if (random_stars) {
+    sample(c("", "*", "**", "***"), 1, prob = c(0.95, 0.05, 0, 0))
+  } else {
+    ""
+  }
+  glue("{round(mean(x, na.rm = TRUE), n)} ({round(sd(x, na.rm = TRUE), n)}){stars}")
+}
+
+diag_t1_a <- simulations_data |>
+  filter(
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2")
+  ) |>
+  group_by(sgp, rgp, sim, r) |>
+
+  summarise(
+    avg = mean(y, na.rm = TRUE),
+    acf = tryCatch(cor(y[-n()], y[-1], use = "complete.obs"), error = \(e) NA_real_),
+    vol = sd(y, na.rm = TRUE)
+  ) |>
+  group_by(sgp, rgp, r) |>
+  summarise(
+    avg = glue_mean(avg),
+    acf = glue_mean(acf),
+    vol = glue_mean(vol)
+  )
+
+diag_t1_b <- simulations_data |>
+  filter(
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2")
+  ) |>
+  group_by(sgp, rgp, sim) |>
+  summarise(
+    avg = mean(y, na.rm = TRUE),
+    acf = tryCatch(cor(y[-n()], y[-1], use = "complete.obs"), error = \(e) NA_real_),
+    vol = sd(y, na.rm = TRUE)
+  ) |>
+  group_by(sgp, rgp) |>
+  summarise(
+    avg = glue_mean(avg),
+    acf = glue_mean(acf),
+    vol = glue_mean(vol)
+  ) |>
+  mutate(r = 0)
+
+fmt_cols <- c(
+  "avg_1", "avg_2", "avg_0",
+  "acf_1", "acf_2", "acf_0",
+  "vol_1", "vol_2", "vol_0"
+)
+
+bind_rows(diag_t1_a, diag_t1_b) |>
+  pivot_wider(
+    names_from = r,
+    values_from = c(avg, acf, vol),
+  ) |>
+  relocate(rgp, sgp) |>
+  arrange(rgp, sgp) |>
+  mutate(
+    rgp = str_replace_all(rgp, c(
+      "r2_markov_symm_high" = "MS, symm.",
+      "r2_markov_symm_low" = "MS, asymm.",
+      "r2_threshold_x_0" = "SET, τ = 0",
+      "r2_threshold_x_05" = "SET, τ = 0.5",
+      "r2_stransition_l0" = "ST, τ = 0",
+      "r2_stransition_l05" = "ST, τ = 0.5",
+      "r2_sbreak_mid" = "SB, mid",
+      "r2_sbreak_end" = "SB, end"
+    )),
+    sgp = str_replace_all(sgp, c(
+      "r2_ar1_mu1" = "μ, (0, 0.5)",
+      "r2_ar1_mu2" = "μ, (0, 2)",
+      "r2_ar1_rho1" = "ρ, (0.1, 0.9)",
+      "r2_ar1_rho2" = "ρ, (0.4, 0.6)",
+      "r2_ar1_vol1" = "σ, (1, 2)",
+      "r2_ar1_vol2" = "σ, (1, 4)"
+    ))
+  ) |>
+  gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
+  cols_label(
+    rgp = "RGP",
+    sgp = "SGP",
+    avg_1 = "s = 1",
+    avg_2 = "s = 2",
+    avg_0 = "⫠s",
+    acf_1 = "s = 1",
+    acf_2 = "s = 2",
+    acf_0 = "⫠s",
+    vol_1 = "s = 1",
+    vol_2 = "s = 2",
+    vol_0 = "⫠s",
+  ) |>
+  tab_spanner(label = "DGP", columns = c("rgp", "sgp")) |>
+  tab_spanner(label = "Average", columns = c("avg_1", "avg_2", "avg_0")) |>
+  tab_spanner(label = "ACF", columns = c("acf_1", "acf_2", "acf_0")) |>
+  tab_spanner(label = "Volatility", columns = c("vol_1", "vol_2", "vol_0")) |>
+  cols_align(align = "left", columns = fmt_cols) |>
+  fmt(columns = fmt_cols, fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x)) |>
+  gtsave("outputs/table_dgp.tex")
+  #as_latex() |>
+  #clipr::write_clip()
+
+# TODO: use latex math in the labels and such
+
+
+diag_t2_a <- estimations_data |>
+  filter(
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2"),
+    (rgp == "r2_markov_symm_high" & model == "r2_markov") |
+      (rgp == "r2_sbreak_mid" & model == "r2_sbreak") |
+      (rgp == "r2_threshold_x_0" & model == "r2_threshold_x") |
+      (rgp == "r2_stransition_l0" & model == "r2_stransition"),
+    !is.na(r)
+  ) |>
+  group_by(sgp, rgp, sim, r) |>
+  summarise(
+    avg = mean(y, na.rm = TRUE),
+    acf = tryCatch(cor(y[-n()], y[-1], use = "complete.obs"), error = \(e) NA_real_),
+    vol = sd(y, na.rm = TRUE)
+  ) |>
+  group_by(sgp, rgp, r) |>
+  summarise(
+    avg = glue_mean(avg),
+    acf = glue_mean(acf),
+    vol = glue_mean(vol)
+  )
+
+diag_t2_b <- estimations_data |>
+  filter(
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2"),
+    (rgp == "r2_markov_symm_high" & model == "r2_markov") |
+      (rgp == "r2_sbreak_mid" & model == "r2_sbreak") |
+      (rgp == "r2_threshold_x_0" & model == "r2_threshold_x") |
+      (rgp == "r2_stransition_l0" & model == "r2_stransition"),
+    !is.na(r)
+  ) |>
+  group_by(sgp, rgp, sim) |>
+  summarise(
+    avg = mean(y, na.rm = TRUE),
+    acf = tryCatch(cor(y[-n()], y[-1], use = "complete.obs"), error = \(e) NA_real_),
+    vol = sd(y, na.rm = TRUE)
+  ) |>
+  group_by(sgp, rgp) |>
+  summarise(
+    avg = glue_mean(avg),
+    acf = glue_mean(acf),
+    vol = glue_mean(vol)
+  ) |>
+  mutate(r = 0)
+
+bind_rows(diag_t2_a, diag_t2_b) |>
+  pivot_wider(
+    names_from = r,
+    values_from = c(avg, acf, vol),
+  ) |>
+  relocate(rgp, sgp) |>
+  arrange(rgp, sgp) |>
+  mutate(
+    rgp = str_replace_all(rgp, c(
+      "r2_markov_symm_high" = "MS, symm.",
+      "r2_markov_symm_low" = "MS, asymm.",
+      "r2_threshold_x_0" = "SET, τ = 0",
+      "r2_threshold_x_05" = "SET, τ = 0.5",
+      "r2_stransition_l0" = "ST, τ = 0",
+      "r2_stransition_l05" = "ST, τ = 0.5",
+      "r2_sbreak_mid" = "SB, mid",
+      "r2_sbreak_end" = "SB, end"
+    )),
+    sgp = str_replace_all(sgp, c(
+      "r2_ar1_mu1" = "μ, (0, 0.5)",
+      "r2_ar1_mu2" = "μ, (0, 2)",
+      "r2_ar1_rho1" = "ρ, (0.1, 0.9)",
+      "r2_ar1_rho2" = "ρ, (0.4, 0.6)",
+      "r2_ar1_vol1" = "σ, (1, 2)",
+      "r2_ar1_vol2" = "σ, (1, 4)"
+    ))
+  ) |>
+  gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
+  cols_label(
+    rgp = "RGP",
+    sgp = "SGP",
+    avg_1 = "s = 1",
+    avg_2 = "s = 2",
+    avg_0 = "⫠s",
+    acf_1 = "s = 1",
+    acf_2 = "s = 2",
+    acf_0 = "⫠s",
+    vol_1 = "s = 1",
+    vol_2 = "s = 2",
+    vol_0 = "⫠s",
+  ) |>
+  tab_spanner(label = "DGP", columns = c("rgp", "sgp")) |>
+  tab_spanner(label = "Average", columns = c("avg_1", "avg_2", "avg_0")) |>
+  tab_spanner(label = "ACF", columns = c("acf_1", "acf_2", "acf_0")) |>
+  tab_spanner(label = "Volatility", columns = c("vol_1", "vol_2", "vol_0")) |>
+  cols_align(align = "left", columns = fmt_cols) |>
+  fmt(columns = fmt_cols, fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x)) |>
+  gtsave("outputs/table_dgp2.tex")
+  #as_latex() |>
+  #clipr::write_clip()
+
+
+left_join(
+  estimations_data, simulations_data,
+  by = c("sgp", "rgp", "sim", "t"), suffix = c("_est", "_sim")
+) |>
+  group_by(sgp, rgp, sim) |>
+  summarise(
+    fit = sum(
+      y_est[t %in% 1:(n_t - n_h - 1)] > mean(y_sim, na.rm = TRUE) + 3 * sd(y_sim, na.rm = TRUE),
+      na.rm = TRUE
+    ) / sum(!is.na(y_est[t %in% 1:(n_t - n_h - 1)])),
+    pred = sum(
+      y_est[t %in% (n_t - n_h):n_t] > y_sim[t %in% (n_t - n_h):n_t] + 3 * sd(y_sim, na.rm = TRUE),
+      na.rm = TRUE
+    ) / sum(!is.na(y_est[t %in% (n_t - n_h):n_t]))
+  ) |>
+  ungroup() |>
+  summarise(
+    fit = mean(fit, na.rm = TRUE),
+    pred = mean(pred, na.rm = TRUE)
+  )
+
+
+
+# Exploratory analysis ---------------------------------------------------------
+
+# Metrics separation in T:
+simulations_data |>
+  filter(
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+  ) |>
+  group_by(sgp, rgp) |>
+  summarise(
+    avg = metrics$series_average(y, r) |> metrics$diff_p() |> round(2),
+    acf = metrics$series_autocorr(y, r) |> metrics$diff_p() |> round(2),
+    vol = metrics$series_volatility(y, r) |> metrics$diff_p() |> round(2)
+  ) |>
+  relocate(rgp, sgp) |>
+  arrange(rgp, sgp) |>
+  mutate(
+    big_rn = c("big", "small")[grepl("2$", sgp) + 1],
+    rgp = str_replace_all(rgp, c(
+      "r2_markov_symm_high" = "MS, symm.",
+      "r2_markov_symm_low" = "MS, asymm.",
+      "r2_threshold_x_0" = "SET, τ = 0",
+      "r2_threshold_x_05" = "SET, τ = 0.5",
+      "r2_stransition_l0" = "ST, τ = 0",
+      "r2_stransition_l05" = "ST, τ = 0.5",
+      "r2_sbreak_mid" = "SB, mid",
+      "r2_sbreak_end" = "SB, end"
+    )),
+    sgp = str_replace_all(sgp, c(
+      "r2_ar1_mu1" = "μ",
+      "r2_ar1_mu2" = "μ",
+      "r2_ar1_rho1" = "ρ",
+      "r2_ar1_rho2" = "ρ",
+      "r2_ar1_vol1" = "σ",
+      "r2_ar1_vol2" = "σ"
+    ))
+  ) |>
+  pivot_wider(names_from = big_rn, values_from = c(avg, acf, vol)) |>
+  gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
+  tab_spanner(label = "avg", columns = c("avg_small", "avg_big")) |>
+  tab_spanner(label = "acf", columns = c("acf_small", "acf_big")) |>
+  tab_spanner(label = "vol", columns = c("vol_small", "vol_big")) |>
+  cols_label(
+    rgp = "RGP",
+    sgp = "SGP"
+  ) |>
+  gtsave("outputs/table_expl.tex")
+
+
+
+stats <- function(y, r) {
+  c(
+    avg = metrics$series_average(y, r, na.rm = TRUE) |> metrics$diff_p(),
+    acf = metrics$series_autocorr(y, r, use = "complete.obs") |> metrics$diff_p(),
+    vol = metrics$series_volatility(y, r, na.rm = TRUE) |> metrics$diff_p()
+  )
+}
+
+
+# Metrics separation across t:
+hi = simulations_data |>
+  filter(sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2")) |>
+  filter(sim %in% sample(n_s, 8)) |>
+  group_by(rgp, sgp, sim) |>
+  reframe(
+    map_dfr(1:n_t, \(tmax) stats(y = y[t <= tmax], r = r[t <= tmax])),
+    t = 1:n_t
+  )
+
+hi2 = hi |>
+  group_by(rgp, sgp, t) |>
+  reframe(
+    across(c(avg, acf, vol), list(avg = ~ mean(.x, na.rm = TRUE), sd = ~ sd(.x, na.rm = TRUE)))
+  ) |>
+  pivot_longer(matches("^avg|^acf|^vol"), names_to = c("stat", ".value"), values_to = "value", names_sep = "_") |>
+  mutate(
+    big_rn = c("big", "small")[grepl("2$", sgp) + 1],
+    sym_rgp = c(
+      "Symm.", "Asymm."
+    )[rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0") + 1],
+    sgp = str_replace_all(sgp, c(
+      "r2_ar1_mu1" = "μ",
+      "r2_ar1_mu2" = "μ",
+      "r2_ar1_rho1" = "ρ",
+      "r2_ar1_rho2" = "ρ",
+      "r2_ar1_vol1" = "σ",
+      "r2_ar1_vol2" = "σ"
+    )) |>
+      fct(c("μ", "ρ", "σ")),
+    stat = str_replace_all(stat, c(
+      "avg" = "RC average",
+      "acf" = "RC ACF",
+      "vol" = "RC volatility"
+    )) |>
+      fct(c("RC average", "RC ACF", "RC volatility"))
+  )
+
+ggplot(filter(hi2, rgp %in% c("r2_threshold_x_0", "r2_threshold_x_05")), aes(t, avg)) +
+  geom_line(aes(color = sym_rgp)) +
+  geom_ribbon(aes(ymin = avg - sd, ymax = avg + sd, fill = sym_rgp), alpha = 0.1) +
+  geom_hline(yintercept = 0) +
+  xlim(10, n_t) +
+  labs(color = "DGP symmetry", fill = "DGP symmetry", x = "Time", y = "Moment's dispersion") +
+  ggh4x::facet_grid2(vars(sgp), vars(stat), scales = "free_y") #, independent = "y"
+ggsave2("outputs/metrics/set.png", 26, 20)
+
+ggplot(filter(hi2, rgp %in% c("r2_sbreak_mid", "r2_sbreak_end")), aes(t, avg)) +
+  geom_line(aes(color = sym_rgp)) +
+  geom_ribbon(aes(ymin = avg - sd, ymax = avg + sd, fill = sym_rgp), alpha = 0.1) +
+  geom_hline(yintercept = 0) +
+  labs(color = "DGP symmetry", fill = "DGP symmetry", x = "Time", y = "Moment's dispersion") +
+  xlim(10, n_t) +
+  ggh4x::facet_grid2(vars(sgp), vars(stat), scales = "free_y") #, independent = "y"
+ggsave2("outputs/metrics/sb.png", 26, 20)
+
+ggplot(filter(hi2, rgp %in% c("r2_stransition_l0", "r2_stransition_l05")), aes(t, avg)) +
+  geom_line(aes(color = sym_rgp)) +
+  geom_ribbon(aes(ymin = avg - sd, ymax = avg + sd, fill = sym_rgp), alpha = 0.1) +
+  geom_hline(yintercept = 0) +
+  labs(color = "DGP symmetry", fill = "DGP symmetry", x = "Time", y = "Moment's dispersion") +
+  xlim(10, n_t) +
+  ggh4x::facet_grid2(vars(sgp), vars(stat), scales = "free_y") #, independent = "y"
+ggsave2("outputs/metrics/st.png", 26, 20)
+
+ggplot(filter(hi2, rgp %in% c("r2_markov_symm_high", "r2_markov_symm_low")), aes(t, avg)) +
+  geom_line(aes(color = sym_rgp)) +
+  geom_ribbon(aes(ymin = avg - sd, ymax = avg + sd, fill = sym_rgp), alpha = 0.1) +
+  geom_hline(yintercept = 0) +
+  labs(color = "DGP symmetry", fill = "DGP symmetry", x = "Time", y = "Moment's dispersion") +
+  xlim(10, n_t) +
+  ggh4x::facet_grid2(vars(sgp), vars(stat), scales = "free_y") #, independent = "y"
+ggsave2("outputs/metrics/ms.png", 26, 20)
+
+
+# Forecasting erros and regimes:
+hello = estimations_data |>
+  filter(
+    t >= t - n_h,
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2"),
+  ) |>
+  left_join(
+    simulations_data,
+    by = c("sgp", "rgp", "sim", "t"), suffix = c("_est", "_sim")
+  ) |>
+  mutate(
+    error = y_est - y_sim,
+    correct_r = c("Correct", "Incorrect")[(r_est == r_sim) + 1],
+    sgp = str_replace_all(sgp, c(
+      "r2_ar1_mu1" = "μ",
+      "r2_ar1_mu2" = "μ",
+      "r2_ar1_rho1" = "ρ",
+      "r2_ar1_rho2" = "ρ",
+      "r2_ar1_vol1" = "σ",
+      "r2_ar1_vol2" = "σ"
+    )) |>
+      fct(c("μ", "ρ", "σ")),
+    rgp = str_replace_all(rgp, c(
+      "r2_markov_symm_high" = "MS, symm.",
+      "r2_markov_symm_low" = "MS, asymm.",
+      "r2_threshold_x_0" = "SET, τ = 0",
+      "r2_threshold_x_05" = "SET, τ = 0.5",
+      "r2_stransition_l0" = "ST, τ = 0",
+      "r2_stransition_l05" = "ST, τ = 0.5",
+      "r2_sbreak_mid" = "SB, mid",
+      "r2_sbreak_end" = "SB, end"
+    ))
+  ) |>
+  group_by(sgp, rgp) |>
+  filter(
+    error >= quantile(error, 0.0005, na.rm = TRUE),
+    error <= quantile(error, 0.9995, na.rm = TRUE)
+  )
+
+ggplot(filter(hello, model == "r2_markov"), aes(x = error)) +
+  geom_density(aes(color = correct_r)) +
+  ggh4x::facet_grid2(vars(sgp), vars(rgp), scales = "free", independent = "all") +
+  labs(y = "Density", x = "Forecasting error", color = "Regime ID")
+ggsave2("outputs/metrics/forecast_regime_ms.png", 28, 20)
+ggplot(filter(hello, model == "r2_threshold_x"), aes(x = error)) +
+  geom_density(aes(color = correct_r)) +
+  ggh4x::facet_grid2(vars(sgp), vars(rgp), scales = "free", independent = "all") +
+  labs(y = "Density", x = "Forecasting error", color = "Regime ID")
+ggsave2("outputs/metrics/forecast_regime_threshold.png", 28, 20)
+ggplot(filter(hello, model == "r2_stransition"), aes(x = error)) +
+  geom_density(aes(color = correct_r)) +
+  ggh4x::facet_grid2(vars(sgp), vars(rgp), scales = "free", independent = "all") +
+  labs(y = "Density", x = "Forecasting error", color = "Regime ID")
+ggsave2("outputs/metrics/forecast_regime_stransition.png", 28, 20)
+ggplot(filter(hello, model == "r2_sbreak"), aes(x = error)) +
+  geom_density(aes(color = correct_r)) +
+  ggh4x::facet_grid2(vars(sgp), vars(rgp), scales = "free", independent = "all") +
+  labs(y = "Density", x = "Forecasting error", color = "Regime ID")
+ggsave2("outputs/metrics/forecast_regime_sbreak.png", 28, 20)
+
+
+ola = left_join(
+  estimations_meta, simulations_meta,
+  by = c("sgp", "rgp", "sim"), suffix = c("_est", "_sim")
+) |>
+  rowwise() |>
+  mutate(
+    error = list(rowMeans(abs(meta_est$coefs - meta_sim$coefs)))
+  ) |>
+  unnest_wider(error, names_sep = "_")
+
+
+ola2 <- ola |>
+  left_join(
+    select(data_models_final, sgp, rgp, sim, rmse),
+    by = c("sgp", "rgp", "sim")
+  ) |>
+  pivot_longer(matches("^error_"), names_to = "coef", values_to = "error") |>
+  filter(
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_vol2"),
+  )
+
+ola3 <- ola2 |>
+  filter(
+    row_number() %in% sample(n(), 10000, replace = TRUE),
+    error <= 10,
+    rmse <= 10
+  ) |>
+  ungroup() |>
+  mutate(
+    sgp = str_replace_all(sgp, c(
+      "r2_ar1_mu1" = "RN: μ",
+      "r2_ar1_mu2" = "RN: μ",
+      "r2_ar1_rho1" = "RN: ρ",
+      "r2_ar1_rho2" = "RN: ρ",
+      "r2_ar1_vol1" = "RN: σ",
+      "r2_ar1_vol2" = "RN: σ"
+    )) |>
+      fct(c("RN: μ", "RN: ρ", "RN: σ")),
+    rgp = str_replace_all(rgp, c(
+      "r2_markov_symm_high" = "MS, symm.",
+      "r2_markov_symm_low" = "MS, asymm.",
+      "r2_threshold_x_0" = "SET, τ = 0",
+      "r2_threshold_x_05" = "SET, τ = 0.5",
+      "r2_stransition_l0" = "ST, τ = 0",
+      "r2_stransition_l05" = "ST, τ = 0.5",
+      "r2_sbreak_mid" = "SB, mid",
+      "r2_sbreak_end" = "SB, end"
+    )),
+    coef = str_replace_all(coef, c(
+      "error_mu" = "Coef.: μ",
+      "error_rho" = "Coef.: ρ",
+      "error_vol" = "Coef.: σ"
+    ))
+  )
+
+ggplot(filter(ola3, model == "r2_markov"), aes(error, rmse)) +
+  geom_point(aes(color = rgp), alpha = 0.3) +
+  ggh4x::facet_grid2(vars(coef), vars(sgp), scales = "free", independent = "all") +
+  labs(y = "RMSE", x = "Average absolute error in coefficients", color = "RGP")
+ggsave2("outputs/metrics/scatter_markov.png", 28, 20)
+ggplot(filter(ola3, model == "r2_threshold_x"), aes(error, rmse)) +
+  geom_point(aes(color = rgp), alpha = 0.3) +
+  ggh4x::facet_grid2(vars(coef), vars(sgp), scales = "free", independent = "all") +
+  labs(y = "RMSE", x = "Average absolute error in coefficients", color = "RGP")
+ggsave2("outputs/metrics/scatter_threshold.png", 28, 20)
+ggplot(filter(ola3, model == "r2_sbreak"), aes(error, rmse)) +
+  geom_point(aes(color = rgp), alpha = 0.3) +
+  ggh4x::facet_grid2(vars(coef), vars(sgp), scales = "free", independent = "all") +
+  labs(y = "RMSE", x = "Average absolute error in coefficients", color = "RGP")
+ggsave2("outputs/metrics/scatter_sbreak.png", 28, 20)
+ggplot(filter(ola3, model == "r2_stransition"), aes(error, rmse)) +
+  geom_point(aes(color = rgp), alpha = 0.3) +
+  ggh4x::facet_grid2(vars(coef), vars(sgp), scales = "free", independent = "all") +
+  labs(y = "RMSE", x = "Average absolute error in coefficients", color = "RGP")
+ggsave2("outputs/metrics/scatter_stransition.png", 28, 20)
+
+
+
+# Regressions ------------------------------------------------------------------
+
+box::use(gtsummary[...])
+
+trimmed_sd <- function(x, trim = 0.01) {
+  idx <- x >= quantile(x, trim, na.rm = TRUE) & x <= quantile(x, 1 - trim, na.rm = TRUE)
+  sd(x[idx], na.rm = TRUE)
+}
+
+data_reg <- data_models_final |>
+  mutate(across(where(is.numeric), ~ ifelse(is.finite(.x), .x, NA_real_))) |>
+  mutate(across(where(is.numeric), ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_))) |>
+  mutate(across(where(is.numeric), ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)))
+
+abs(data_reg$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, Inf)) |> table()
+
+
+## Taking a step back:
+
+# Diagnosticos:
+lm(rmse ~ sim, data_reg) |> stargazer::stargazer()
+#lm(mape ~ sim, data_reg) |> summary()
+
+
+# Models FE:
+lm(rmse ~ model - 1, data_reg) |> stargazer::stargazer(single.row = TRUE)
+#lm(mape ~ model - 1, data_reg) |> summary()
+
+
+# Models misspecifications:
+reg1 <- lm(
+  rmse ~ model*rgp - 1,
+  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
+) |> summary()
+
+reg12 <- lm( # Adding assymmetry to the mix:
+  rmse ~ model*rgp - 1,
+  filter(data_reg, rgp %in% c("r2_markov_symm_low", "r2_sbreak_end", "r2_threshold_x_05", "r2_stransition_l05"))
+) |> summary()
+# Esses dois deveriam ser matrizes, mas uma coisa de cada vez
+
+reg1$coefficients[8:16, 1] - reg12$coefficients[8:16, 1]
+
+glue("{round(reg1$coefficients[8:16, 1], 3)} ({round(reg1$coefficients[8:16, 1], 3)})") |>
+  matrix(3, 3) %>%
+  cbind(c("SET", "ST", "MS"), .) %>%
+  stargazer::stargazer()
+glue("{round(reg12$coefficients[8:16, 1], 3)} ({round(reg12$coefficients[8:16, 1], 3)})") |>
+  matrix(3, 3) %>%
+  cbind(c("SET", "ST", "MS"), .) %>%
+  stargazer::stargazer()
+
+
+
+reg13 <- lm( # Adding RN to the mix:
+  rmse ~ model*rgp - 1,
+  filter(data_reg,
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    grepl("2$", sgp)
+  )
+) |> summary()
+
+reg1$coefficients[8:16, 1] - reg13$coefficients[8:16, 1]
+glue("{round(reg13$coefficients[8:16, 1], 3)} ({round(reg13$coefficients[8:16, 1], 3)})") |>
+  matrix(3, 3) %>%
+  cbind(c("SET", "ST", "MS"), .) %>%
+  stargazer::stargazer()
+
+
+# Now with the metrics instead of RGP:
+reg2 <- lm(
+  rmse ~ model*(avg_est + acf_est + vol_est) - 1,
+  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
+) |> summary()
+# And also with cross metric interactions, but later
+
+reg2
+glue("{round(reg2$coefficients[8:16, 1], 3)} ({round(reg2$coefficients[8:16, 1], 3)})") |>
+  matrix(3, 3) %>%
+  cbind(c("SET", "ST", "MS"), .) %>%
+  stargazer::stargazer()
+
+
+reg22 <- lm(
+  rmse ~ model*(avg_est * acf_est * vol_est) - 1,
+  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
+) |> summary()
+# And also with cross metric interactions, but later
+glue("{round(reg22$coefficients[8:16, 1], 3)} ({round(reg22$coefficients[8:16, 1], 3)})") |>
+  matrix(3, 3) %>%
+  cbind(c("SET", "ST", "MS"), .) %>%
+  stargazer::stargazer()
+
+
+# What is best to match?
+
+reg3 <- lm(
+  rmse ~ r2 + regimes_me +
+    #switches_diff + duration_diff +
+    #avg_diff + acf_diff + vol_diff +
+    mu_diff + rho1_diff + sigma_diff +
+    NULL,
+  data = data_reg
+)
+
+reg3 |> stargazer::stargazer(single.row = TRUE)
+
+# TODO: regime_me only with predictions
+
+reg4 <- lm(
+  rmse ~
+    model:(avg_diff + acf_diff + vol_diff) - 1 - model +
+    #mu_diff + rho1_diff + sigma_diff +
+    NULL,
+  data = data_reg
+) |> summary()
+
+glue("{round(reg4$coefficients[1:12, 1], 3)} ({round(reg4$coefficients[1:12, 1], 3)})") |>
+  matrix(3, 4) %>%
+  cbind(c("SET", "ST", "MS"), .) %>%
+  stargazer::stargazer()
+reg4 |> stargazer::stargazer(single.row = TRUE)
+
+# TODO: add interactions between metrics as control
+
+# Check:
+reg1_cor <- cor(
+  select(data_models_final, rmse, r2, regimes_me,
+  switches_diff, duration_diff,
+  avg_diff, acf_diff, vol_diff, mu_diff, rho1_diff, sigma_diff),
+  use = "complete.obs"
+)
+
+reg1_cor[upper.tri(reg1_cor, diag = TRUE)] <- 0
+reg1_cor >= 0.8
