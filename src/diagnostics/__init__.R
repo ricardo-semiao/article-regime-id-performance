@@ -1,7 +1,6 @@
 
 #' @export
 box::use(
-  ./errors,
-  ./simulations,
-  ./estimations
+  ./errors[...],
+  ./simulations[...]
 )

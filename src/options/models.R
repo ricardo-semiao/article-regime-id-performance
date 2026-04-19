@@ -13,13 +13,9 @@ box::use(
 
 #' Models' names dictionary
 #' @export
-dict <- c(
-  r2_sbreak = "Structural Breaks",
-  r2_threshold_x = "Threshold x",
-  r2_threshold_abs = "Threshold |x|",
-  r2_threshold_abs = "Threshold Dx",
-  r2_stransition = "Smooth Transition",
-  r2_markov = "Markov Switching"
+dict <- list(
+  gt = c(),
+  gg = c()
 )
 
 #' Models' parameters

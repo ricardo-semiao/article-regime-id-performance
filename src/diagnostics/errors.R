@@ -1,11 +1,10 @@
 
 # Setup ------------------------------------------------------------------------
 
-# Loading dependencies:
 box::use(
-  ./utils_diagnostics[...]
+  src/utils[...],
+  ggplot2[...]
 )
-
 
 
 # Dependence and Distribution --------------------------------------------------
@@ -21,7 +20,7 @@ box::use(
 #'
 #' @returns [`ggplot()`] Correlation matrix heatmap of error segments.
 #' @export
-errors_dependence <- function(
+error_dependence <- function(
   errors, grain = 100,
   simmetric = TRUE, triangular = TRUE, title = NULL
 ) {
@@ -56,7 +55,7 @@ errors_dependence <- function(
 #'
 #' @returns [`patchwork`] Combined QQ plot and histogram of error distribution.
 #' @export
-errors_distribution <- function(
+error_distribution <- function(
   errors, sample_size = 3000, sd = 1,
   title = NULL
 ) {

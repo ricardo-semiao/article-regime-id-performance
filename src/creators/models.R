@@ -10,12 +10,9 @@ box::use(
 # MSwM::msmFit
 
 #' Helper: Order regimes by a varying parameter
-#' Todo: document and think where to put
-#' @export
-regimes_order <- function(coefs, sgp_name) {
-  param_varying <- gsub(".+_([a-z]+)[0-9]+", "\\1", sgp_name)
-  if (param_varying == "rho") param_varying <- "rho1"
-  order(meta$coefs[, param_varying], decreasing = FALSE)
+#' TODO: document and think where to put
+regimes_order <- function(coefs, rn_par, dims) {
+  order(coefs[, which(rn_par == dims$cols)], decreasing = FALSE)
 }
 fn_env(regimes_order) <- pkg_env("base")
 
@@ -25,7 +22,7 @@ if (FALSE) {
   n_h <- 10; n_burn <- 10; n_t <- 100 + n_h + n_burn
   n_l <- 1; n_r <- 2
   min_r_size <- 0.1; tol <- 1e-5; max_iter <- 10
-  g <- \(x) x; gamma <- NULL
+  g <- \(x) x; gamma <- NULL; rn_par = "rho1"
   data <- data.frame(y = c(rnorm(50, 2), rnorm(30, 0), rnorm(n_t - 80, 1))) |>
     data_lags(n_l = 1)
 }
@@ -55,6 +52,11 @@ get_results <- list()
 #' - Regimes: similar to cut(1:n_t, mod$dates). Prediction is straightforward
 #' - Series: prediction using last regime's coefficients. n_l NAs at start
 get_results$mbreaks_dofix <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_par) {
+  dims <- list(
+    rows = paste0("R", 1:n_r),
+    cols = c("mu", paste0("rho", 1:n_l), "sigma")
+  )
+
   # Regimes:
   date1 <- n_burn + c(1 - n_burn, mod$date)
   date2 <- n_burn + c(mod$date - 1, n_t - n_burn)
@@ -76,16 +78,13 @@ get_results$mbreaks_dofix <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_
 
   # Meta information:
   coefs <- cbind(
-    matrix(mod$beta, n_l + 1, n_r, byrow = FALSE),
-    series_sd(y, r, n_r, na.rm = TRUE)
+    matrix(mod$beta, n_r, n_l + 1, byrow = TRUE),
+    series_sd(data[, 1] - y, r, n_r, na.rm = TRUE)
   )
-  ord <- regimes_order(coefs, rn_par)
+  ord <- regimes_order(coefs, rn_par, dims)
 
   meta <- list(
-    coefs = `dimnames<-`(
-      coefs[ord, ],
-      list(paste0("R", 1:n_r), c("mu", paste0("rho", 1:n_l), "sigma"))
-    ),
+    coefs = `dimnames<-`(coefs[ord, ], dims),
     switches = c(mod$date)
   )
 
@@ -100,12 +99,17 @@ get_results$mbreaks_dofix <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_
 #' - Series: current regime's coefficient used at each moment. n_l+1 NAs at
 #'  start
 get_results$tsdyn_setar <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_par, g) {
-  thresholds <- mod$coefficients[grep("^th", names(mod$coefficients))]
+  dims <- list(
+    rows = paste0("R", 1:n_r),
+    cols = c("mu", paste0("rho", 1:n_l), "sigma")
+  )
+  coefs_raw <- mod$coefficients
+
+  thresholds <- coefs_raw[grep("^th", names(coefs_raw))]
   coefs <- matrix(
-    mod$coefficients[grep("^[^th]", names(mod$coefficients))],
+    coefs_raw[grep("^[^th]", names(coefs_raw))],
     n_r, n_l + 1, byrow = TRUE
   )
-  ord <- regimes_order(coefs, rn_par)
 
   # Regimes:
   r <- integer(n_t)
@@ -125,11 +129,11 @@ get_results$tsdyn_setar <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_pa
   y <- c(rep(NA, n_burn + n_l + 1), mod$fitted.values, preds)
 
   # Meta information:
+  coefs <- cbind(coefs, series_sd(data[, 1] - y, r, n_r, na.rm = TRUE))
+  ord <- regimes_order(coefs, rn_par, dims)
+
   meta <- list(
-    coefs = `dimnames<-`(
-      cbind(coefs, series_sd(y, r, n_r, na.rm = TRUE))[ord, ],
-      list(paste0("R", 1:n_r), c("mu", paste0("rho", 1:n_l), "sigma"))
-    ),
+    coefs = `dimnames<-`(coefs[ord, ], dims),
     switches = thresholds
   )
 
@@ -143,13 +147,17 @@ get_results$tsdyn_setar <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_pa
 #' - Regimes: same as tsDyn::setar
 #' - Series: use the current regime's value to weight the coefficients
 get_results$tsdyn_lstar <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_par) {
+  dims <- list(
+    rows = paste0("R", 1:n_r),
+    cols = c("mu", paste0("rho", 1:n_l), "sigma")
+  )
+
   threshold <- mod$coefficients["th"]
   gamma <- mod$coefficients["gamma"]
   coefs <- matrix(
     mod$coefficients[grep("const|phi", names(mod$coefficients))],
     2, n_l + 1, byrow = TRUE
   )
-  ord <- regimes_order(coefs, rn_par)
 
   # Regimes:
   r <- c(
@@ -169,11 +177,11 @@ get_results$tsdyn_lstar <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_pa
   y <- c(rep(NA, n_burn + n_l + 1), mod$fitted.values, preds)
 
   # Meta information:
+  coefs <- cbind(coefs, series_sd(data[, 1] - y, r, n_r, na.rm = TRUE))
+  ord <- regimes_order(coefs, rn_par, dims)
+
   meta <- list(
-    coefs = `dimnames<-`(
-      cbind(coefs, series_sd(y, (r <= 0.5) + 1, n_r, na.rm = TRUE))[ord, ],
-      list(paste0("R", 1:n_r), c("mu", paste0("rho", 1:n_l), "sigma"))
-    ),
+    coefs = `dimnames<-`(coefs[ord, ], dims),
     switches = threshold,
     gamma = gamma
   )
@@ -190,8 +198,12 @@ get_results$tsdyn_lstar <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_pa
 #'  likely regime.
 #' - Series: average across regimes using the marginal probabilities
 get_results$mswm_msmfit <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_par) {
+  dims <- list(
+    rows = paste0("R", 1:n_r),
+    cols = c("mu", paste0("rho", 1:n_l), "sigma")
+  )
+
   coefs <- as.matrix(mod@Coef)
-  ord <- regimes_order(coefs, rn_par)
 
   # Regimes:
   r <- matrix(NA, n_t, n_r)
@@ -211,11 +223,11 @@ get_results$mswm_msmfit <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_pa
   r <- max.col(r)
 
   # Meta information:
+  coefs <- cbind(coefs, series_sd(data[, 1] - y, r, n_r, na.rm = TRUE))
+  ord <- regimes_order(coefs, rn_par, dims)
+
   meta <- list(
-    coefs = `dimnames<-`(
-      cbind(coefs, series_sd(y, r, n_r, na.rm = TRUE))[ord, ],
-      list(paste0("R", 1:n_r), c("mu", paste0("rho", 1:n_l), "sigma"))
-    ),
+    coefs = `dimnames<-`(coefs[ord, ], dims),
     switches = mod@transMat
   )
 
@@ -226,7 +238,7 @@ get_results$mswm_msmfit <- function(data, mod, n_burn, n_h, n_t, n_r, n_l, rn_pa
 # Sanitizing enclosing environments
 for (model_name in names(get_results)) {
   fn_env(get_results[[model_name]]) <- new_environment(
-    list(series_sd = series_sd),
+    list(series_sd = series_sd, regimes_order = regimes_order),
     pkg_env("base")
   )
 }
@@ -244,6 +256,8 @@ for (model_name in names(get_results)) {
 # parallelism
 
 #' Structural breaks
+#'
+#' Might only work for n_l = 1.
 #'
 #' Comments on parameters:
 #' - h set by eps1; model with intercept; no error treatments
@@ -280,7 +294,7 @@ sbreak <- function(
     env = new_environment(defaults, pkg_env("base"))
   )
 }
-# TODO: generalize for n_l > 1
+
 
 #' Model: Threshold
 #'
@@ -298,7 +312,7 @@ threshold <- function(
   min_r_size = 0.1,
   tol = 1e-5, max_iter = 10
 ) {
-  g <- new_function(exprs(y = ), fn_body(g), pkg_env("base"))
+  fn_env(g) <- pkg_env("base")
 
   defaults <- c(
     as.list(current_env()), results = get_results$tsdyn_setar
@@ -368,6 +382,7 @@ stransition <- function(
     env = new_environment(defaults, pkg_env("base"))
   )
 }
+
 
 #' Model: Markov switching
 #'

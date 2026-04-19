@@ -4,6 +4,7 @@
 # Loading dependencies:
 box::use(
   src/utils[...],
+  latex2exp[TeX],
   create_sgp = src/creators/sgps
 )
 
@@ -59,19 +60,30 @@ standardize_params_sgp <- function(args) {
 
 #' SGPs' names dictionary
 #' @export
-dict <- c(
-  r2_ar1_mu1   = "\u03BC (small change)",
-  r2_ar1_mu2   = "\u03BC (big change)",
-  r2_ar1_rho1  = "\u03C1 (small change)",
-  r2_ar1_rho2  = "\u03C1 (big change)",
-  r2_ar1_sign1 = "sign(\u03C1) (small change)",
-  r2_ar1_sign2 = "sign(\u03C1) (big change)",
-  r2_ar2_pos1  = "New positive lag (small)",
-  r2_ar2_pos2  = "New positive lag (big)",
-  r2_ar2_neg1  = "New negative lag (small)",
-  r2_ar2_neg2  = "New negative lag (big)",
-  r2_ar1_sigma1  = "\u03C3 (small change)",
-  r2_ar1_sigma2  = "\u03C3 (big change)"
+dict <- list(
+  gt = c(
+    "r2_ar1_mu1" = r"($\mu ~ (0, 0.5)$)",
+    "r2_ar1_mu2" = r"($\mu ~ (0, 2)$)",
+    "r2_ar1_rho1" = r"($\rho_1 ~ (0.1, 0.9)$)",
+    "r2_ar1_rho2" = r"($\rho_1 ~ (0.4, 0.6)$)",
+    "r2_ar1_sigma1" = r"($\sigma ~ (1, 2)$)",
+    "r2_ar1_sigma2" = r"($\sigma ~ (1, 4)$)"
+  ),
+  gg = c(
+    r2_ar1_mu1 = r"(\mu)",
+    r2_ar1_mu2 = r"(\mu)",
+    r2_ar1_rho1 = r"(\rho_1)",
+    r2_ar1_rho2 = r"(\rho_1)",
+    r2_ar1_sigma1 = r"(\sigma)",
+    r2_ar1_sigma2 = r"(\sigma)"
+    # r2_ar1_mu1 = r"(\mu ~ (0, 0.5))",
+    # r2_ar1_mu2 = r"(\mu ~ (0, 2))",
+    # r2_ar1_rho1 = r"(\rho_1 ~ (0.1, 0.9))",
+    # r2_ar1_rho2 = r"(\rho_1 ~ (0.4, 0.6))",
+    # r2_ar1_sigma1 = r"(\sigma ~ (1, 2))",
+    # r2_ar1_sigma2 = r"(\sigma ~ (1, 4))"
+  ) |>
+    map_chr(~ TeX(.x) %@% "plotmath")
 )
 
 

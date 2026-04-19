@@ -67,7 +67,7 @@ threshold <- function(breaks, g = \(y, t) y[t - 1]) {
     env = new_environment(list(g = g), pkg_env("base"))
   )
 }
-# Todo: implement left_closed argument (not really needed)
+# TODO: implement left_closed argument (not really needed)
 
 #' SRP: Smooth Transition
 #'
@@ -100,7 +100,6 @@ stransition <- function(breaks, g) {
     env = new_environment(list(g = g), pkg_env("base"))
   )
 }
-# Todo: rename to smooth_transition
 
 #' RGP: Markov
 #'

@@ -683,11 +683,11 @@ The regime-separation graphs should be read as follows.
 - The y-axis is the dispersion of the relevant RC metric across the two regimes, computed on the prefix sample.
 - Column-panels separate the different metrics, and the rows correspond to the different RNs (only 'big' versions considered); different colors/line types separate alternative hyperparameterizations within the same RGP (symmetric vs. asymmetric regime frequencies).
 
-![Regime separation - SET](../../outputs/metrics/set.png){#fig-rs-set height=40%}
+![Regime separation - SET](../../outputs/exploratory_series/set.png){#fig-rs-set height=40%}
 
-![Regime separation - ST](../../outputs/metrics/st.png){#fig-rs-st height=40%}
+![Regime separation - ST](../../outputs/exploratory_series/st.png){#fig-rs-st height=40%}
 
-![Regime separation - MS](../../outputs/metrics/ms.png){#fig-rs-ms height=40%}
+![Regime separation - MS](../../outputs/exploratory_series/ms.png){#fig-rs-ms height=40%}
 
 
 ## Models' performance {#sec-exp-perf}
@@ -700,11 +700,11 @@ The first object of this subsection targets regime identification error. The gra
 - Within each panel, forecast errors are split by an indicator of regime correctness (correct vs. incorrect regime assignment), so the comparison is between two conditional error distributions.
 - Each figure corresponds to one empirical model class (SET/ST/MS), making it possible to compare how the same diagnostic behaves across models.
 
-![Regime and series prediction - SET](../../outputs/metrics/forecast_regime_threshold.png){#fig-rp-set height=40%}
+![Regime and series prediction - SET](../../outputs/exploratory_models/forecast_regime_threshold.png){#fig-rp-set height=40%}
 
-![Regime and series prediction - ST](../../outputs/metrics/forecast_regime_stransition.png){#fig-rp-st height=40%}
+![Regime and series prediction - ST](../../outputs/exploratory_models/forecast_regime_stransition.png){#fig-rp-st height=40%}
 
-![Regime and series prediction - MS](../../outputs/metrics/forecast_regime_ms.png){#fig-rp-ms height=40%}
+![Regime and series prediction - MS](../../outputs/exploratory_models/forecast_regime_ms.png){#fig-rp-ms height=40%}
 
 The second object targets parameter estimation error. Since parameter errors and forecast errors are both continuous, the basic diagnostic is a scatterplot relating the two. These scatterplots should be read as follows.
 
@@ -713,11 +713,11 @@ The second object targets parameter estimation error. Since parameter errors and
 - The y-axis is the corresponding forecasting error (or an aggregated forecast-loss measure, depending on the figure definition).
 - Colors and/or facets separate DGP features (RGP and RN), so that the same relationship can be compared across different regime-change mechanisms and regime natures.
 
-![Prediction and coefficient errors - SET](../../outputs/metrics/scatter_threshold.png){#fig-scat-set height=40%}
+![Prediction and coefficient errors - SET](../../outputs/exploratory_models/scatter_threshold.png){#fig-scat-set height=40%}
 
-![Prediction and coefficient errors - ST](../../outputs/metrics/scatter_stransition.png){#fig-scat-st height=40%}
+![Prediction and coefficient errors - ST](../../outputs/exploratory_models/scatter_stransition.png){#fig-scat-st height=40%}
 
-![Prediction and coefficient errors - MS](../../outputs/metrics/scatter_markov.png){#fig-scat-ms height=40%}
+![Prediction and coefficient errors - MS](../../outputs/exploratory_models/scatter_markov.png){#fig-scat-ms height=40%}
 
 A complementary identification-style visualization would be to plot the empirical distribution of the estimated parameters against the true parameter values. The scatterplot diagnostics used here are more directly aligned with the learning objective of this thesis, which is to connect estimation errors to forecasting performance.
 
@@ -902,11 +902,7 @@ $\hat{\sigma}$ & 0.18 (0.18) & 0.254 (0.254) & -0.052 (-0.052) & -0.12 (-0.12) \
 
 # Conclusion {#sec-conclusion}
 
-This work studies regime switching models from a learning perspective. The
-objective is not to evaluate identification per se, but to understand how RS
-models learn under mis-specification, and how that learning relates to the
-information carried by the regime distributions implied by the estimated
-models.
+This work studies regime switching models from a learning perspective. Theobjective is not to evaluate identification per se, but to understand how RS models learn under mis-specification, and how that learning relates to the information carried by the regime distributions implied by the estimated models.
 
 The main contribution is a general and expandable framework. I represent any RS DGP as a combination of a regime generating process (RGP) and a series generating process (SGP), and I formalize regime-conditional (RC) metrics as functions that characterize the regime distributions. This makes it possible to discuss model behavior both in terms of labels (RGP and regime nature) and in terms of observable regime characteristics computed from $(\hat{y},~\hat{r})$.
 
@@ -1087,11 +1083,11 @@ As described in @sec-theory-usage, there can be better estimators for population
 
 The @fig-diag-errors-dependence shows the correlation of the errors across the parallelization structure. A simple visual check shows no evident patterns and an overall low correlation, as expected.
 
-![Errors - Correlation across parallelization structure](../../outputs/errors/dependence.png){#fig-diag-errors-dependence height=45%}
+![Errors - Correlation across parallelization structure](../../outputs/diagnostics/error_dependence.png){#fig-diag-errors-dependence height=45%}
 
 The @fig-diag-errors-distribution shows the distribution of a size 3000 sample of the errors, via the usual histogram and QQ-plot. The distribution is very close to normal, as expected.
 
-![Errors - Distribution](../../outputs/errors/distribution.png){#fig-diag-errors-distribution height=45%}
+![Errors - Distribution](../../outputs/diagnostics/error_distribution.png){#fig-diag-errors-distribution height=45%}
 
 
 ## Series generation and model estimation

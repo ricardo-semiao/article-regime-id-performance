@@ -403,7 +403,6 @@ bind_rows(bench_back_sim)
 estimate_models1 <- function(y_name) {
   y <- simulations_ys[[y_name]]
   data <- data.frame(y = y, y_l1 = lag(y, 1L, default = NA))
-  # Todo: generalize for n_p > 1
 
   results <- vector("list", n_m)
   names(results) <- names(models)
@@ -412,12 +411,11 @@ estimate_models1 <- function(y_name) {
     results[[mod_name]] <- models[[mod_name]](data, n_t, n_h)
   }
 
-  results # Todo: transpose?
+  results
 }
 
 estimate_models2 <- function(y) {
   data <- data.frame(y = y, y_l1 = lag(y, 1L, default = NA))
-  # Todo: generalize for n_p > 1
 
   results <- vector("list", n_m)
   names(results) <- names(models)
@@ -426,7 +424,7 @@ estimate_models2 <- function(y) {
     results[[mod_name]] <- models[[mod_name]](data, n_t, n_h)
   }
 
-  results # Todo: transpose?
+  results 
 }
 
 if (!exists("bench_ref_est")) bench_ref_est <- list()

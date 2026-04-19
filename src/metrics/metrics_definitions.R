@@ -106,7 +106,7 @@ fn_env(performance_rmse) <- pkg_env("base")
 
 #' Metrics - performance: Binary ME
 #' @export
-performance_BME <- function(r_est, r_true, n_h, n_t, t = 1:length(y), ...) {
+performance_bme <- function(r_est, r_true, n_h, n_t, t = 1:length(y), ...) {
   idx <- t == max(t, n_t - n_h + 1):min(t, n_t - n_h)
   mean(r_est[idx] != r_true[idx], ...)
 }

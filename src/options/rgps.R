@@ -4,6 +4,7 @@
 # Loading dependencies:
 box::use(
   src/utils[...],
+  latex2exp[TeX],
   create_rgp = src/creators/rgps
 )
 
@@ -56,56 +57,37 @@ transmat_main_col <- function(p, n_r, col = 1) {
   mat
 }
 
-#' Internal: Logistic CDF
-#'
-#' @param x [`numeric()`] input values.
-#' @param location, scale [`numeric(1)`] Location and scale parameters.
-#'
-#' @returns [`numeric()`] Logistic CDF evaluated at `x`.
-logistic_cdf <- function(x, location = 0, scale = 1) {
-  1 / (1 + exp(- (x - location) / scale))
-}
-# Todo: remove?
-
-#' Internal: Exponential CDF
-#'
-#' @param x [`numeric()`] Input values.
-#' @param location, scale [`numeric(1)`] Location and scale parameters.
-#'
-#' @returns [`numeric()`] Exponential CDF evaluated at `x`.
-exponential_cdf <- function(x, location = 0, scale = 1) {
-  1 - exp(- (x - location)^2 / scale)
-}
-# Todo: remove?
-
 
 
 # Options ----------------------------------------------------------------------
 
 #' RGPs' names dictionary
 #' @export
-dict <- c(
-  r2_multinomial_equal      = "Multinomial (symm.)",
-  r2_multinomial_reg1       = "Multinomial (asymm.)",
-  r2_markov_symm_high       = "Markov (symm., high persist.)",
-  r2_markov_symm_low        = "Markov (symm., low persist.)",
-  r2_markov_asymm_high      = "Markov (asymm., high persist.)",
-  r2_markov_asymm_low       = "Markov (asymm., low persist.)",
-  r2_sbreak_mid             = "S-break (at 1/2)",
-  r2_sbreak_end             = "S-break (at 2/3)",
-  r2_threshold_x_0          = "Threshold (x, at 0)",
-  r2_threshold_x_05         = "Threshold (x, at 0.5)",
-  r2_threshold_abs_05       = "Threshold (|x|, at 0.5)",
-  r2_threshold_abs_2        = "Threshold (|x|, at 2)",
-  r2_threshold_diff_05      = "Threshold (Dx, at 0.5)",
-  r2_threshold_diff_2       = "Threshold (Dx, at 2)",
-  r2_stransition_l0                = "LSTAR (at 0)",
-  r2_stransition_l05               = "LSTAR (at 0.5)",
-  r2_stransition_e0                = "ESTAR (at 0)",
-  r2_stransition_e5               = "ESTAR (at 0.5)"
+dict <- list(
+  gt = c(
+    r2_markov_symm_high = "MS, $p_{21} = 0.1$",
+    r2_markov_symm_low = "MS, $p_{21} = 0.7$",
+    r2_threshold_x_0 = "SET, $\\\\tau = 0$",
+    r2_threshold_x_05 = "SET, $\\\\tau = 0.5$",
+    r2_stransition_l0 = "ST, $\\\\tau = 0$",
+    r2_stransition_l05 = "ST, $\\\\tau = 0.5$",
+    r2_sbreak_mid = "SB, mid",
+    r2_sbreak_end = "SB, end"
+  ),
+  gg = c(
+    r2_markov_symm_high = r"(MS, $p_{21} = 0.1$)",
+    r2_markov_symm_low = r"(MS, $p_{21} = 0.7$)",
+    r2_threshold_x_0 = r"(SET, $\tau = 0$)",
+    r2_threshold_x_05 = r"(SET, $\tau = 0.5$)",
+    r2_stransition_l0 = r"(ST, $\tau = 0$)",
+    r2_stransition_l05 = r"(ST, $\tau = 0.5$)",
+    r2_sbreak_mid = r"(SB, mid)",
+    r2_sbreak_end = r"(SB, end)"
+  ) |>
+    map_chr(~ TeX(.x) %@% "plotmath")
 )
 
-n_t <- 120L # Todo: correct this temporary fix
+n_t <- 120L # TODO: correct this temporary fix
 #' RGPs' parameters
 #' @export
 params <- list(

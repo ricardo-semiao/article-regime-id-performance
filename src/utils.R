@@ -18,16 +18,14 @@ box::use(
   dplyr[...], tidyr[...],
   tibble[tibble], readr[write_rds, read_rds],
   stringr[...], forcats[...],
-  purrr[...], ggplot2[...],
-  rlang[...]
+  purrr[...], rlang[...]
 )
 
 
 # Modules for helpers:
-
-#' Parallel processing
 box::use(
-  mirai[mirai_map, mirai_collect = collect_mirai, mirai_daemons = daemons]
+  mirai[mirai_map, mirai_collect = collect_mirai, mirai_daemons = daemons],
+  ggplot2[...]
 )
 
 
@@ -38,38 +36,19 @@ box::use(
 #' @export
 pal <- list(
   main = c(
-    orange = "#cc5500",
-    green = "#007f5b",
-    yellow = "#e5b300",
-    blue = "#008c99",
-    red = "#cc0022"
+    orange = "#cc5500", green = "#007f5b", yellow = "#e5b300", blue = "#008c99", red = "#cc0022"
   ),
   dark = c(
-    orange = "#7f3500",
-    green = "#004c36",
-    yellow = "#997700",
-    blue = "#00464c",
-    red = "#990019"
+    orange = "#7f3500", green = "#004c36", yellow = "#997700", blue = "#00464c", red = "#990019"
   ),
   light = c(
-    orange = "#e08d51",
-    green = "#22c395",
-    yellow = "#f7d96d",
-    blue = "#32bfcc",
-    red = "#e05169"
+    orange = "#e08d51", green = "#22c395", yellow = "#f7d96d", blue = "#32bfcc", red = "#e05169"
   ),
   aqua = c(
-    orange = "#f7d3ba",
-    green = "#a5f2dc",
-    yellow = "#f9ebb8",
-    blue = "#a5ebf2",
-    red = "#f5bcc5"
+    orange = "#f7d3ba", green = "#a5f2dc", yellow = "#f9ebb8", blue = "#a5ebf2", red = "#f5bcc5"
   ),
   grays = c(
-    gray = "#f2f2f2",
-    darkgray = "#cccccc",
-    blackgray = "#666666",
-    fontblack = "#22262a"
+    gray = "#f2f2f2", darkgray = "#cccccc", blackgray = "#666666", fontblack = "#22262a"
   )
 )
 
@@ -131,8 +110,8 @@ cli_alert_items <- function(failed_items, flatten = FALSE) {
 
   items_unique <- unique(failed_items)
 
-  cli$cli_alert_danger("There were {.val {length(items_unique)}} across \\
-  {.val {length(failed_items)}} items.")
+  cli$cli_alert_danger("There were {.val {length(items_unique)}} errors across \\
+  {.val {length(failed_items)}} item{?s}.")
 
   cli$cli_rule()
   cli$cli_h3("Errors:")
@@ -141,7 +120,7 @@ cli_alert_items <- function(failed_items, flatten = FALSE) {
     is_of_error <- map_lgl(failed_items, ~ identical(.x, error))
 
     cli$cli_li("Error {.val {i}}:")
-    cli$cli_text("Occurances: {.val {sum(is_of_error)}}. On items: \\
+    cli$cli_text("Occurances: {.val {sum(is_of_error)}}. On item{?s}: \\
     {.val {names(failed_items[is_of_error])}}.")
     print(error)
     cli$cli_par()
@@ -203,6 +182,10 @@ write_rds2 <- function(x, file, ...) {
   write_rds(x, file, ...)
   cli$cli_alert_success("File saved: {.file {file}}")
 }
+
+
+
+# Parallel Execution ----------------------------------------------------------
 
 #' Helper: updates a function body to be safely
 #'
@@ -291,4 +274,12 @@ fn_env(data_lags) <- new_environment(list(lag = lag), pkg_env("base"))
 #' @export
 add_star <- function(x) {
   cut(x, c(-Inf, 0.01, 0.05, 0.1, Inf), c("***", "**", "*", ""))
+}
+
+#' @export
+get_varying_param <- function(dgp_names) {
+  dgp_names |>
+    str_split_i("-", 1) |>
+    gsub(".+_([a-z]+)[0-9]+", "\\1", x = _) %>%
+    {if_else(. == "rho", "rho1", .)} # sgp names have 'rho' refering to 'rho1'
 }

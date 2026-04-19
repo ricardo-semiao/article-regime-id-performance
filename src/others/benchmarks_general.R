@@ -23,6 +23,35 @@ box::use(
 
 
 
+# Dimnames ----------------------------------------------------------
+
+x <- matrix(1:9, 3, 3)
+
+f1 <- function() {
+  colnames(x) <- c("a", "b", "c")
+  x <- x[order(x[, "b"]), ]
+  `rownames<-`(x, c("1", "2", "3"))
+}
+
+f2 <- function() {
+  cols <- c("a", "b", "c")
+  x <- x[order(x[, which("b" == cols)]), ]
+  `dimnames<-`(x, list(c("1", "2", "3"), cols))
+}
+
+f3 <- function() {
+  x <- x[order(x[, which("b" == c("a", "b", "c"))]), ]
+  `dimnames<-`(x, list(c("1", "2", "3"), c("a", "b", "c")))
+}
+
+bench::mark(
+  check = FALSE,
+  f1(),
+  f2(),
+  f3()
+)
+
+
 # t in ... ---------------------------------------------------------------------
 
 t1 <- 1:100

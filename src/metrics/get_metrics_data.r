@@ -29,15 +29,12 @@ if (FALSE) {
 #' TODO: document
 #' @export
 get_metrics_data <- function(
-  data_s, data_e, data_sm, data_em,
+  data_s, data_e, data_em,
   n_t, n_burn, n_h
 ) {
   cat("Getting model metrics...\n")
-  metrics_meta <- left_join(
-    rename(data_em, meta_est = meta),
-    rename(data_sm, meta_true = meta),
-    by = c("sgp", "rgp", "sim")
-  ) |>
+  metrics_meta <- data_em |>
+    rename(meta_true = meta_sim) |>
     arrange(sgp, rgp, model, sim) |>
     get_meta_metrics(n_t, n_h)
 
@@ -71,7 +68,7 @@ get_metrics_data <- function(
 
 # Estimation and Meta-Based Data -----------------------------------------------
 
-#' Todo: document
+#' TODO: document
 get_meta_metrics <- function(data, n_t, n_h) {
   lazy_dt(data) |>
     group_by(sgp, rgp, sim, model, arrange = FALSE) |>
@@ -101,7 +98,7 @@ get_estimation_metrics <- function(data, n_t, n_h) {
       rmse = metrics$performance_rmse(y_est, y_true, n_h, n_t, t = t),
       mape = metrics$performance_mape(y_est, y_true, n_h, n_t, t = t),
       r2 = metrics$performance_r2(y_est, y_true, n_h, n_t, t = t),
-      regimes_bme = metrics$performance_BME(r_est, r_true, n_h, n_t, t = t),
+      regimes_bme = metrics$performance_bme(r_est, r_true, n_h, n_t, t = t),
       switches_est = metrics$average_switches(y_est, r_est),
       duration_est = metrics$duration_diff(y_est, r_est),
       switches_true = metrics$average_switches(y_true, r_true),
