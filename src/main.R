@@ -349,10 +349,18 @@ if (FALSE) {
 
 
 # Improbable counts:
-diagnostics$improbable_counts(
+diag_counts <- diagnostics$improbable_counts(
   estimations_data, simulations_data,
   n_burn = n_burn, n_t = n_t, n_h = n_h
 )
+diag_counts
+
+if (FALSE) {
+  writeLines(
+    imap_chr(diag_counts, ~ glue("{.y}: {formatC(.x, 8, format = 'f')}")),
+    "outputs/diagnostics/improbable_counts.txt"
+  )
+}
 
 
 
@@ -373,156 +381,33 @@ if (FALSE) {
 # Metrics separation across t:
 res_met_graphs <- results$metrics_sep_graphs(simulations_data,
   n_t = n_t,
-  #row_number() %in% sample(n(), 1000),
+  row_number() %in% sample(n(), 1000),
   rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0")
 )
-res_met_graphs
+res_met_graphs[[1]]
 
 if (FALSE) {
-  imap(res_met_graphs, \(graph, name) {
-    ggsave(graph, glue("outputs/exploratory/metrics_sep_{name}.pdf"))
+  iwalk(res_met_graphs, \(graph, name) {
+    ggsave2(plot = graph, glue("outputs/exploratory/metrics_sep_{name}.pdf"), 8, 1)
   })
 }
 
 
 # Forecasting errors and regimes:
-hello = estimations_data |>
-  filter(
-    t >= t - n_h,
-    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
-  ) |>
-  left_join(
-    simulations_data,
-    by = c("sgp", "rgp", "sim", "t"), suffix = c("_est", "_sim")
-  ) |>
-  mutate(
-    error = y_est - y_sim,
-    correct_r = c("Correct", "Incorrect")[(r_est == r_sim) + 1],
-    sgp = str_replace_all(sgp, c(
-      "r2_ar1_mu1" = "μ",
-      "r2_ar1_mu2" = "μ",
-      "r2_ar1_rho1" = "ρ",
-      "r2_ar1_rho2" = "ρ",
-      "r2_ar1_sigma1" = "σ",
-      "r2_ar1_sigma2" = "σ"
-    )) |>
-      fct(c("μ", "ρ", "σ")),
-    rgp = str_replace_all(rgp, c(
-      "r2_markov_symm_high" = "MS, symm.",
-      "r2_markov_symm_low" = "MS, asymm.",
-      "r2_threshold_x_0" = "SET, τ = 0",
-      "r2_threshold_x_05" = "SET, τ = 0.5",
-      "r2_stransition_l0" = "ST, τ = 0",
-      "r2_stransition_l05" = "ST, τ = 0.5",
-      "r2_sbreak_mid" = "SB, mid",
-      "r2_sbreak_end" = "SB, end"
-    ))
-  ) |>
-  group_by(sgp, rgp) |>
-  filter(
-    error >= quantile(error, 0.0005, na.rm = TRUE),
-    error <= quantile(error, 0.9995, na.rm = TRUE)
-  )
+res_regimes_graphs <- results$regimes_rmse_graphs(
+  estimations_data, simulations_data, n_t = n_t, n_h = n_h,
+  #row_number() %in% sample(n(), 1000),
+  rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+  sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
+  models = c("r2_markov", "r2_sbreak", "r2_threshold_x", "r2_stransition")
+)
+res_regimes_graphs[[1]]
 
-ggplot(filter(hello, model == "r2_markov"), aes(x = error)) +
-  geom_density(aes(color = correct_r)) +
-  ggh4x::facet_grid2(vars(sgp), vars(rgp), scales = "free", independent = "all") +
-  labs(y = "Density", x = "Forecasting error", color = "Regime ID")
-ggsave2("outputs/metrics/forecast_regime_ms.png", 28, 20)
-ggplot(filter(hello, model == "r2_threshold_x"), aes(x = error)) +
-  geom_density(aes(color = correct_r)) +
-  ggh4x::facet_grid2(vars(sgp), vars(rgp), scales = "free", independent = "all") +
-  labs(y = "Density", x = "Forecasting error", color = "Regime ID")
-ggsave2("outputs/metrics/forecast_regime_threshold.png", 28, 20)
-ggplot(filter(hello, model == "r2_stransition"), aes(x = error)) +
-  geom_density(aes(color = correct_r)) +
-  ggh4x::facet_grid2(vars(sgp), vars(rgp), scales = "free", independent = "all") +
-  labs(y = "Density", x = "Forecasting error", color = "Regime ID")
-ggsave2("outputs/metrics/forecast_regime_stransition.png", 28, 20)
-ggplot(filter(hello, model == "r2_sbreak"), aes(x = error)) +
-  geom_density(aes(color = correct_r)) +
-  ggh4x::facet_grid2(vars(sgp), vars(rgp), scales = "free", independent = "all") +
-  labs(y = "Density", x = "Forecasting error", color = "Regime ID")
-ggsave2("outputs/metrics/forecast_regime_sbreak.png", 28, 20)
-
-
-ola = left_join(
-  estimations_meta, simulations_meta,
-  by = c("sgp", "rgp", "sim"), suffix = c("_est", "_sim")
-) |>
-  rowwise() |>
-  mutate(
-    error = list(rowMeans(abs(meta_est$coefs - meta_sim$coefs)))
-  ) |>
-  unnest_wider(error, names_sep = "_")
-
-
-ola2 <- ola |>
-  left_join(
-    select(data_metrics, sgp, rgp, sim, rmse),
-    by = c("sgp", "rgp", "sim")
-  ) |>
-  pivot_longer(matches("^error_"), names_to = "coef", values_to = "error") |>
-  filter(
-    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
-  )
-
-ola3 <- ola2 |>
-  filter(
-    row_number() %in% sample(n(), 10000, replace = TRUE),
-    error <= 10,
-    rmse <= 10
-  ) |>
-  ungroup() |>
-  mutate(
-    sgp = str_replace_all(sgp, c(
-      "r2_ar1_mu1" = "RN: μ",
-      "r2_ar1_mu2" = "RN: μ",
-      "r2_ar1_rho1" = "RN: ρ",
-      "r2_ar1_rho2" = "RN: ρ",
-      "r2_ar1_sigma1" = "RN: σ",
-      "r2_ar1_sigma2" = "RN: σ"
-    )) |>
-      fct(c("RN: μ", "RN: ρ", "RN: σ")),
-    rgp = str_replace_all(rgp, c(
-      "r2_markov_symm_high" = "MS, symm.",
-      "r2_markov_symm_low" = "MS, asymm.",
-      "r2_threshold_x_0" = "SET, τ = 0",
-      "r2_threshold_x_05" = "SET, τ = 0.5",
-      "r2_stransition_l0" = "ST, τ = 0",
-      "r2_stransition_l05" = "ST, τ = 0.5",
-      "r2_sbreak_mid" = "SB, mid",
-      "r2_sbreak_end" = "SB, end"
-    )),
-    coef = str_replace_all(coef, c(
-      "error_mu" = "Coef.: μ",
-      "error_rho" = "Coef.: ρ",
-      "error_sigma" = "Coef.: σ"
-    ))
-  )
-
-ggplot(filter(ola3, model == "r2_markov"), aes(error, rmse)) +
-  geom_point(aes(color = rgp), alpha = 0.3) +
-  ggh4x::facet_grid2(vars(coef), vars(sgp), scales = "free", independent = "all") +
-  labs(y = "RMSE", x = "Average absolute error in coefficients", color = "RGP")
-ggsave2("outputs/metrics/scatter_markov.png", 28, 20)
-ggplot(filter(ola3, model == "r2_threshold_x"), aes(error, rmse)) +
-  geom_point(aes(color = rgp), alpha = 0.3) +
-  ggh4x::facet_grid2(vars(coef), vars(sgp), scales = "free", independent = "all") +
-  labs(y = "RMSE", x = "Average absolute error in coefficients", color = "RGP")
-ggsave2("outputs/metrics/scatter_threshold.png", 28, 20)
-ggplot(filter(ola3, model == "r2_sbreak"), aes(error, rmse)) +
-  geom_point(aes(color = rgp), alpha = 0.3) +
-  ggh4x::facet_grid2(vars(coef), vars(sgp), scales = "free", independent = "all") +
-  labs(y = "RMSE", x = "Average absolute error in coefficients", color = "RGP")
-ggsave2("outputs/metrics/scatter_sbreak.png", 28, 20)
-ggplot(filter(ola3, model == "r2_stransition"), aes(error, rmse)) +
-  geom_point(aes(color = rgp), alpha = 0.3) +
-  ggh4x::facet_grid2(vars(coef), vars(sgp), scales = "free", independent = "all") +
-  labs(y = "RMSE", x = "Average absolute error in coefficients", color = "RGP")
-ggsave2("outputs/metrics/scatter_stransition.png", 28, 20)
+if (FALSE) {
+  iwalk(res_regimes_graphs, \(graph, name) {
+    ggsave2(plot = graph, glue("outputs/exploratory/rmse_regimes_{name}.pdf"), 8, 1)
+  })
+}
 
 
 

@@ -5,6 +5,7 @@ box::use(
   src/utils[...],
   src/options[dicts],
   src/metrics,
+  ggplot2[...],
   gt[...]
 )
 
@@ -17,6 +18,14 @@ if (FALSE) {
     rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0")
   )
   data = estimations_data
+  filters <- quos(
+    #row_number() %in% sample(n(), 1000),
+    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2")
+  )
+  trim = 0.005
+  data_e <- estimations_data
+  data_s <- simulations_data
 }
 
 
@@ -137,9 +146,7 @@ metrics_sep_graphs <- function(data, ..., n_t) {
     ) |>
     mutate(
       sym_rgp = c("Symm.", "Asymm.")[rgp %in% rgp_sym + 1],
-      sgp = dicts$sgp$gg[sgp] |>
-        fct(c("mu", "rho*'_1'", "sigma")) |>
-        fct_recode("rho[1]" = "rho*'_1'"),
+      sgp = dicts$sgp$gg[sgp] |> fct(unique(dicts$sgp$gg)),
       stat = fct(stat, c("avg", "acf", "sd")) |>
         fct_recode(!!!(dicts$metrics$gg %>% {set_names(names(.), .)}))
     )
@@ -154,5 +161,42 @@ metrics_sep_graphs <- function(data, ..., n_t) {
       ggh4x::facet_grid2(
         vars(sgp), vars(stat), scales = "free_y", labeller = label_parsed
       )
+  })
+}
+
+
+
+# Forecasting errors and regime prediction ----------------------------------------------------------
+
+#' @export
+regimes_rmse_graphs <- function(data_e, data_s, n_t, n_h, ..., models, trim = 0.0005) {
+  filters <- enquos(...)
+
+  gdata <- data_e |>
+    filter(!!!filters, t >= n_t - n_h) |>
+    left_join(
+      data_s, by = c("sgp", "rgp", "sim", "t"),
+      suffix = c("_est", "_sim")
+    ) |>
+    mutate(
+      error = y_est - y_sim,
+      correct_r = c("Correct", "Incorrect")[(r_est == r_sim) + 1],
+      sgp = str_replace_all(sgp, dicts$sgps$gg) |> fct(unique(dicts$sgps$gg)),
+      rgp = str_replace_all(rgp, dicts$rgps$gg)
+    ) |>
+    group_by(sgp, rgp) |>
+    filter(
+      error >= quantile(error, trim, na.rm = TRUE),
+      error <= quantile(error, 1 - trim, na.rm = TRUE)
+    )
+
+  map(set_names(models), \(mod_name) {
+    ggplot(filter(gdata, model == mod_name), aes(x = error)) +
+      geom_density(aes(color = correct_r)) +
+      ggh4x::facet_grid2(
+        vars(sgp), vars(rgp),
+        scales = "free", independent = "all", labeller = label_parsed
+      ) +
+      labs(y = "Density", x = "Forecasting error", color = "Regime ID")
   })
 }
