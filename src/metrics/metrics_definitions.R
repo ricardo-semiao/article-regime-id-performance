@@ -86,8 +86,8 @@ fn_env(diff_k_2) <- pkg_env("base")
 
 #' Metrics - performance: R squared
 #' @export
-performance_r2 <- function(y_est, y_true, n_h, n_t, t = 1:length(y), ...) {
-  idx <- t == max(t, 1):min(t, n_t - n_h)
+performance_r2 <- function(y_est, y_true, n_h, n_t, n_b, t = 1:length(y), ...) {
+  idx <- t %in% (n_b + 1):(n_t - n_h)
   y_bar <- mean(y_true[idx], ...)
   ss_reg <- sum((y_est[idx] - y_bar)^2, ...)
   ss_tot <- sum((y_true[idx] - y_bar)^2, ...)
@@ -98,7 +98,7 @@ fn_env(performance_r2) <- pkg_env("base")
 #' Metrics - performance: RMSE
 #' @export
 performance_rmse <- function(y_est, y_true, n_h, n_t, t = 1:length(y), ...) {
-  idx <- t == max(t, n_t - n_h + 1):min(t, n_t - n_h)
+  idx <- t %in% (n_t - n_h + 1):n_t
   error <- y_est[idx] - y_true[idx]
   sqrt(mean(error^2, ...))
 }
@@ -107,7 +107,7 @@ fn_env(performance_rmse) <- pkg_env("base")
 #' Metrics - performance: Binary ME
 #' @export
 performance_bme <- function(r_est, r_true, n_h, n_t, t = 1:length(y), ...) {
-  idx <- t == max(t, n_t - n_h + 1):min(t, n_t - n_h)
+  idx <- t %in% (n_t - n_h + 1):n_t
   mean(r_est[idx] != r_true[idx], ...)
 }
 fn_env(performance_rmse) <- pkg_env("base")
@@ -115,7 +115,7 @@ fn_env(performance_rmse) <- pkg_env("base")
 #' Metrics - performance: MAPE
 #' @export
 performance_mape <- function(y, y_true, n_h, n_t, t = 1:length(y), ...) {
-  idx <- t == max(t, n_t - n_h + 1):min(t, n_t - n_h)
+  idx <- t %in% (n_t - n_h + 1):n_t
   error <- y[idx] - y_true[idx]
   mean(abs(error) / abs(y_true[idx]), ...)
 }

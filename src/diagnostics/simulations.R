@@ -220,8 +220,8 @@ coefs_table <- function(data, ..., test = test) {
 # Improbable Things ----------------------------------------------------------
 
 #' @export
-improbable_counts <- function(data_e, data_s, n_burn, n_t, n_h) {
-  te1 <- n_burn + 1
+improbable_counts <- function(data_e, data_s, n_b, n_t, n_h) {
+  te1 <- n_b + 1
   te2 <- n_t - n_h - 1
   tp1 <- n_t - n_h
 

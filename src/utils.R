@@ -183,6 +183,12 @@ write_rds2 <- function(x, file, ...) {
   cli$cli_alert_success("File saved: {.file {file}}")
 }
 
+#' @export
+print_summary <- function(x, ...) {
+  print(summary(x, ...))
+  invisible(x)
+}
+
 
 
 # Parallel Execution ----------------------------------------------------------
@@ -218,7 +224,7 @@ safely_modify <- function(.f) {
 #'
 #' @returns [`list()`] Results of applying `f` to `x`.
 #' @export
-map_parallel <- function(x, f, ..., parallel, safe, workers = 6) {
+map_parallel <- function(x, f, ..., parallel, safe, workers = 7) {
   if (inherits_any(x, "data.frame")) {
     cli_warn("{.code x} is a dataframe, {.code pmap}-like behavior may occour")
   }
@@ -228,7 +234,7 @@ map_parallel <- function(x, f, ..., parallel, safe, workers = 6) {
 
   if (parallel) {
     on.exit(mirai_daemons(0), add = TRUE)
-    mirai_daemons(workers)
+    mirai_daemons(workers, cleanup = FALSE) # * No worker cleanup between tasks
 
     promise <- mirai_map(x, f_safe)
     results <- mirai_collect(promise, options = c(".progress"))
@@ -272,8 +278,10 @@ fn_env(data_lags) <- new_environment(list(lag = lag), pkg_env("base"))
 
 #' Helper: Add significance stars to p-values
 #' @export
-add_star <- function(x) {
-  cut(x, c(-Inf, 0.01, 0.05, 0.1, Inf), c("***", "**", "*", ""))
+add_star <- function(x, escape = FALSE) {
+  levels <- c("***", "**", "*", "")
+  if (escape) levels <- str_replace_all(levels, "\\*", "\\\\*")
+  cut(x, c(-Inf, 0.01, 0.05, 0.1, Inf), levels) |> as.character()
 }
 
 #' @export
@@ -282,4 +290,11 @@ get_varying_param <- function(dgp_names) {
     str_split_i("-", 1) |>
     gsub(".+_([a-z]+)[0-9]+", "\\1", x = _) %>%
     {if_else(. == "rho", "rho1", .)} # sgp names have 'rho' refering to 'rho1'
+}
+
+#' @export
+trimmed_sd <- function(x, trim = 0.01, na.rm = TRUE) {
+  idx <- x >= quantile(x, trim, na.rm = na.rm) &
+    x <= quantile(x, 1 - trim, na.rm = na.rm)
+  sd(x[idx], na.rm = na.rm)
 }

@@ -57,12 +57,11 @@ bench::mark(
 t1 <- 1:100
 t2 <- 1:1000
 
-mark(
-  check = FALSE,
+bench::mark(
   t1 %in% (7:83),
-  t1 == max(t1, 7):min(t1, 83),
+  t1 == max(min(t1), 7):min(max(t1), 83),
   t2 %in% (7:83),
-  t2 == max(t2, 7):min(t2, 83)
+  t2 == max(min(t2), 7):min(max(t2), 83)
 )
 
 

@@ -8,7 +8,7 @@ box::use(
 )
 
 
-# NOTE: based on n_r = 2, can be expanded
+# * Based on n_r = 2, can be expanded
 dict_regimes <- list(
   metrics = list(
     avg_1 = md("$s = 1$"), avg_2 = md("$s = 2$"), avg_0 = md("$\\perp s$"),

@@ -18,15 +18,17 @@ box::use(
   src/metrics,
   src/results,
   rTRNG[rnorm_trng],
-  gt[gtsave]
+  gt[gtsave],
+  stargazer[stargazer],
+  ggplot2[...]
 )
 
 
 # Simulation parameters:
-n_s <- 500L # Number of simulations
-n_burn <- 10L # Burn-in periods
+n_s <- 400L # Number of simulations
+n_b <- 4L # Burn-in periods
 n_h <- 10L # Number of periods to predict
-n_t <- 100L + n_burn + n_h # Number of time periods
+n_t <- 100L + n_b + n_h # Number of time periods
 
 
 
@@ -224,7 +226,7 @@ estimate_models <- function(input) {
   names(results) <- names(mods)
 
   for (mod_name in names(mods)) {
-    results[[mod_name]] <- mods[[mod_name]](data, n_t, n_h, n_burn, rn_par = input$rn_par)
+    results[[mod_name]] <- mods[[mod_name]](data, n_t, n_h, n_b, rn_par = input$rn_par)
   }
 
   results
@@ -237,7 +239,7 @@ if (safe) considered_models <- map(considered_models, safely_modify)
 estimations <- map_parallel(
   est_inputs, estimate_models,
   mods = considered_models, data_lags = data_lags,
-  n_burn = n_burn, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m,
+  n_b = n_b, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m,
   parallel = TRUE, safe = FALSE
 )
 
@@ -251,23 +253,21 @@ if (FALSE) {
 if (safe) {
   compact(map(estimations, ~ compact(map(.x, "error")))) |>
     cli_alert_items(flatten = TRUE)
-  #estimations$`r2_ar1_rho2-r2_threshold_x_0-415` |> map("error")
   estimations <- map(estimations, ~ compact(map(.x, "result")))
 }
 
 # Checking regimes:
-check_n_regimes <- imap_dfr(estimations, \(sim, name) {
-  c(name = name, map(sim, \(model) length(table(model$r)))[])
+.regimes_per_model <- imap_dfr(estimations, \(sim, name) {
+  c(name = name, map(sim, \(model) length(tabulate(model$r)))[])
 }) |>
   pivot_longer(-name, names_to = "model") |>
   filter(value != 2)
 
-table(check_n_regimes$model, check_n_regimes$value)
-for (l in split(check_n_regimes, 1:nrow(check_n_regimes))) {
+table(.regimes_per_model$model, .regimes_per_model$value)
+for (l in split(.regimes_per_model, seq_len(nrow(.regimes_per_model)))) {
   estimations[[l$name]][[l$model]] <- NULL
 }
 estimations <- map(estimations, compact)
-rm(check_n_regimes, l)
 
 
 # Collecting results:
@@ -306,7 +306,7 @@ estimations_data <- estimations_flat |>
 
 metrics_data <- metrics$get_metrics_data(
   simulations_data, estimations_data, estimations_meta,
-  n_t = n_t, n_burn = n_burn + n_l + 1, n_h = n_h
+  n_t = n_t, n_b = n_b + n_l + 1, n_h = n_h
 )
 
 if (FALSE) {
@@ -351,7 +351,7 @@ if (FALSE) {
 # Improbable counts:
 diag_counts <- diagnostics$improbable_counts(
   estimations_data, simulations_data,
-  n_burn = n_burn, n_t = n_t, n_h = n_h
+  n_b = n_b, n_t = n_t, n_h = n_h
 )
 diag_counts
 
@@ -413,127 +413,209 @@ if (FALSE) {
 
 # Results: Systematic Analysis -------------------------------------------------
 
-trimmed_sd <- function(x, trim = 0.01) {
-  idx <- x >= quantile(x, trim, na.rm = TRUE) & x <= quantile(x, 1 - trim, na.rm = TRUE)
-  sd(x[idx], na.rm = TRUE)
-}
+# Setup:
+colnames(metrics_data)
 
-data_reg <- data_metrics |>
-  mutate(across(where(is.numeric), ~ ifelse(is.finite(.x), .x, NA_real_))) |>
-  mutate(across(where(is.numeric), ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_))) |>
-  mutate(across(where(is.numeric), ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)))
+imap_dfr(select(metrics_data, where(is.numeric)), \(col, col_name) {
+  c(
+    col = col_name,
+    class = class(col),
+    nas = sum(is_na(col) & ! is.nan(col)),
+    nans = sum(is.nan(col)),
+    infs = sum(is.infinite(col)),
+    outliers = sum(abs(col) > 30 * trimmed_sd(col), na.rm = TRUE)
+  )
+}) |>
+  print(n = Inf)
 
-abs(data_reg$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, Inf)) |> table()
+sys_data <- metrics_data |>
+  mutate(across(where(is.numeric), ~ ifelse(!is.finite(.x), NA_real_, .x))) |>
+  mutate(across(
+    c(mu_est, rho1_est, sigma_est, mu_diff, rho1_diff, sigma_diff, rmse, mape, r2),
+    ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_))
+  ) |>
+  mutate(across(
+    c(where(is.numeric), -sim, -rmse, -mape, -r2),
+    ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE))
+  )
 
+abs(metrics_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, Inf)) |> table()
+abs(sys_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, Inf)) |> table()
 
-## Taking a step back:
 
 # Diagnosticos:
-lm(rmse ~ sim, data_reg) |> stargazer::stargazer()
-#lm(mape ~ sim, data_reg) |> summary()
+sys_data |>
+  slice_sample(n = 10000) |>
+  mutate(rmse = log(rmse)) |>
+  ggplot(aes(sim, rmse)) +
+  geom_point()
+
+lm(log(rmse) ~ poly(sim, 3) + log(sim), sys_data) |> print_summary()
+sys_i <- lm(rmse ~ poly(sim, 3) + log(sim), sys_data) |> print_summary()
+
+if (FALSE) {
+  stargazer(
+    sys_i, out = "outputs/systematic/i.tex",
+    single.row = TRUE, df = FALSE
+  )
+}
 
 
 # Models FE:
-lm(rmse ~ model - 1, data_reg) |> stargazer::stargazer(single.row = TRUE)
-#lm(mape ~ model - 1, data_reg) |> summary()
+sys_model_fe <- list()
+sys_model_fe[[1]] <- lm(mape ~ model - 1, sys_data)
+sys_model_fe[[2]] <- lm(
+  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff,
+  sys_data
+)
+sys_model_fe[[3]] <- lm(
+  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff +
+    mu_diff + rho1_diff + sigma_diff,
+  sys_data
+)
+sys_model_fe[[4]] <- lm(
+  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff +
+    avg_diff + acf_diff + sd_diff,
+  sys_data
+)
+
+if (FALSE) {
+  stargazer(
+    sys_model_fe, out = "outputs/systematic/model_fe.tex", type = "text",
+    single.row = TRUE, omit.stat = c("f"), df = FALSE
+  )
+}
 
 
 # Models misspecifications:
-reg1 <- lm(
-  rmse ~ model*rgp - 1,
-  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
-) |> summary()
+mods_groups <- list(
+  sym = c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+  asym = c("r2_markov_symm_low", "r2_sbreak_end", "r2_threshold_x_05", "r2_stransition_l05"),
+  rn = c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0")
+)
 
-reg12 <- lm( # Adding assymmetry to the mix:
-  rmse ~ model*rgp - 1,
-  filter(data_reg, rgp %in% c("r2_markov_symm_low", "r2_sbreak_end", "r2_threshold_x_05", "r2_stransition_l05"))
-) |> summary()
-# Esses dois deveriam ser matrizes, mas uma coisa de cada vez
+sys_mis <- list()
 
-reg1$coefficients[8:16, 1] - reg12$coefficients[8:16, 1]
+sys_mis$sym <- lm(
+  rmse ~ model * rgp - 1,
+  filter(sys_data, rgp %in% mods_groups$sym)
+) |> print_summary()
 
-glue("{round(reg1$coefficients[8:16, 1], 3)} ({round(reg1$coefficients[8:16, 1], 3)})") |>
-  matrix(3, 3) %>%
-  cbind(c("SET", "ST", "MS"), .) %>%
-  stargazer::stargazer()
-glue("{round(reg12$coefficients[8:16, 1], 3)} ({round(reg12$coefficients[8:16, 1], 3)})") |>
-  matrix(3, 3) %>%
-  cbind(c("SET", "ST", "MS"), .) %>%
-  stargazer::stargazer()
-
-
-
-reg13 <- lm( # Adding RN to the mix:
-  rmse ~ model*rgp - 1,
-  filter(data_reg,
-    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    grepl("2$", sgp)
+if (FALSE) {
+  format_reg_matrix(
+    sys_mis$sym, out = "outputs/systematic/mis_sym.tex", type = "text"
   )
-) |> summary()
+}
 
-reg1$coefficients[8:16, 1] - reg13$coefficients[8:16, 1]
-glue("{round(reg13$coefficients[8:16, 1], 3)} ({round(reg13$coefficients[8:16, 1], 3)})") |>
-  matrix(3, 3) %>%
-  cbind(c("SET", "ST", "MS"), .) %>%
-  stargazer::stargazer()
+sys_mis$asym <- lm(
+  rmse ~ model * rgp - 1,
+  filter(sys_data, rgp %in% mods_groups$asym)
+) |> print_summary()
+
+if (FALSE) {
+  format_reg_matrix(
+    sys_mis$asym, out = "outputs/systematic/mis_asym.tex", type = "text"
+  )
+}
+
+sys_mis$rn <- lm(
+  rmse ~ model*rgp - 1,
+  filter(sys_data, rgp %in% mods_groups$rn, grepl("2$", sgp))
+) |> print_summary()
+
+if (FALSE) {
+  format_reg_matrix(
+    sys_mis$rn, out = "outputs/systematic/mis_rn.tex", type = "text"
+  )
+}
 
 
-# Now with the metrics instead of RGP:
-reg2 <- lm(
-  rmse ~ model*(avg_est + acf_est + sd_est) - 1,
-  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
-) |> summary()
-# And also with cross metric interactions, but later
+# Model mis. with true metrics:
+sys_mis$metrics_true <- lm(
+  rmse ~ model * (avg_true + acf_true + sd_true) - 1,
+  filter(sys_data, rgp %in% mods_groups$sym)
+) |> print_summary()
 
-reg2
-glue("{round(reg2$coefficients[8:16, 1], 3)} ({round(reg2$coefficients[8:16, 1], 3)})") |>
-  matrix(3, 3) %>%
-  cbind(c("SET", "ST", "MS"), .) %>%
-  stargazer::stargazer()
+if (FALSE) {
+  format_reg_matrix(
+    sys_mis$metrics_true, out = "outputs/systematic/mis_metrics_true.tex", type = "text"
+  )
+}
+
+sys_mis$metrics_true_int <- lm(
+  rmse ~ model * (avg_true + acf_true + sd_true) - 1,
+  filter(sys_data, rgp %in% mods_groups$sym)
+) |> print_summary()
+
+if (FALSE) {
+  format_reg_matrix(
+    sys_mis$metrics_true_int, out = "outputs/systematic/mis_metrics_true_int.tex", type = "text"
+  )
+}
 
 
-reg22 <- lm(
-  rmse ~ model*(avg_est * acf_est * sd_est) - 1,
-  filter(data_reg, rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"))
-) |> summary()
-# And also with cross metric interactions, but later
-glue("{round(reg22$coefficients[8:16, 1], 3)} ({round(reg22$coefficients[8:16, 1], 3)})") |>
-  matrix(3, 3) %>%
-  cbind(c("SET", "ST", "MS"), .) %>%
-  stargazer::stargazer()
+# Model mis. with estimated metrics:
+sys_mis$metrics <- lm(
+  rmse ~ model * (avg_est + acf_est + sd_est) - 1,
+  filter(sys_data, rgp %in% mods_groups$sym)
+) |> print_summary()
+
+if (FALSE) {
+  format_reg_matrix(
+    sys_mis$metrics, out = "outputs/systematic/mis_metrics.tex", type = "text"
+  )
+}
+
+sys_mis$metrics_int <- lm(
+  rmse ~ model * (avg_est * acf_est * sd_est) - 1,
+  filter(sys_data, rgp %in% mods_groups$sym)
+) |> print_summary()
+
+if (FALSE) {
+  format_reg_matrix(
+    sys_mis$metrics_int, out = "outputs/systematic/mis_metrics_int.tex", type = "text"
+  )
+}
+
+
+# Comparisons:
+sys_mis$sym$coefficients[8:16, 1] - sys_mis$asym$coefficients[8:16, 1]
+sys_mis$sym$coefficients[8:16, 1] - sys_mis$rn$coefficients[8:16, 1]
+sys_mis$metrics$coefficients[8:16, 1] - sys_mis$metrics_int$coefficients[8:16, 1]
 
 
 # What is best to match?
+sys_match <- list()
+sys_match$regimes_bme <- lm(rmse ~ regimes_bme - 1, sys_data)
+sys_match$regimes_info <- lm(rmse ~ switches_diff + duration_diff - 1, sys_data)
+sys_match$coefs <- lm(rmse ~ mu_diff + rho1_diff + sigma_diff - 1, sys_data)
+sys_match$metrics <- lm(rmse ~ avg_diff + acf_diff + sd_diff - 1, sys_data)
 
-reg3 <- lm(
-  rmse ~ r2 + regimes_bme +
-    #switches_diff + duration_diff +
-    #avg_diff + acf_diff + sd_diff +
-    mu_diff + rho1_diff + sigma_diff +
-    NULL,
-  data = data_reg
-)
+if (FALSE) {
+  format_reg_table(
+    sys_match, out = "outputs/systematic/match.tex", type = "text",
+    single.row = TRUE, df = FALSE
+  )
+}
 
-reg3 |> stargazer::stargazer(single.row = TRUE)
 
-reg4 <- lm(
-  rmse ~
-    model:(avg_diff + acf_diff + sd_diff) - 1 - model +
-    #mu_diff + rho1_diff + sigma_diff +
-    NULL,
-  data = data_reg
-) |> summary()
+sys_match$metrics_int <- lm(
+  rmse ~ model:(avg_diff + acf_diff + sd_diff) - 1,
+  data = sys_data
+) |> print_summary()
 
-glue("{round(reg4$coefficients[1:12, 1], 3)} ({round(reg4$coefficients[1:12, 1], 3)})") |>
-  matrix(3, 4) %>%
-  cbind(c("SET", "ST", "MS"), .) %>%
-  stargazer::stargazer()
-reg4 |> stargazer::stargazer(single.row = TRUE)
+if (FALSE) {
+  format_reg_matrix(
+    sys_match$metrics_int, out = "outputs/systematic/match_metrics.tex", type = "text",
+    rows = 1:9
+  )
+}
+
 
 
 # Check:
 reg1_cor <- cor(
-  select(data_metrics, rmse, r2, regimes_bme,
+  select(sys_data, rmse, r2, regimes_bme,
   switches_diff, duration_diff,
   avg_diff, acf_diff, sd_diff, mu_diff, rho1_diff, sigma_diff),
   use = "na.or.complete"

@@ -125,7 +125,7 @@ get_correct_params <- function(dgp_names, relabel = TRUE) {
 
 #' Internal: Burn-in period background via annotate
 #' @export
-annotate_burn <- function(n_burn = NA_real_, ...) {
+annotate_burn <- function(n_b = NA_real_, ...) {
   args_annotate <- list2(...)
   args_annotate$alpha <- args_annotate$alpha %||% 0.5
   args_annotate$fill <- args_annotate$fill %||% "darkgrey"
@@ -133,7 +133,7 @@ annotate_burn <- function(n_burn = NA_real_, ...) {
   inject(list(
     annotate(
       "rect", !!!args_annotate,
-      xmin = 1, xmax = as.numeric(n_burn), ymin = -Inf, ymax = Inf
+      xmin = 1, xmax = as.numeric(n_b), ymin = -Inf, ymax = Inf
     )
   ))
 }
@@ -232,13 +232,13 @@ conditional_color <- function(regime_aligned, ...) {
 #' @param gdata [`data.frame()`] Input data containing simulation results.
 #' @param t_max [`integer(1)`] Maximum time step to visualize.
 #' @param sims [`integer(1)`] Simulation identifiers to visualize.
-#' @param n_burn [`integer(1)`] Number of initial time steps to consider as
+#' @param n_b [`integer(1)`] Number of initial time steps to consider as
 #'   burn-in.
 #'
 #' @returns [`ggplot()`] Plot of simulated paths in regime-value space.
 series_paths <- function(
   data, t_max = max(data$t), sims = 1,
-  n_burn, faceted = NULL
+  n_b, faceted = NULL
 ) {
   faceted <- faceted %||% (
     length(unique(data$sgp)) > 1 || length(unique(data$rgp)) > 1
@@ -250,7 +250,7 @@ series_paths <- function(
     mutate(
       across(c(r, y), ~ jitter(.x, amount = 0.2)),
       r_lead = lead(r), y_lead = lead(y), t_lead = lead(t),
-      burn = t <= n_burn
+      burn = t <= n_b
     )
 
   ggplot(gdata, aes(x = r, y = y)) +
@@ -285,13 +285,13 @@ series_paths <- function(
 #' @param gdata [`data.frame()`] Input data containing simulation results.
 #' @param t_max [`integer(1)`] Maximum time step to visualize.
 #' @param sims [`integer(1)`] Simulation identifiers to visualize.
-#' @param n_burn [`integer(1)`] Number of initial time steps to consider as
+#' @param n_b [`integer(1)`] Number of initial time steps to consider as
 #'   burn-in.
 #'
 #' @returns [`ggplot()`] Plot of simulated regime paths over time.
 regimes_values <- function(
   data, t_max = max(data$t), sims = 1,
-  n_burn, faceted = NULL
+  n_b, faceted = NULL
 ) {
   faceted <- faceted %||% (
     length(unique(data$sgp)) > 1 || length(unique(data$rgp)) > 1
@@ -307,7 +307,7 @@ regimes_values <- function(
 
   ggplot(gdata, aes(x = t, y = r)) +
     annotate_regimes("y") +
-    annotate_burn(n_burn) +
+    annotate_burn(n_b) +
     geom_segment(
       aes(xend = t_lead, yend = r_lead, group = sim),
       arrow = arrow1, alpha = if (length(sims) > 1) 0.4 else 1,
@@ -350,11 +350,11 @@ get_error_data <- function(data_s, data_e, regime_aligned) {
 #' @export
 series_values <- function(
   data_s, data_e,
-  sims = 1, n_burn = NA, n_t = length(unique(data_e$t)), n_h = 0,
+  sims = 1, n_b = NA, n_t = length(unique(data_e$t)), n_h = 0,
   multiple = TRUE, hline = NULL, title = NULL, faceted = NULL
 ) {
   args <- list(
-    sims = sims, n_burn = n_burn, multiple = multiple, hline = hline,
+    sims = sims, n_b = n_b, multiple = multiple, hline = hline,
     title = title, faceted = faceted
   )
 
@@ -376,10 +376,10 @@ series_values <- function(
 #' @export
 series_distribution <- function(
   data_s, data_e,
-  n_burn = NA, hline = NULL, title = NULL, faceted = NULL
+  n_b = NA, hline = NULL, title = NULL, faceted = NULL
 ) {
   args <- list(
-    n_burn = n_burn, hline = hline, title = title, faceted = faceted
+    n_b = n_b, hline = hline, title = title, faceted = faceted
   )
 
   g_s <- inject(simulations$series_distribution(data_s, !!!args))
@@ -393,17 +393,17 @@ series_distribution <- function(
 #' @export
 panel_estimations <- function(
   data_s, data_e,
-  n_burn = NA, n_t = length(unique(data_e$t)), n_h = 0,
+  n_b = NA, n_t = length(unique(data_e$t)), n_h = 0,
   title = NULL
 ) {
   g_values <- series_values(
     data_s, data_e,
-    sims = 1, n_burn = n_burn, n_t = n_t, n_h = n_h
+    sims = 1, n_b = n_b, n_t = n_t, n_h = n_h
   ) &
     theme(legend.position = "none")
   g_distribution <- series_distribution(
     data_s, data_e,
-    n_burn = n_burn
+    n_b = n_b
   ) &
     geom_line(aes(NA_real_, NA_real_, color = as.factor(r)), linewidth = 1) &
     theme(legend.position = "bottom")
@@ -434,11 +434,11 @@ panel_estimations <- function(
 #' @export
 residuals_values <- function(
   data_s, data_e, regime_aligned = TRUE,
-  sims = 1, n_burn = NA, n_t = length(unique(data_e$t)), n_h = 0,
+  sims = 1, n_b = NA, n_t = length(unique(data_e$t)), n_h = 0,
   multiple = TRUE, hline = NULL, title = NULL, faceted = NULL
 ) {
   args <- list(
-    sims = sims, n_burn = n_burn, multiple = multiple, hline = hline,
+    sims = sims, n_b = n_b, multiple = multiple, hline = hline,
     title = title, faceted = faceted
   )
 
@@ -453,10 +453,10 @@ residuals_values <- function(
 #' @export
 residuals_distribution <- function(
   data_s, data_e, regime_aligned = TRUE,
-  n_burn = NA, hline = 0, title = NULL, faceted = NULL
+  n_b = NA, hline = 0, title = NULL, faceted = NULL
 ) {
   args <- list(
-    n_burn = n_burn, hline = hline, title = title, faceted = faceted
+    n_b = n_b, hline = hline, title = title, faceted = faceted
   )
 
   data <- get_error_data(data_s, data_e, regime_aligned)
@@ -469,16 +469,16 @@ residuals_distribution <- function(
 #' @export
 panel_residuals <- function(
   data_s, data_e, regime_aligned = TRUE,
-  n_burn = NA, n_t = length(unique(data_e$t)), n_h = 0,
+  n_b = NA, n_t = length(unique(data_e$t)), n_h = 0,
   hline = NULL, title = NULL
 ) {
   g_values <- residuals_values(
     data_s, data_e, regime_aligned = regime_aligned,
-    sims = 1, n_burn = n_burn, n_t = n_t, n_h = n_h, hline = hline
+    sims = 1, n_b = n_b, n_t = n_t, n_h = n_h, hline = hline
   ) +
     theme(legend.position = "none")
   g_distribution <- residuals_distribution(
-    data_s, data_e, regime_aligned = regime_aligned, n_burn = n_burn
+    data_s, data_e, regime_aligned = regime_aligned, n_b = n_b
   ) +
     geom_line(aes(NA_real_, NA_real_, color = as.factor(r))) +
     theme(legend.direction = "horizontal")
@@ -555,7 +555,7 @@ coefs_distribution <- function(
 #' @export
 table_residuals <- function(
   data_s, data_e, regime_aligned = TRUE,
-  dgps = NULL, ..., n_burn = n_burn
+  dgps = NULL, ..., n_b = n_b
 ) {
   # Setup:
   if (Sys.getenv("RADIAN_VERSION") != "") {
@@ -569,7 +569,7 @@ table_residuals <- function(
   }
 
   data <- get_error_data(data_s, data_e, regime_aligned) |>
-    filter(t > n_burn + 2) # 2 is the warmup. For most models, it is n_l + 1. TODO: generalize
+    filter(t > n_b + 2) # 2 is the warmup. For most models, it is n_l + 1. TODO: generalize
   
   if (!is_null(dgps)) {
     data <- filter(data, str_c(sgp, rgp, sep = "-") %in% dgps)
@@ -638,14 +638,14 @@ table_residuals <- function(
 #'  include regimes background or not.
 #' @export
 series_values <- function(
-  data, sims = 1, n_burn = NA, multiple = TRUE, hline = NULL,
+  data, sims = 1, n_b = NA, multiple = TRUE, hline = NULL,
   title = NULL, faceted = NULL
 ) {
   gdata <- filter(data, sim %in% sims)
 
   ggplot(gdata, aes(x = t, y = y)) +
     conditional_rect(sims, multiple = multiple) +
-    annotate_burn(n_burn) +
+    annotate_burn(n_b) +
     {if (!is_null(hline)) geom_hline(yintercept = hline)} +
     geom_line(
       aes(color = as.factor(r), group = as.factor(sim)),
@@ -663,11 +663,11 @@ series_values <- function(
 #' Diagnostics - simulations: Visualize simulated series' distribution
 #' @export
 series_distribution <- function(
-  data, n_burn = 0,
+  data, n_b = 0,
   hline = NULL, title = NULL, faceted = NULL
 ) {
   data %>%
-    filter(t > n_burn) %>%
+    filter(t > n_b) %>%
     ggplot(aes(y = y, color = as.factor(r))) +
     {if (!is_null(hline)) geom_hline(yintercept = hline)} +
     geom_density(linewidth = 1) +
@@ -683,11 +683,11 @@ series_distribution <- function(
 #' Diagnostics - simulations: Panel of simulated series' values and distribution
 #' @export
 panel_simulations <- function(
-  data, n_burn = NA, title = NULL
+  data, n_b = NA, title = NULL
 ) {
-  g_values <- series_values(data, sims = 1, n_burn = n_burn) +
+  g_values <- series_values(data, sims = 1, n_b = n_b) +
     theme(legend.direction = "horizontal")
-  g_distribution <- series_distribution(data, n_burn = n_burn) +
+  g_distribution <- series_distribution(data, n_b = n_b) +
     theme(legend.position = "none")
 
   y_lims <- range(filter(data)$y, na.rm = TRUE, finite = TRUE)
@@ -720,7 +720,7 @@ panel_simulations <- function(
 #' @export
 stats_accumulated <- function(
   data, stats,
-  sims = 1, n_burn = NA, multiple = length(sims) > 1,
+  sims = 1, n_b = NA, multiple = length(sims) > 1,
   title = NULL, faceted = NULL, regime_aligned = FALSE
 ) {
   groups <- `if`(multiple,
@@ -745,7 +745,7 @@ stats_accumulated <- function(
 
   ggplot(gdata, aes(t, value)) +
     conditional_rect(sims, multiple) +
-    annotate_burn(n_burn) +
+    annotate_burn(n_b) +
     geom_line(
       aes(color = stat, group = interaction(stat, sim)),
       linewidth = 1, alpha = if (length(sims) > 1) 0.6 else 1
@@ -766,7 +766,7 @@ stats_accumulated <- function(
 #'  and thus so should their line colors, or not (the default).
 #' @export
 stats_density <- function(
-  data, stats, sims = 1, n_burn = NA,
+  data, stats, sims = 1, n_b = NA,
   title = NULL, faceted = NULL, regime_aligned = FALSE
 ) {
   gdata <- data %>%
@@ -802,7 +802,7 @@ stats_density <- function(
 #' @export
 panel_stats <- function(
   data, dimension, option, stats = NULL,
-  sims = 1, n_burn = NA, regime_aligned, title = NULL
+  sims = 1, n_b = NA, regime_aligned, title = NULL
 ) {
   stats <- stats %||% switch(dimension,
     "sgp" = \(y, r, n_r) sgp_metric(option, y, r, n_r),
@@ -811,12 +811,12 @@ panel_stats <- function(
   )
 
   g_accumulated <- stats_accumulated(
-    data, stats, sims, n_burn, regime_aligned = regime_aligned
+    data, stats, sims, n_b, regime_aligned = regime_aligned
   ) +
     theme(legend.direction = "horizontal")
 
   g_distribution <- stats_density(
-    data, stats, n_burn, regime_aligned = regime_aligned
+    data, stats, n_b, regime_aligned = regime_aligned
   ) +
     theme(legend.position = "none")
 

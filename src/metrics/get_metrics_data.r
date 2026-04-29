@@ -19,7 +19,7 @@ diff_k_2 <- metrics$diff_k_2
 if (FALSE) {
   data_s = simulations_data; data_e = estimations_data;
   data_sm = simulations_meta; data_em = estimations_meta;
-  n_t = n_t; n_burn = n_burn + n_l + 1; n_h = n_h
+  n_t = n_t; n_b = n_b + n_l + 1; n_h = n_h
 }
 
 
@@ -30,7 +30,7 @@ if (FALSE) {
 #' @export
 get_metrics_data <- function(
   data_s, data_e, data_em,
-  n_t, n_burn, n_h
+  n_t, n_b, n_h
 ) {
   cat("Getting model metrics...\n")
   metrics_meta <- data_em |>
@@ -44,9 +44,9 @@ get_metrics_data <- function(
     rename(data_s, y_true = y, r_true = r),
     by = c("sgp", "rgp", "sim", "t")
   ) |>
-    filter(t > n_burn) |>
+    filter(t > n_b) |> # * Should be unecessary
     arrange(sgp, rgp, model, sim, t) |>
-    get_estimation_metrics(n_t, n_h)
+    get_estimation_metrics(n_t, n_h, n_b)
 
   left_join(
     metrics_meta, metrics_estimation,
@@ -88,7 +88,7 @@ get_meta_metrics <- function(data, n_t, n_h) {
 }
 
 #' TODO: document
-get_estimation_metrics <- function(data, n_t, n_h) {
+get_estimation_metrics <- function(data, n_t, n_h, n_b) {
   lazy_dt(data) |>
     group_by(sgp, rgp, sim, model, arrange = FALSE) |>
     summarise(
@@ -97,14 +97,14 @@ get_estimation_metrics <- function(data, n_t, n_h) {
       sd_est = metrics$series_sd(y_true, r_est, na.rm = TRUE) |> diff_k_2(),
       rmse = metrics$performance_rmse(y_est, y_true, n_h, n_t, t = t),
       mape = metrics$performance_mape(y_est, y_true, n_h, n_t, t = t),
-      r2 = metrics$performance_r2(y_est, y_true, n_h, n_t, t = t),
+      r2 = metrics$performance_r2(y_est, y_true, n_h, n_t, n_b, t = t),
       regimes_bme = metrics$performance_bme(r_est, r_true, n_h, n_t, t = t),
       switches_est = metrics$average_switches(y_est, r_est),
       duration_est = metrics$duration_diff(y_est, r_est),
       switches_true = metrics$average_switches(y_true, r_true),
       duration_true = metrics$duration_diff(y_true, r_true),
-      skewness = metrics$inconditional_skewness(y_true, na.rm = TRUE),
-      kurtosis = metrics$inconditional_kurtosis(y_true, na.rm = TRUE)
+      #skewness = metrics$inconditional_skewness(y_true, na.rm = TRUE),
+      #kurtosis = metrics$inconditional_kurtosis(y_true, na.rm = TRUE)
     ) |>
     ungroup() |>
     as_tibble()
