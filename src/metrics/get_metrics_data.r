@@ -12,7 +12,7 @@ box::use(
   dtplyr[lazy_dt]
 )
 
-diff_k_2 <- metrics$diff_k_2
+disp_mpe <- metrics$disp_mpe
 
 
 # Example:
@@ -36,7 +36,7 @@ get_metrics_data <- function(
   metrics_meta <- data_em |>
     rename(meta_true = meta_sim) |>
     arrange(sgp, rgp, model, sim) |>
-    get_meta_metrics(n_t, n_h)
+    get_meta_metrics()
 
   cat("Getting regime metrics...\n")
   metrics_estimation <- left_join(
@@ -44,7 +44,6 @@ get_metrics_data <- function(
     rename(data_s, y_true = y, r_true = r),
     by = c("sgp", "rgp", "sim", "t")
   ) |>
-    filter(t > n_b) |> # * Should be unecessary
     arrange(sgp, rgp, model, sim, t) |>
     get_estimation_metrics(n_t, n_h, n_b)
 
@@ -69,36 +68,37 @@ get_metrics_data <- function(
 # Estimation and Meta-Based Data -----------------------------------------------
 
 #' TODO: document
-get_meta_metrics <- function(data, n_t, n_h) {
-  lazy_dt(data) |>
-    group_by(sgp, rgp, sim, model, arrange = FALSE) |>
+get_meta_metrics <- function(data_em) {
+  lazy_dt(data_em) |>
+    group_by(sgp, rgp, sim, model, arrange = FALSE) |> # TODO: consider rowwise()
     summarise(
-      avg_true = metrics$analytical_avg(meta_true[[1]]$coefs) |> diff_k_2(),
-      acf_true = metrics$analytical_acf(meta_true[[1]]$coefs) |> diff_k_2(),
-      sd_true = metrics$analytical_sd(meta_true[[1]]$coefs) |> diff_k_2(),
-      mu_est = meta_est[[1]]$coefs[1:2, "mu"] |> diff_k_2(),
-      mu_true = meta_true[[1]]$coefs[1:2, "mu"] |> diff_k_2(),
-      rho1_est = meta_est[[1]]$coefs[1:2, "rho1"] |> diff_k_2(),
-      rho1_true = meta_true[[1]]$coefs[1:2, "rho1"] |> diff_k_2(),
-      sigma_est = meta_est[[1]]$coefs[1:2, "sigma"] |> diff_k_2(),
-      sigma_true = meta_true[[1]]$coefs[1:2, "sigma"] |> diff_k_2()
+      avg_true = metrics$analytical_avg(meta_true[[1]]$coefs) |> disp_mpe(),
+      acf_true = metrics$analytical_acf(meta_true[[1]]$coefs) |> disp_mpe(),
+      sd_true = metrics$analytical_sd(meta_true[[1]]$coefs) |> disp_mpe(),
+      mu_est = meta_est[[1]]$coefs |> disp_mpe(),
+      mu_true = meta_true[[1]]$coefs |> disp_mpe(),
+      rho1_est = meta_est[[1]]$coefs |> disp_mpe(),
+      rho1_true = meta_true[[1]]$coefs |> disp_mpe(),
+      sigma_est = meta_est[[1]]$coefs |> disp_mpe(),
+      sigma_true = meta_true[[1]]$coefs |> disp_mpe()
     ) |>
     ungroup() |>
     as_tibble()
 }
 
 #' TODO: document
-get_estimation_metrics <- function(data, n_t, n_h, n_b) {
-  lazy_dt(data) |>
+get_estimation_metrics <- function(data_s_e, n_t, n_h, n_b) {
+  lazy_dt(data_s_e) |>
     group_by(sgp, rgp, sim, model, arrange = FALSE) |>
+    filter(t > n_b & t <= n_t - n_h) |>
     summarise(
-      avg_est = metrics$series_avg(y_true, r_est, na.rm = TRUE) |> diff_k_2(),
-      acf_est = metrics$series_acf(y_true, r_est, na.rm = TRUE) |> diff_k_2(),
-      sd_est = metrics$series_sd(y_true, r_est, na.rm = TRUE) |> diff_k_2(),
-      rmse = metrics$performance_rmse(y_est, y_true, n_h, n_t, t = t),
-      mape = metrics$performance_mape(y_est, y_true, n_h, n_t, t = t),
-      r2 = metrics$performance_r2(y_est, y_true, n_h, n_t, n_b, t = t),
-      regimes_bme = metrics$performance_bme(r_est, r_true, n_h, n_t, t = t),
+      avg_est = metrics$series_avg(y_true, r_est, na.rm = TRUE) |> disp_mpe(),
+      acf_est = metrics$series_acf(y_true, r_est, na.rm = TRUE) |> disp_mpe(),
+      sd_est = metrics$series_sd(y_true, r_est, na.rm = TRUE) |> disp_mpe(),
+      rmse = metrics$performance_rmse(y_est, y_true),
+      mape = metrics$performance_mape(y_est, y_true),
+      r2 = metrics$performance_r2(y_est, y_true),
+      regimes_bme = metrics$performance_bme(r_est, r_true),
       switches_est = metrics$average_switches(y_est, r_est),
       duration_est = metrics$duration_diff(y_est, r_est),
       switches_true = metrics$average_switches(y_true, r_true),

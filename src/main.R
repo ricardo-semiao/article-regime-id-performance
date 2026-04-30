@@ -17,7 +17,7 @@ box::use(
   src/diagnostics,
   src/metrics,
   src/results,
-  rTRNG[rnorm_trng],
+  RcppParallel[setThreadOptions], rTRNG[rnorm_trng],
   gt[gtsave],
   stargazer[stargazer],
   ggplot2[...]
@@ -48,10 +48,11 @@ dgp_names <- expand_grid(
     NULL  # To correct trailing comma
   ),
   rgp = c(
+    "r1_no_rs",
     #"r2_multinomial_equal", "r2_multinomial_reg1",
     "r2_markov_symm_high", "r2_markov_asymm_high",
     #"r2_markov_symm_low", "r2_markov_asymm_low",
-    "r2_sbreak_mid", "r2_sbreak_end",
+    #"r2_sbreak_mid", "r2_sbreak_end",
     "r2_threshold_x_0", "r2_threshold_x_05",
     #"r2_threshold_abs_05", "r2_threshold_abs_2",
     #"r2_threshold_diff_05", "r2_threshold_diff_2",
@@ -86,7 +87,8 @@ simulations_meta <- params$sgps[unique(dgp_names$sgp)] |>
 # Simulation: Errors -----------------------------------------------------------
 
 # Generation:
-errors_raw <- rnorm_trng(n_t * n_p * n_s, parallelGrain = 100)
+setThreadOptions(numThreads = 6L)
+errors_raw <- rnorm_trng(n_t * n_p * n_s, parallelGrain = 100L)
 
 errors <- errors_raw |>
   matrix(nrow = n_t, ncol = n_p * n_s) |>
@@ -192,7 +194,8 @@ dput(names(options$models))
 model_names <- expand_grid(
   sim_names,
   model = c(
-    "r2_sbreak",
+    "r1_no_rs",
+    #"r2_sbreak",
     "r2_threshold_x",
     #"r2_threshold_abs",
     #"r2_threshold_diff",
@@ -202,8 +205,6 @@ model_names <- expand_grid(
   )
 ) |>
   mutate(dgp_sim_model = str_c(dgp_sim, "-", model))
-
-considered_models <- options$models[unique(model_names$model)]
 
 n_l <- 1 # Can be arbitrarily large, must be at least the max n_l used in models
 n_m <- length(unique(model_names$model))
@@ -233,11 +234,12 @@ estimate_models <- function(input) {
 }
 
 # Running estimations:
+considered_models <- options$models[unique(model_names$model)]
 safe <- TRUE
 if (safe) considered_models <- map(considered_models, safely_modify)
 
 estimations <- map_parallel(
-  est_inputs, estimate_models,
+  sample(est_inputs, 1000), estimate_models,
   mods = considered_models, data_lags = data_lags,
   n_b = n_b, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m,
   parallel = TRUE, safe = FALSE
@@ -261,7 +263,9 @@ if (safe) {
   c(name = name, map(sim, \(model) length(tabulate(model$r)))[])
 }) |>
   pivot_longer(-name, names_to = "model") |>
-  filter(value != 2)
+  filter(
+    as.integer(gsub("r([0-9]+)_.+", "\\1", model)) != value
+  )
 
 table(.regimes_per_model$model, .regimes_per_model$value)
 for (l in split(.regimes_per_model, seq_len(nrow(.regimes_per_model)))) {
@@ -429,33 +433,45 @@ imap_dfr(select(metrics_data, where(is.numeric)), \(col, col_name) {
   print(n = Inf)
 
 sys_data <- metrics_data |>
-  mutate(across(where(is.numeric), ~ ifelse(!is.finite(.x), NA_real_, .x))) |>
-  mutate(across(
-    c(mu_est, rho1_est, sigma_est, mu_diff, rho1_diff, sigma_diff, rmse, mape, r2),
-    ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_))
-  ) |>
-  mutate(across(
-    c(where(is.numeric), -sim, -rmse, -mape, -r2),
-    ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE))
+  mutate(
+    across(where(is.numeric), ~ ifelse(!is.finite(.x), NA_real_, .x)),
+    across(
+      c(mu_est, rho1_est, sigma_est, mu_diff, rho1_diff, sigma_diff, rmse, mape, r2),
+      ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_)
+    ),
+    across(
+      c(where(is.numeric), -sim, -rmse, -mape, -r2),
+      ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)
+    ),
+    model = fct(model, unique(model_names$model)),
+    rgp = fct(rgp, unique(model_names$rgp)),
+    is_mis = str_replace(rgp, "(r[0-9]+_[^_]+)_.+", "\\1") != as.character(model)
   )
 
 abs(metrics_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, Inf)) |> table()
 abs(sys_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, Inf)) |> table()
 
 
-# Diagnosticos:
-sys_data |>
-  slice_sample(n = 10000) |>
-  mutate(rmse = log(rmse)) |>
-  ggplot(aes(sim, rmse)) +
-  geom_point()
+# Correlations:
+cor_mat <- select(sys_data,
+  rmse, r2, regimes_bme,
+  switches_diff, duration_diff,
+  avg_diff, acf_diff, sd_diff, mu_diff, rho1_diff, sigma_diff
+) |>
+  cor(use = "na.or.complete")
 
+cor_mat[upper.tri(cor_mat, diag = TRUE)] <- 0
+which(cor_mat >= 0.8, arr.ind = TRUE) %>%
+  {cbind(row = rownames(cor_mat)[.[, "row"]], col = colnames(cor_mat)[.[, "col"]])}
+
+
+# Diagnosticos:
 lm(log(rmse) ~ poly(sim, 3) + log(sim), sys_data) |> print_summary()
 sys_i <- lm(rmse ~ poly(sim, 3) + log(sim), sys_data) |> print_summary()
 
 if (FALSE) {
-  stargazer(
-    sys_i, out = "outputs/systematic/i.tex",
+  format_reg_table(
+    sys_i, "outputs/systematic/i.tex",
     single.row = TRUE, df = FALSE
   )
 }
@@ -469,20 +485,24 @@ sys_model_fe[[2]] <- lm(
   sys_data
 )
 sys_model_fe[[3]] <- lm(
-  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff +
-    mu_diff + rho1_diff + sigma_diff,
+  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2,
   sys_data
 )
 sys_model_fe[[4]] <- lm(
-  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff +
+  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2 +
+    mu_diff + rho1_diff + sigma_diff,
+  sys_data
+)
+sys_model_fe[[5]] <- lm(
+  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2 +
     avg_diff + acf_diff + sd_diff,
   sys_data
 )
 
 if (FALSE) {
-  stargazer(
-    sys_model_fe, out = "outputs/systematic/model_fe.tex", type = "text",
-    single.row = TRUE, omit.stat = c("f"), df = FALSE
+  format_reg_table(
+    sys_model_fe, "outputs/systematic/model_fe.tex",
+    single.row = TRUE, df = FALSE, omit.stat = c("f")
   )
 }
 
@@ -496,6 +516,18 @@ mods_groups <- list(
 
 sys_mis <- list()
 
+sys_mis$is <- lm(
+  rmse ~ is_mis,
+  filter(sys_data, rgp %in% mods_groups$sym)
+) |> print_summary()
+
+if (FALSE) {
+  format_reg_table(
+    sys_mis$is, out = "outputs/systematic/mis_is.tex",
+    single.row = TRUE, df = FALSE
+  )
+}
+
 sys_mis$sym <- lm(
   rmse ~ model * rgp - 1,
   filter(sys_data, rgp %in% mods_groups$sym)
@@ -503,9 +535,10 @@ sys_mis$sym <- lm(
 
 if (FALSE) {
   format_reg_matrix(
-    sys_mis$sym, out = "outputs/systematic/mis_sym.tex", type = "text"
+    sys_mis$sym, out = "outputs/systematic/mis_sym.tex"
   )
 }
+
 
 sys_mis$asym <- lm(
   rmse ~ model * rgp - 1,
@@ -514,18 +547,19 @@ sys_mis$asym <- lm(
 
 if (FALSE) {
   format_reg_matrix(
-    sys_mis$asym, out = "outputs/systematic/mis_asym.tex", type = "text"
+    sys_mis$asym, out = "outputs/systematic/mis_asym.tex"
   )
 }
 
+
 sys_mis$rn <- lm(
-  rmse ~ model*rgp - 1,
+  rmse ~ model * rgp - 1,
   filter(sys_data, rgp %in% mods_groups$rn, grepl("2$", sgp))
 ) |> print_summary()
 
 if (FALSE) {
   format_reg_matrix(
-    sys_mis$rn, out = "outputs/systematic/mis_rn.tex", type = "text"
+    sys_mis$rn, out = "outputs/systematic/mis_rn.tex"
   )
 }
 
@@ -538,7 +572,7 @@ sys_mis$metrics_true <- lm(
 
 if (FALSE) {
   format_reg_matrix(
-    sys_mis$metrics_true, out = "outputs/systematic/mis_metrics_true.tex", type = "text"
+    sys_mis$metrics_true, out = "outputs/systematic/mis_metrics_true.tex"
   )
 }
 
@@ -549,7 +583,7 @@ sys_mis$metrics_true_int <- lm(
 
 if (FALSE) {
   format_reg_matrix(
-    sys_mis$metrics_true_int, out = "outputs/systematic/mis_metrics_true_int.tex", type = "text"
+    sys_mis$metrics_true_int, out = "outputs/systematic/mis_metrics_true_int.tex"
   )
 }
 
@@ -562,7 +596,7 @@ sys_mis$metrics <- lm(
 
 if (FALSE) {
   format_reg_matrix(
-    sys_mis$metrics, out = "outputs/systematic/mis_metrics.tex", type = "text"
+    sys_mis$metrics, out = "outputs/systematic/mis_metrics.tex"
   )
 }
 
@@ -573,7 +607,7 @@ sys_mis$metrics_int <- lm(
 
 if (FALSE) {
   format_reg_matrix(
-    sys_mis$metrics_int, out = "outputs/systematic/mis_metrics_int.tex", type = "text"
+    sys_mis$metrics_int, out = "outputs/systematic/mis_metrics_int.tex"
   )
 }
 
@@ -588,6 +622,7 @@ sys_mis$metrics$coefficients[8:16, 1] - sys_mis$metrics_int$coefficients[8:16, 1
 sys_match <- list()
 sys_match$regimes_bme <- lm(rmse ~ regimes_bme - 1, sys_data)
 sys_match$regimes_info <- lm(rmse ~ switches_diff + duration_diff - 1, sys_data)
+sys_match$r2 <- lm(rmse ~ r2 - 1, sys_data)
 sys_match$coefs <- lm(rmse ~ mu_diff + rho1_diff + sigma_diff - 1, sys_data)
 sys_match$metrics <- lm(rmse ~ avg_diff + acf_diff + sd_diff - 1, sys_data)
 
@@ -610,16 +645,3 @@ if (FALSE) {
     rows = 1:9
   )
 }
-
-
-
-# Check:
-reg1_cor <- cor(
-  select(sys_data, rmse, r2, regimes_bme,
-  switches_diff, duration_diff,
-  avg_diff, acf_diff, sd_diff, mu_diff, rho1_diff, sigma_diff),
-  use = "na.or.complete"
-)
-
-reg1_cor[upper.tri(reg1_cor, diag = TRUE)] <- 0
-reg1_cor >= 0.8

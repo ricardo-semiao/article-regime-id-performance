@@ -20,7 +20,7 @@ if (FALSE) {
   data = estimations_data
   filters <- quos(
     #row_number() %in% sample(n(), 1000),
-    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    #rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
     sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2")
   )
   trim = 0.005
@@ -33,8 +33,8 @@ if (FALSE) {
 # Metrics Separation at T ------------------------------------------------------
 
 glue_test <- function(x, r, formula, n = 2, test = TRUE) {
-  m <- metrics$series_avg(x, r, na.rm = TRUE) |> metrics$diff_k_2()
-  s <- metrics$series_sd(x, r, na.rm = TRUE) |> metrics$diff_k_2()
+  m <- metrics$series_avg(x, r, na.rm = TRUE) |> metrics$disp_mpe()
+  s <- metrics$series_sd(x, r, na.rm = TRUE) |> metrics$disp_mpe()
 
   stars <- if (test) {
     p <- tryCatch(
@@ -108,9 +108,9 @@ metrics_sep_graphs <- function(data, ..., n_t) {
 
   stats <- function(y, r) {
     c(
-      avg = metrics$series_avg(y, r, na.rm = TRUE) |> metrics$diff_k_2(),
-      acf = metrics$series_acf(y, r, use = "na.or.complete") |> metrics$diff_k_2(),
-      sd = metrics$series_sd(y, r, na.rm = TRUE) |> metrics$diff_k_2()
+      avg = metrics$series_avg(y, r, na.rm = TRUE) |> metrics$disp_mpe(),
+      acf = metrics$series_acf(y, r, use = "na.or.complete") |> metrics$disp_mpe(),
+      sd = metrics$series_sd(y, r, na.rm = TRUE) |> metrics$disp_mpe()
     )
   }
 
@@ -130,13 +130,16 @@ metrics_sep_graphs <- function(data, ..., n_t) {
     filter(!!!filters) |>
     group_by(rgp, sgp, sim) |>
     reframe(
-      map_dfr(1:n_t, \(tmax) stats(y = y[t <= tmax], r = r[t <= tmax])),
+      map_dfr(1:n_t, \(tmax) {
+        idx <- t <= tmax
+        stats(y = y[idx], r = r[idx])
+      }),
       t = 1:n_t
     ) |>
     group_by(rgp, sgp, t) |>
     reframe(
       across(
-        c(avg, acf, sd), 
+        c(avg, acf, sd),
         list(avg = ~ mean(.x, na.rm = TRUE), sd = ~ sd(.x, na.rm = TRUE))
       )
     ) |>
@@ -173,7 +176,7 @@ regimes_rmse_graphs <- function(data_e, data_s, n_t, n_h, ..., models, trim = 0.
   filters <- enquos(...)
 
   gdata <- data_e |>
-    filter(!!!filters, t >= n_t - n_h) |>
+    filter(!!!filters, t > n_t - n_h) |>
     left_join(
       data_s, by = c("sgp", "rgp", "sim", "t"),
       suffix = c("_est", "_sim")

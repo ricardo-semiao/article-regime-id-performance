@@ -21,8 +21,11 @@ dict <- list(
 #' Models' parameters
 #' @export
 params <- list(
-  r2_sbreak = list3(
-    n_r = 2, rgp = "sbreak", args = list(n_r = n_r)
+  # r2_sbreak = list3(
+  #   n_r = 2, rgp = "sbreak", args = list(n_r = n_r)
+  # ),
+  r1_no_rs = list3(
+    n_r = 1, rgp = "ar", args = list(n_r = n_r)
   ),
   r2_threshold_x = list3(
     n_r = 2, rgp = "threshold", args = list(n_r = n_r)

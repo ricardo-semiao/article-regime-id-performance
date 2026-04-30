@@ -222,8 +222,8 @@ coefs_table <- function(data, ..., test = test) {
 #' @export
 improbable_counts <- function(data_e, data_s, n_b, n_t, n_h) {
   te1 <- n_b + 1
-  te2 <- n_t - n_h - 1
-  tp1 <- n_t - n_h
+  te2 <- n_t - n_h
+  tp1 <- te2 + 1
 
   left_join(
     data_e, data_s,

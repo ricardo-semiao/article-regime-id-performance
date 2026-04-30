@@ -47,6 +47,42 @@ if (FALSE) {
 get_results <- list()
 
 
+#' Get results from stats::lm
+#' n_r and rn_par are ignored, as there is only 1 regime and no varying
+#'  parameters
+get_results$stats_lm <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) {
+  dims <- list(
+    rows = paste0("R", 1),
+    cols = c("mu", paste0("rho", 1:n_l), "sigma")
+  )
+
+  # Regimes:
+  r <- rep(1L, n_t)
+  r[1:n_b] <- NA_integer_
+
+  # Series:
+  preds <- double(n_h)
+  for (i in 0:(n_h - 1)) {
+    preds[i + 1] <- sum(mod$coefficients * c(1, data[n_t - i, -1]))
+  }
+
+  y <- c(rep(NA, n_b + n_l), mod$fitted.values, preds)
+
+  # Meta information:
+  idx_fit <- (n_b + 1):(n_t - n_h)
+  coefs <- cbind(
+    matrix(mod$coefficients, 1, n_l + 1, byrow = TRUE),
+    series_sd(data[idx_fit, 1] - y[idx_fit], r, 1, na.rm = TRUE)
+  )
+
+  meta <- list(
+    coefs = `dimnames<-`(coefs, dims)
+  )
+
+  list(y = y, r = r, meta = meta)
+}
+
+
 #' Get results from mbreaks::dofix
 #'
 #' - Regimes: similar to cut(1:n_t, mod$dates). Prediction is straightforward
@@ -58,28 +94,30 @@ get_results$mbreaks_dofix <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par
   )
 
   # Regimes:
-  date1 <- n_b + c(1 - n_b, mod$date)
+  date1 <- n_b + c(1, mod$date)
   date2 <- n_b + c(mod$date - 1, n_t - n_b)
 
   r <- integer(n_t)
+  r[1:n_b] <- NA_integer_
   for (s in 1:n_r) {
     r[date1[s]:date2[s]] <- s
   }
 
   # Series:
-  coefs_last_r <- mod$beta[((n_r - 1) * (n_l + 1) + 1):(n_r * (n_l + 1))]
+  coefs_last_r <- mod$beta[((n_r - 1) * (n_l + 1) + 1):(n_r * (n_l + 1))] # TODO: Check
 
   preds <- double(n_h)
-  for (i in 1:n_h) {
-    preds[i] <- sum(coefs_last_r * c(1, data[n_t - i + 1, -1]))
+  for (i in 0:(n_h - 1)) {
+    preds[i + 1] <- sum(coefs_last_r * c(1, data[n_t - i, -1]))
   }
 
   y <- c(rep(NA, n_b + n_l), mod$fitted.values, preds)
 
   # Meta information:
+  idx_fit <- (n_b + 1):(n_t - n_h)
   coefs <- cbind(
     matrix(mod$beta, n_r, n_l + 1, byrow = TRUE),
-    series_sd(data[, 1] - y, r, n_r, na.rm = TRUE)
+    series_sd(data[idx_fit, 1] - y[idx_fit], r, n_r, na.rm = TRUE)
   )
   ord <- regimes_order(coefs, rn_par, dims)
 
@@ -116,20 +154,21 @@ get_results$tsdyn_setar <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par, 
   r[1:(n_b + 1)] <- NA_integer_ # tsDyn with m = 1 un-uses 1 more observation
   r[(n_b + 2):(n_t - n_h)] <- mod$model.specific$regime
 
-  for (i in n_h:1) {
-    r[n_t - i + 1] <- sum(thresholds < g(data[, "y_l1"])[n_t - i + 1]) + 1
+  for (i in (n_h - 1):0) {
+    r[n_t - i] <- sum(thresholds < g(data[, "y_l1"])[n_t - i]) + 1
   }
 
   # Series:
   preds <- double(n_h)
-  for (i in 1:n_h) {
-    preds[i] <- sum(coefs[r[n_t - i + 1], ] * c(1, data[n_t - i + 1, -1]))
+  for (i in 0:(n_h - 1)) {
+    preds[i + 1] <- sum(coefs[r[n_t - i], ] * c(1, data[n_t - i, -1]))
   }
 
   y <- c(rep(NA, n_b + n_l + 1), mod$fitted.values, preds)
 
   # Meta information:
-  coefs <- cbind(coefs, series_sd(data[, 1] - y, r, n_r, na.rm = TRUE))
+  idx_fit <- (n_b + 1):(n_t - n_h)
+  coefs <- cbind(coefs, series_sd(data[idx_fit, 1] - y[idx_fit], r, n_r, na.rm = TRUE))
   ord <- regimes_order(coefs, rn_par, dims)
 
   meta <- list(
@@ -167,17 +206,18 @@ get_results$tsdyn_lstar <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
 
   # Series:
   preds <- double(n_h)
-  for (i in 1:n_h) {
-    r_i <- r[n_t - i + 1]
-    preds[i] <- sum(
-      (coefs[1, ] * r_i + coefs[2, ] * (1 - r_i)) * c(1, data[n_t - i + 1, -1])
+  for (i in 0:(n_h - 1)) {
+    r_i <- r[n_t - i]
+    preds[i + 1] <- sum(
+      (coefs[1, ] * r_i + coefs[2, ] * (1 - r_i)) * c(1, data[n_t - i, -1])
     )
   }
 
   y <- c(rep(NA, n_b + n_l + 1), mod$fitted.values, preds)
 
   # Meta information:
-  coefs <- cbind(coefs, series_sd(data[, 1] - y, r, n_r, na.rm = TRUE))
+  idx_fit <- (n_b + 1):(n_t - n_h)
+  coefs <- cbind(coefs, series_sd(data[idx_fit, 1] - y[idx_fit], r, n_r, na.rm = TRUE))
   ord <- regimes_order(coefs, rn_par, dims)
 
   meta <- list(
@@ -209,21 +249,22 @@ get_results$mswm_msmfit <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
   r <- matrix(NA, n_t, n_r)
   r[(n_b + n_l + 1):(n_t - n_h), ] <- mod@Fit@filtProb
 
-  for (i in n_h:1) {
-    r[(n_t - i + 1), ] <- mod@transMat %*% r[(n_t - i), ]
+  for (i in (n_h - 1):0) {
+    r[(n_t - i), ] <- mod@transMat %*% r[(n_t - i - 1), ]
   }
 
   # Series:
   preds <- double(n_h)
-  for (i in 1:n_h) {
-    preds[i] <- sum(coefs %*% c(1, data[n_t - i + 1, -1]) * r[(n_t - i + 1), ])
+  for (i in 0:(n_h - 1)) {
+    preds[i + 1] <- sum(coefs %*% c(1, data[n_t - i, -1]) * r[(n_t - i), ])
   }
 
   y <- c(rep(NA, n_b + n_l), mod@model$fitted.values, preds)
   r <- max.col(r)
 
   # Meta information:
-  coefs <- cbind(coefs, series_sd(data[, 1] - y, r, n_r, na.rm = TRUE))
+  idx_fit <- (n_b + 1):(n_t - n_h)
+  coefs <- cbind(coefs, series_sd(data[idx_fit, 1] - y[idx_fit], r, n_r, na.rm = TRUE))
   ord <- regimes_order(coefs, rn_par, dims)
 
   meta <- list(
@@ -255,6 +296,29 @@ for (model_name in names(get_results)) {
 # Model functions are passed via usual `::`, as box might interact weirdly with
 # parallelism
 
+#' Standard AR model
+#' @export
+ar <- function(
+  n_r, n_l = 1
+) {
+  defaults <- c(
+    as.list(current_env()), results = get_results$stats_lm
+  )
+
+  body <- expr({
+    mod <- stats::lm(
+      data[(n_b + n_l + 1):(n_t - n_h), 1] ~ data[(n_b + n_l):(n_t - n_h - 1), 1]
+    )
+    results(data, mod, n_b, n_h, n_t, n_r, n_l)
+  })
+
+  new_function(
+    args = exprs(data = , n_t = , n_h = , n_b = , rn_par = ),
+    body = body,
+    env = new_environment(defaults, pkg_env("base"))
+  )
+}
+
 #' Structural breaks
 #'
 #' Might only work for n_l = 1.
@@ -265,7 +329,7 @@ for (model_name in names(get_results)) {
 #' @export
 sbreak <- function(
   n_r, n_l = 1,
-  min_r_size = 0.1,
+  min_r_size = 0.25,
   tol = 1e-5, max_iter = 10
 ) {
   defaults <- c(

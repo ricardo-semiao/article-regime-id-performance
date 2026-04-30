@@ -65,6 +65,7 @@ transmat_main_col <- function(p, n_r, col = 1) {
 #' @export
 dict <- list(
   gt = c(
+    r1_no_rs = "No RS",
     r2_markov_symm_high = "MS, $p_{21} = 0.1$",
     r2_markov_symm_low = "MS, $p_{21} = 0.7$",
     r2_threshold_x_0 = "SET, $\\\\tau = 0$",
@@ -75,6 +76,7 @@ dict <- list(
     r2_sbreak_end = "SB, end"
   ),
   gg = c(
+    r1_no_rs = "No RS",
     r2_markov_symm_high = r"(MS, $p_{21} = 0.1$)",
     r2_markov_symm_low = r"(MS, $p_{21} = 0.7$)",
     r2_threshold_x_0 = r"(SET, $\tau = 0$)",
@@ -87,10 +89,14 @@ dict <- list(
     map_chr(~ TeX(.x) %@% "plotmath")
 )
 
-n_t <- 120L # TODO: correct this temporary fix
+n_t <- 114L # TODO: correct this temporary fix
 #' RGPs' parameters
 #' @export
 params <- list(
+  # No-RS AR:
+  r1_no_rs = list3(
+    n_r = 1, rgp = "no_rs", r_start = 1
+  ),
   # Multinomial:
   r2_multinomial_equal = list3(
     n_r = 2, rgp = "markov", args = list(transmat_diag(0.5, n_r)),

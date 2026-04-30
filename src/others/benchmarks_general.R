@@ -22,6 +22,63 @@ box::use(
 )
 
 
+# Dispersion metrics ----------------------------------------------------------
+
+y = 1
+x = c(1, 2.5, -7)
+
+bench::mark(
+  check = FALSE,
+  x[1] - x[2],
+  dist(x),
+  mean(sapply(seq_along(x), \(i) abs(x[i] - x[-i]))),
+  vapply(seq_along(x), \(i) abs(x[i] - x[-i]), double(2)),
+  {
+    n <- 1
+    vapply(1:3, \(i) abs(x[i] - x[-i]), double(3 - 1))
+  },
+  y,
+  dist(y)
+)
+
+n <- length(y) - 1
+dists <- vapply(seq_along(y), \(i) abs(y[i] - y[-i]), double(n))
+
+length(dists)
+
+
+str(dists)
+
+mean(dists)
+i = 1
+dist(x) |> mean()
+x - rbind(x[-1], x[-2], x[-3])
+
+mean(sapply(seq_along(x), \(i) abs(x[i] - x[-i])^k))
+
+for (i in seq_along(x)) {
+  abs(x[i] - x[-i])
+}
+
+n <- length(x)
+seq(1, n^2, by = n)
+
+expand.grid(x, x)[-c]
+
+
+unclass(dist(y))
+
+
+# AR model ----------------------------------------------------------
+
+bench::mark(
+  check = FALSE,
+  arima1 = stats::arima(1:100, c(1, 0, 0)),
+  arima2 = stats::arima(1:100, c(1, 0, 0), method = "CSS"),
+  lm = stats::lm(1:100 ~ lag(1:100, default = 0))
+)
+
+
 
 # Dimnames ----------------------------------------------------------
 
@@ -52,7 +109,8 @@ bench::mark(
 )
 
 
-# t in ... ---------------------------------------------------------------------
+
+# T index ----------------------------------------------------------
 
 t1 <- 1:100
 t2 <- 1:1000
@@ -63,7 +121,6 @@ bench::mark(
   t2 %in% (7:83),
   t2 == max(min(t2), 7):min(max(t2), 83)
 )
-
 
 
 

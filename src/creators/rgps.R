@@ -13,6 +13,19 @@ box::use(
 # All return a function with enclosing environment as a child of base, carrying
 # needed objects
 
+#' RGP: No RS
+#' @export
+no_rs <- function() {
+  new_function(
+    args = pairlist2(y = , r = , t = ),
+    body = expr({
+      r[t, 1] <- 1
+      r[t, ]
+    }),
+    env = new_environment(list(), pkg_env("base"))
+  )
+}
+
 #' RGP: Structural breaks
 #'
 #' @param breaks [`integer()`] Strictly increasing vector of break points
