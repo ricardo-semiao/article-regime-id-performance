@@ -92,103 +92,103 @@ dict <- list(
 n_t <- 114L # TODO: correct this temporary fix
 #' RGPs' parameters
 #' @export
-params <- list(
+params <- list2(
   # No-RS AR:
   r1_no_rs = list3(
     n_r = 1, rgp = "no_rs", r_start = 1
   ),
   # Multinomial:
-  r2_multinomial_equal = list3(
-    n_r = 2, rgp = "markov", args = list(transmat_diag(0.5, n_r)),
-    r_start = sample(1:2, 1)
-  ),
-  r2_multinomial_reg1 = list3(
-    n_r = 2, rgp = "markov", args = list(transmat_main_col(0.7, n_r)),
-    r_start = sample(1:2, 1)
-  ),
-  # Markov, symmetric:
+  # r2_multinomial_equal = list3(
+  #   n_r = 2, rgp = "markov", args = list(transmat_diag(0.5, n_r)),
+  #   r_start = sample(1:2, 1)
+  # ),
+  # r2_multinomial_reg1 = list3(
+  #   n_r = 2, rgp = "markov", args = list(transmat_main_col(0.7, n_r)),
+  #   r_start = sample(1:2, 1)
+  # ),
+  # Markov, high persistence:
   r2_markov_symm_high = list3(
     n_r = 2, rgp = "markov", args = list(transmat_diag(0.9, n_r)),
     r_start = sample(1:2, 1)
   ),
-  r2_markov_symm_low = list3(
-    n_r = 2, rgp = "markov", args = list(transmat_diag(0.6, n_r)),
-    r_start = sample(1:2, 1)
-  ),
-  # Markov, asymmetric:
   r2_markov_asymm_high = list3(
-    n_r = 2, rgp = "markov", args = list(transmat_main_col(c(0.9, 0.7), n_r)),
+    n_r = 2, rgp = "markov", args = list(transmat_main_col(c(0.9, 0.3), n_r)),
     r_start = sample(1:2, 1)
   ),
-  r2_markov_asymm_low = list3(
-    n_r = 2, rgp = "markov", args = list(transmat_main_col(c(0.8, 0.6), n_r)),
-    r_start = sample(1:2, 1)
-  ),
+  # Markov, low persistence:
+  # r2_markov_symm_low = list3(
+  #   n_r = 2, rgp = "markov", args = list(transmat_diag(0.6, n_r)),
+  #   r_start = sample(1:2, 1)
+  # ),
+  # r2_markov_asymm_low = list3(
+  #   n_r = 2, rgp = "markov", args = list(transmat_main_col(c(0.8, 0.6), n_r)),
+  #   r_start = sample(1:2, 1)
+  # ),
   # S-break:
-  r2_sbreak_mid = list3(
-    n_r = 2, rgp = "sbreak", args = list(c(as.integer(n_t / 2))),
-    r_start = 1
-  ),
-  r2_sbreak_end = list3(
-    n_r = 2, rgp = "sbreak", args = list(c(as.integer(n_t * 2 / 3))),
-    r_start = 1
-  ),
+  # r2_sbreak_symm = list3(
+  #   n_r = 2, rgp = "sbreak", args = list(c(as.integer(n_t / 2))),
+  #   r_start = 1
+  # ),
+  # r2_sbreak_asymm = list3(
+  #   n_r = 2, rgp = "sbreak", args = list(c(as.integer(n_t * 2 / 3))),
+  #   r_start = 1
+  # ),
   # Threshold x:
-  r2_threshold_x_0 = list3(
-    n_r = 2, rgp = "threshold", args = list(c(0)),
-    r_start = expr(fun(y, r, t_start))
-  ),
-  r2_threshold_x_05 = list3(
+  r2_threshold_symm_x = list3(
     n_r = 2, rgp = "threshold", args = list(c(0.5)),
     r_start = expr(fun(y, r, t_start))
   ),
+  r2_threshold_asymm_x = list3(
+    n_r = 2, rgp = "threshold", args = list(c(0.9)),
+    r_start = expr(fun(y, r, t_start))
+  ),
   # Threshold |x|:
-  r2_threshold_abs_05 = list3(
-    n_r = 2, rgp = "threshold", args = list(c(0.5), g = \(y, t) abs(y[t - 1])),
-    r_start = expr(fun(y, r, t_start))
-  ),
-  r2_threshold_abs_2 = list3(
-    n_r = 2, rgp = "threshold", args = list(c(2), g = \(y, t) abs(y[t - 1])),
-    r_start = expr(fun(y, r, t_start))
-  ),
+  # r2_threshold_symm_abs = list3(
+  #   n_r = 2, rgp = "threshold", args = list(c(0.5), g = \(y, t) abs(y[t - 1])),
+  #   r_start = expr(fun(y, r, t_start))
+  # ),
+  # r2_threshold_asymm_abs = list3(
+  #   n_r = 2, rgp = "threshold", args = list(c(2), g = \(y, t) abs(y[t - 1])),
+  #   r_start = expr(fun(y, r, t_start))
+  # ),
   # Threshold Dx:
-  r2_threshold_diff_05 = list3(
-    n_r = 2, rgp = "threshold", args = list(
-      c(0.5), g = \(y, t) diff(y[(t-2):(t-1)])
-    ),
-    r_start = expr(fun(y, r, t_start))
-  ),
-  r2_threshold_diff_2 = list3(
-    n_r = 2, rgp = "threshold", args = list(
-      c(2), g = \(y, t) diff(y[(t-2):(t-1)])
-    ),
-    r_start = expr(fun(y, r, t_start))
-  ),
+  # r2_threshold_symm_diff = list3(
+  #   n_r = 2, rgp = "threshold", args = list(
+  #     c(0.5), g = \(y, t) diff(y[(t-2):(t-1)])
+  #   ),
+  #   r_start = expr(fun(y, r, t_start))
+  # ),
+  # r2_threshold_asymm_diff = list3(
+  #   n_r = 2, rgp = "threshold", args = list(
+  #     c(2), g = \(y, t) diff(y[(t-2):(t-1)])
+  #   ),
+  #   r_start = expr(fun(y, r, t_start))
+  # ),
   # LSTAR, ESTAR:
-  r2_stransition_l0 = list3(
-    n_r = 2, rgp = "stransition", args = list(
-      c(0), g = \(y, t, breaks) 1 / (1 + exp(- (y[t-1] - breaks) / 1))
-    ),
-    r_start = expr(fun(y, r, t_start))
-  ),
-  r2_stransition_l05 = list3(
+  r2_stransition_symm_l = list3(
     n_r = 2, rgp = "stransition", args = list(
       c(0.5), g = \(y, t, breaks) 1 / (1 + exp(- (y[t-1] - breaks) / 1))
     ),
     r_start = expr(fun(y, r, t_start))
   ),
-  r2_stransition_e0 = list3(
+  r2_stransition_asymm_l = list3(
     n_r = 2, rgp = "stransition", args = list(
-      c(0), g = \(y, t, breaks) 1 - exp(- (y[t-1] - breaks)^2 / 1)
+      c(0.9), g = \(y, t, breaks) 1 / (1 + exp(- (y[t-1] - breaks) / 1))
     ),
     r_start = expr(fun(y, r, t_start))
   ),
-  r2_stransition_e05 = list3(
-    n_r = 2, rgp = "stransition", args = list(
-      c(0.5), g = \(y, t, breaks) 1 - exp(- (y[t-1] - breaks)^2 / 1)
-    ),
-    r_start = expr(fun(y, r, t_start))
-  )
+  # r2_stransition_symm_e = list3(
+  #   n_r = 2, rgp = "stransition", args = list(
+  #     c(0), g = \(y, t, breaks) 1 - exp(- (y[t-1] - breaks)^2 / 1)
+  #   ),
+  #   r_start = expr(fun(y, r, t_start))
+  # ),
+  # r2_stransition_asymm_e = list3(
+  #   n_r = 2, rgp = "stransition", args = list(
+  #     c(0.5), g = \(y, t, breaks) 1 - exp(- (y[t-1] - breaks)^2 / 1)
+  #   ),
+  #   r_start = expr(fun(y, r, t_start))
+  # )
 )
 
 #' RGP options

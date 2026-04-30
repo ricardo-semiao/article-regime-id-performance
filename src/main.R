@@ -16,7 +16,9 @@ box::use(
   src/options[dicts, params, options],
   src/diagnostics,
   src/metrics,
-  src/results,
+  src/results
+)
+box::use(
   RcppParallel[setThreadOptions], rTRNG[rnorm_trng],
   gt[gtsave],
   stargazer[stargazer],
@@ -25,7 +27,7 @@ box::use(
 
 
 # Simulation parameters:
-n_s <- 400L # Number of simulations
+n_s <- 500L # Number of simulations
 n_b <- 4L # Burn-in periods
 n_h <- 10L # Number of periods to predict
 n_t <- 100L + n_b + n_h # Number of time periods
@@ -49,24 +51,24 @@ dgp_names <- expand_grid(
   ),
   rgp = c(
     "r1_no_rs",
-    #"r2_multinomial_equal", "r2_multinomial_reg1",
+    #"r2_multinomial_symm", "r2_multinomial_asymm",
     "r2_markov_symm_high", "r2_markov_asymm_high",
     #"r2_markov_symm_low", "r2_markov_asymm_low",
-    #"r2_sbreak_mid", "r2_sbreak_end",
-    "r2_threshold_x_0", "r2_threshold_x_05",
-    #"r2_threshold_abs_05", "r2_threshold_abs_2",
-    #"r2_threshold_diff_05", "r2_threshold_diff_2",
-    "r2_stransition_l0", "r2_stransition_l05",
-    #"r2_stransition_e0", "r2_stransition_e05",
+    #"r2_sbreak_symm", "r2_sbreak_asymm",
+    "r2_threshold_symm_x", "r2_threshold_asymm_x",
+    #"r2_threshold_symm_abs", "r2_threshold_asymm_abs",
+    #"r2_threshold_symm_diff", "r2_threshold_asymm_diff",
+    "r2_stransition_symm_l", "r2_stransition_asymm_l",
+    #"r2_stransition_symm_e", "r2_stransition_asymm_e",
     NULL
   )
 ) |>
   mutate(dgp = str_c(sgp, "-", rgp))
 
-n_p <- nrow(dgp_names)
-
 sim_names <- expand_grid(dgp_names, sim = 1:n_s) |>
   mutate(dgp_sim = str_c(dgp, "-", sim))
+
+n_p <- nrow(sim_names)
 
 simulations_meta <- params$sgps[unique(dgp_names$sgp)] |>
   map(\(xsgp) {
@@ -88,10 +90,10 @@ simulations_meta <- params$sgps[unique(dgp_names$sgp)] |>
 
 # Generation:
 setThreadOptions(numThreads = 6L)
-errors_raw <- rnorm_trng(n_t * n_p * n_s, parallelGrain = 100L)
+errors_raw <- rnorm_trng(n_t * n_p, parallelGrain = 100L)
 
 errors <- errors_raw |>
-  matrix(nrow = n_t, ncol = n_p * n_s) |>
+  matrix(nrow = n_t, ncol = n_p) |>
   `colnames<-`(sim_names$dgp_sim)
 
 
@@ -148,7 +150,7 @@ simulate_serie <- function(input) {
 # Running simulations:
 safe <- TRUE
 simulations <- map_parallel(
-  sim_inputs, simulate_serie,
+  sim_inputs %>% sample(NULL %||% length(.)), simulate_serie,
   n_t = n_t,
   parallel = TRUE, safe = safe
 )
@@ -166,23 +168,36 @@ if (safe) {
   simulations <- map(simulations, "result")
 }
 
+# Collecting results: (result order is scrambled because of parallelization)
+simulations_data <- simulations |>
+  imap_dfr(~ {.x$sim_name <- .y; .x}) |> # Recicles r's n. of columns
+  mutate( # Faster than separate
+    sim_name = str_split_fixed(sim_name, "-", 3),
+    sgp = sim_name[, 1], rgp = sim_name[, 2], sim = as.integer(sim_name[, 3]),
+    sim_name = NULL
+  ) |>
+  mutate(
+    r = max.col(r, ties.method = "first"), # Solves 1 to n recicling
+    sgp = factor(sgp, unique(dgp_names$sgp)),
+    rgp = factor(rgp, unique(dgp_names$rgp))
+  ) |>
+  group_by(sgp, rgp, sim) |>
+  mutate(t = 1:n_t) |>
+  ungroup() |>
+  select(sgp, rgp, sim, t, y, r) |>
+  arrange(sgp, rgp, sim, t)
 
-# Collecting results:
-simulations_data <- bind_rows(simulations) |>
-  mutate(
-    str_split(sim_names$dgp_sim, "-", n = 3) |>
-      rep(each = n_t) |>
-      do.call(rbind, args = _) |>
-      `colnames<-`(c("sgp", "rgp", "sim")) |>
-      as.data.frame(),
-    r = max.col(r),
-    t = rep(1:n_t, n_p * n_s)
-  ) |>
-  mutate(
-    across(c(sgp, rgp), fct),
-    across(c(sim, r), as.integer)
-  ) |>
-  select(sgp, rgp, sim, t, y, r)
+
+# Proportions of regimes:
+simulations_data |>
+  group_by(rgp) |>
+  summarise(prop = abs(sum(r == 1) / n() - 0.5) |> round(2))
+
+simulations_data |>
+  group_by(rgp, sgp) |>
+  summarise(prop = abs(sum(r == 1) / n() - 0.5) |> round(2)) |>
+  pivot_wider(names_from = sgp, values_from = prop) |>
+  rename_with(~ str_remove(.x, "r2_ar1_"))
 
 
 
@@ -239,7 +254,7 @@ safe <- TRUE
 if (safe) considered_models <- map(considered_models, safely_modify)
 
 estimations <- map_parallel(
-  sample(est_inputs, 1000), estimate_models,
+  est_inputs %>% sample(NULL %||% length(.)), estimate_models,
   mods = considered_models, data_lags = data_lags,
   n_b = n_b, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m,
   parallel = TRUE, safe = FALSE

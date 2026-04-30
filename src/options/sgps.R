@@ -63,11 +63,11 @@ standardize_params_sgp <- function(args) {
 dict <- list(
   gt = c(
     "r2_ar1_mu1" = r"($\mu ~ (0, 0.5)$)",
-    "r2_ar1_mu2" = r"($\mu ~ (0, 2)$)",
+    "r2_ar1_mu2" = r"($\mu ~ (0, 1)$)",
     "r2_ar1_rho1" = r"($\rho_{1} ~ (0.1, 0.9)$)",
     "r2_ar1_rho2" = r"($\rho_{1} ~ (0.4, 0.6)$)",
-    "r2_ar1_sigma1" = r"($\sigma ~ (1, 2)$)",
-    "r2_ar1_sigma2" = r"($\sigma ~ (1, 4)$)"
+    "r2_ar1_sigma1" = r"($\sigma ~ (1, 1.5)$)",
+    "r2_ar1_sigma2" = r"($\sigma ~ (1, 2)$)"
   ),
   gg = c(
     r2_ar1_mu1 = r"($\mu$)",
@@ -92,7 +92,7 @@ dict <- list(
 
 #' SGPs' parameters
 #' @export
-params <- list(
+params <- list2(
   # AR mu:
   r2_ar1_mu1 = list3(
     n_r = 2, sgp = "ar",
@@ -100,51 +100,51 @@ params <- list(
   ),
   r2_ar1_mu2 = list3(
     n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5), list(mu = 2, rho1 = 0.5))
+    args = list(list(rho1 = 0.5), list(mu = 1, rho1 = 0.5))
   ),
   # AR rho:
   r2_ar1_rho1 = list3(
     n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.1), list(rho1 = 0.9))
+    args = list(list(rho1 = 0.4), list(rho1 = 0.6))
   ),
   r2_ar1_rho2 = list3(
     n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.4), list(rho1 = 0.6))
+    args = list(list(rho1 = 0.2), list(rho1 = 0.8))
   ),
   # AR sign:
-  r2_ar1_sign1 = list3(
-    n_r = 2, sgp = "ar",
-    args = list(list(rho1 = -0.3), list(rho1 = 0.3))
-  ),
-  r2_ar1_sign2 = list3(
-    n_r = 2, sgp = "ar",
-    args = list(list(rho1 = -0.7), list(rho1 = 0.7))
-  ),
+  # r2_ar1_sign1 = list3(
+  #   n_r = 2, sgp = "ar",
+  #   args = list(list(rho1 = -0.3), list(rho1 = 0.3))
+  # ),
+  # r2_ar1_sign2 = list3(
+  #   n_r = 2, sgp = "ar",
+  #   args = list(list(rho1 = -0.7), list(rho1 = 0.7))
+  # ),
   # AR new lag:
-  r2_ar2_pos1 = list3(
-    n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5), list(rho1 = 0.5, rho2 = 0.2))
-  ),
-  r2_ar2_pos2 = list3(
-    n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5), list(rho1 = 0.5, rho2 = 0.5))
-  ),
-  r2_ar2_neg1 = list3(
-    n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5, rho2 = -0.2), list(rho1 = 0.5))
-  ),
-  r2_ar2_neg2 = list3(
-    n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5, rho2 = -0.5), list(rho1 = 0.5))
-  ),
+  # r2_ar2_pos1 = list3(
+  #   n_r = 2, sgp = "ar",
+  #   args = list(list(rho1 = 0.5), list(rho1 = 0.5, rho2 = 0.2))
+  # ),
+  # r2_ar2_pos2 = list3(
+  #   n_r = 2, sgp = "ar",
+  #   args = list(list(rho1 = 0.5), list(rho1 = 0.5, rho2 = 0.5))
+  # ),
+  # r2_ar2_neg1 = list3(
+  #   n_r = 2, sgp = "ar",
+  #   args = list(list(rho1 = 0.5, rho2 = -0.2), list(rho1 = 0.5))
+  # ),
+  # r2_ar2_neg2 = list3(
+  #   n_r = 2, sgp = "ar",
+  #   args = list(list(rho1 = 0.5, rho2 = -0.5), list(rho1 = 0.5))
+  # ),
   # AR sigma:
   r2_ar1_sigma1 = list3(
     n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5), list(rho1 = 0.5, sigma = 2))
+    args = list(list(rho1 = 0.5), list(rho1 = 0.5, sigma = 1.5))
   ),
   r2_ar1_sigma2 = list3(
     n_r = 2, sgp = "ar",
-    args = list(list(rho1 = 0.5), list(rho1 = 0.5, sigma = 4))
+    args = list(list(rho1 = 0.5), list(rho1 = 0.5, sigma = 2))
   )
 )
 

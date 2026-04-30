@@ -13,7 +13,8 @@ box::use(
 
 # Temporary example:
 if (FALSE) {
-  data = simulations_data; data_meta = simulations_meta; test = TRUE
+  data_e = simulations_data; data_m = simulations_meta;
+  test = TRUE; cond = TRUE
   filters = exprs(
     rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
     sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2")
@@ -46,9 +47,9 @@ matrix_to_vec <- function(x, sep = "_", pref = "", suf = "") {
 glue_test <- function(x, h0, n = 2, test = TRUE) {
   m <- mean(x, na.rm = TRUE)
   s <- sd(x, na.rm = TRUE)
+  ndf <- sum(!is.na(x))
 
   stars <- if (test) {
-    # ndf <- sum(!is.na(x))
     # t <- sqrt(ndf) * (m - h0) / s
     # p <- 2 * pt(-abs(t), df = ndf - 1)
     add_star(t.test(x, mu = h0, conf.level = 0.95)$p.value)
@@ -56,13 +57,13 @@ glue_test <- function(x, h0, n = 2, test = TRUE) {
     ""
   }
 
-  glue("{round(m, n)} ({round(s, n)}){stars}")
+  glue("{round(m, n)} ({round(s / sqrt(ndf), n + 1)}){stars}")
 }
 
-get_moments <- function(x, xh0, cond = TRUE, test = cond) {
+get_moments <- function(data_e, data_m, cond = TRUE, test = cond) {
   add_r <- if (cond) expr(r)
 
-  x <- x |>
+  x <- data_e |>
     group_by(sgp, rgp, sim, !!add_r) |>
     summarise(
       avg = mean(y, na.rm = TRUE),
@@ -78,13 +79,13 @@ get_moments <- function(x, xh0, cond = TRUE, test = cond) {
 
   pmap_dfr(opts, \(sgp, rgp, r = NULL) {
     x_sub <- x |> filter(sgp == !!sgp, rgp == !!rgp, if (cond) r == !!r else TRUE)
-    xh0_sub <- xh0 |> filter(sgp == !!sgp, rgp == !!rgp, if (cond) r == !!r else TRUE)
+    xh0 <- data_m |> filter(sgp == !!sgp, rgp == !!rgp, if (cond) r == !!r else TRUE)
 
     c(
       sgp = sgp, rgp = rgp, r = r,
-      avg = glue_test(x_sub$avg, h0 = xh0_sub$avg, test = test & cond),
-      acf = glue_test(x_sub$acf, h0 = xh0_sub$acf, test = test & cond),
-      sd = glue_test(x_sub$sd, h0 = xh0_sub$sd, test = test & cond)
+      avg = glue_test(x_sub$avg, xh0$avg, test = test & cond),
+      acf = glue_test(atan(x_sub$acf), xh0$acf, test = test & cond), # Consider removing atan()
+      sd = glue_test(x_sub$sd, xh0$sd, test = test & cond)
     )
   })
 }
@@ -140,18 +141,18 @@ format_gt_coefs <- function(data) {
 # Moments Table ----------------------------------------------------------
 
 #' @export
-moments_table <- function(data, data_meta, ..., test = TRUE) {
+moments_table <- function(data_e, data_m, ..., test = TRUE) {
   filters <- enquos(...)
+  meta_names <- c("r1_avg", "r2_avg", "r1_acf", "r2_acf", "r1_sd", "r2_sd")
 
-  data_meta_formatted <- data_meta |>
+  data_m <- data_m |>
     mutate(
       map_dfr(meta, \(x) {
-        metrics <- c(
-          analytical_avg(x$coefs), analytical_acf(x$coefs), analytical_sd(x$coefs)
-        ) |>
-          set_names(c(
-            "r1_avg", "r2_avg", "r1_acf", "r2_acf", "r1_sd", "r2_sd"
-          ))
+        coefs <- x$coefs
+        metrics <- set_names(
+          c(analytical_avg(coefs), analytical_acf(coefs), analytical_sd(coefs)),
+          meta_names
+        )
       })
     ) |>
     pivot_longer(r1_avg:r2_sd, names_to = c("r", ".value"), names_sep = "_") |>
@@ -161,22 +162,15 @@ moments_table <- function(data, data_meta, ..., test = TRUE) {
       sgp = dicts$sgp$gt[sgp]
     )
 
-  data_formatted <- data |>
+  data_e <- data_e |>
     filter(!!!filters) |>
     mutate(
       rgp = dicts$rgp$gt[rgp],
       sgp = dicts$sgp$gt[sgp]
     )
 
-  moments_conditional <- get_moments(
-    data_formatted, data_meta_formatted,
-    cond = TRUE, test = test
-  )
-
-  moments_unconditional <- get_moments(
-    data_formatted, data_meta_formatted,
-    cond = FALSE, test = test
-  ) |>
+  moments_conditional <- get_moments(data_e, data_m, cond = TRUE, test = test)
+  moments_unconditional <- get_moments(data_e, data_m, cond = FALSE, test = test) |>
     mutate(r = "0")
 
   format_gt_metrics(moments_conditional, moments_unconditional)
