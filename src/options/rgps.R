@@ -67,24 +67,24 @@ dict <- list(
   gt = c(
     r1_no_rs = "No RS",
     r2_markov_symm_high = "MS, $p_{21} = 0.1$",
-    r2_markov_symm_low = "MS, $p_{21} = 0.7$",
-    r2_threshold_x_0 = "SET, $\\\\tau = 0$",
-    r2_threshold_x_05 = "SET, $\\\\tau = 0.5$",
-    r2_stransition_l0 = "ST, $\\\\tau = 0$",
-    r2_stransition_l05 = "ST, $\\\\tau = 0.5$",
-    r2_sbreak_mid = "SB, mid",
-    r2_sbreak_end = "SB, end"
+    r2_markov_asymm_high = "MS, $p_{21} = 0.3$",
+    r2_threshold_symm_x = "SET, $\\\\tau = 0.5$",
+    r2_threshold_asymm_x = "SET, $\\\\tau = 0.9$",
+    r2_stransition_symm_l = "ST, $\\\\tau = 0.5$",
+    r2_stransition_asymm_l = "ST, $\\\\tau = 0.9$",
+    r2_sbreak_symm = "SB, mid",
+    r2_sbreak_asymm = "SB, end"
   ),
   gg = c(
     r1_no_rs = "No RS",
-    r2_markov_symm_high = r"(MS, $p_{21} = 0.1$)",
-    r2_markov_symm_low = r"(MS, $p_{21} = 0.7$)",
-    r2_threshold_x_0 = r"(SET, $\tau = 0$)",
-    r2_threshold_x_05 = r"(SET, $\tau = 0.5$)",
-    r2_stransition_l0 = r"(ST, $\tau = 0$)",
-    r2_stransition_l05 = r"(ST, $\tau = 0.5$)",
-    r2_sbreak_mid = r"(SB, mid)",
-    r2_sbreak_end = r"(SB, end)"
+    r2_markov_symm_high = "MS, $p_{21} = 0.1$",
+    r2_markov_asymm_high = "MS, $p_{21} = 0.3$",
+    r2_threshold_symm_x = "SET, $\\tau = 0.5$",
+    r2_threshold_asymm_x = "SET, $\\tau = 0.9$",
+    r2_stransition_symm_l = "ST, $\\tau = 0.5$",
+    r2_stransition_asymm_l = "ST, $\\tau = 0.9$",
+    r2_sbreak_symm = "SB, mid",
+    r2_sbreak_asymm = "SB, end"
   ) |>
     map_chr(~ TeX(.x) %@% "plotmath")
 )

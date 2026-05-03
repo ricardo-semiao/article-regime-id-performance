@@ -13,16 +13,14 @@ box::purge_cache()
 box::use(
   src/utils[...],
   src/utils2[...],
-  src/options[dicts, params, options],
+  src/options[dicts, params, options, groups],
   src/diagnostics,
   src/metrics,
   src/results
 )
 box::use(
   RcppParallel[setThreadOptions], rTRNG[rnorm_trng],
-  gt[gtsave],
-  stargazer[stargazer],
-  ggplot2[...]
+  gt[gtsave]
 )
 
 
@@ -151,8 +149,8 @@ simulate_serie <- function(input) {
 safe <- TRUE
 simulations <- map_parallel(
   sim_inputs %>% sample(NULL %||% length(.)), simulate_serie,
-  n_t = n_t,
-  parallel = TRUE, safe = safe
+  parallel = TRUE, safe = safe,
+  setup_data = list(n_t = n_t)
 )
 
 
@@ -178,8 +176,8 @@ simulations_data <- simulations |>
   ) |>
   mutate(
     r = max.col(r, ties.method = "first"), # Solves 1 to n recicling
-    sgp = factor(sgp, unique(dgp_names$sgp)),
-    rgp = factor(rgp, unique(dgp_names$rgp))
+    #sgp = factor(sgp, unique(dgp_names$sgp)),
+    #rgp = factor(rgp, unique(dgp_names$rgp))
   ) |>
   group_by(sgp, rgp, sim) |>
   mutate(t = 1:n_t) |>
@@ -189,15 +187,27 @@ simulations_data <- simulations |>
 
 
 # Proportions of regimes:
-simulations_data |>
-  group_by(rgp) |>
-  summarise(prop = abs(sum(r == 1) / n() - 0.5) |> round(2))
+regimes_prop_table <- with(global_env(), {
+  data <- simulations_data |>
+    group_by(rgp, sgp) |>
+    summarise(prop_sgp = abs(sum(r == 1) / n() - 0.5) |> round(2)) |>
+    group_by(rgp) |>
+    mutate(prop_base = mean(prop_sgp) |> round(2)) |>
+    pivot_wider(names_from = sgp, values_from = prop_sgp)
 
-simulations_data |>
-  group_by(rgp, sgp) |>
-  summarise(prop = abs(sum(r == 1) / n() - 0.5) |> round(2)) |>
-  pivot_wider(names_from = sgp, values_from = prop) |>
-  rename_with(~ str_remove(.x, "r2_ar1_"))
+  data |>
+    mutate(rgp = dicts$rgps$gt[rgp]) |>
+    rename_with(~ dicts$sgps$gt[.x] %>% ifelse(is.na(.), .x, .)) |>
+    rename("RGP" = rgp, "Uncond." = prop_base) |>
+    gt(rowname_col = "RGP", groupname_col = NULL) |>
+    cols_label_with(fn = md) |>
+    fmt_markdown(RGP)
+})
+regimes_prop_table
+
+if (FALSE) {
+  gtsave(regimes_prop_table, "outputs/diagnostics/regimes_proportions.tex")
+}
 
 
 
@@ -254,11 +264,15 @@ safe <- TRUE
 if (safe) considered_models <- map(considered_models, safely_modify)
 
 estimations <- map_parallel(
-  est_inputs %>% sample(NULL %||% length(.)), estimate_models,
-  mods = considered_models, data_lags = data_lags,
-  n_b = n_b, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m,
-  parallel = TRUE, safe = FALSE
+  est_inputs %>% sample(100 %||% length(.)), estimate_models,
+  parallel = TRUE, safe = FALSE, workers = 7,
+  setup_packages = c("mbreaks", "tsDyn", "MSwM", "stats"),
+  setup_data = list(
+    mods = considered_models, data_lags = data_lags,
+    n_b = n_b, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m
+  )
 )
+
 
 # Saving results:
 if (FALSE) {
@@ -275,19 +289,22 @@ if (safe) {
 
 # Checking regimes:
 .regimes_per_model <- imap_dfr(estimations, \(sim, name) {
-  c(name = name, map(sim, \(model) length(tabulate(model$r)))[])
+  imap(sim, \(model, mname) {
+    tab <- tabulate(model$r)
+    list(model = mname, n_r = length(tab), min = min(tab))
+  }) |>
+    bind_rows() |>
+    mutate(name = name, .before = 1)
 }) |>
-  pivot_longer(-name, names_to = "model") |>
-  filter(
-    as.integer(gsub("r([0-9]+)_.+", "\\1", model)) != value
-  )
+  mutate(correct_regimes = as.integer(gsub("r([0-9]+)_.+", "\\1", model))) |>
+  filter(correct_regimes != n_r | min <= 1)
+# Consider `| is.na(n_r)`
 
 table(.regimes_per_model$model, .regimes_per_model$value)
 for (l in split(.regimes_per_model, seq_len(nrow(.regimes_per_model)))) {
   estimations[[l$name]][[l$model]] <- NULL
 }
 estimations <- map(estimations, compact)
-
 
 # Collecting results:
 estimations_flat <- list_flatten(estimations, name_spec = "{outer}-{inner}")
@@ -300,7 +317,6 @@ estimations_meta <- estimations_flat |>
     names = c("sgp", "rgp", "sim", "model")
   ) |>
   mutate(
-    across(c(sgp, rgp, model), fct),
     across(c(sim), as.integer)
   ) |>
   left_join(
@@ -339,8 +355,7 @@ if (FALSE) {
 
 # Simulation metrics:
 diag_sim <- diagnostics$moments_table(simulations_data, simulations_meta,
-  rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-  sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
+  rgp %in% groups$rgp_sym, sgp %in% groups$sgp_big,
   test = TRUE
 )
 diag_sim
@@ -352,12 +367,11 @@ if (FALSE) {
 
 # Estimations coefficients:
 diag_est <- diagnostics$coefs_table(estimations_meta,
-  rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-  sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
+  rgp %in% groups$rgp_sym,
+  sgp %in% groups$sgp_big,
   (rgp == "r2_markov_symm_high" & model == "r2_markov") |
-    (rgp == "r2_sbreak_mid" & model == "r2_sbreak") |
-    (rgp == "r2_threshold_x_0" & model == "r2_threshold_x") |
-    (rgp == "r2_stransition_l0" & model == "r2_stransition"),
+    (rgp == "r2_threshold_symm_x" & model == "r2_threshold_x") |
+    (rgp == "r2_stransition_symm_l" & model == "r2_stransition"),
   test = TRUE
 )
 diag_est
@@ -387,8 +401,7 @@ if (FALSE) {
 
 # Metrics separation in T:
 res_met_table <- results$metrics_sep_table(simulations_data,
-  #row_number() %in% sample(n(), 1000),
-  rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0")
+  sim %in% sample(n_s, 20), rgp %in% groups$rgp_sym
 )
 res_met_table
 
@@ -400,10 +413,9 @@ if (FALSE) {
 # Metrics separation across t:
 res_met_graphs <- results$metrics_sep_graphs(simulations_data,
   n_t = n_t,
-  row_number() %in% sample(n(), 1000),
-  rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0")
+  sim %in% sample(n_s, 10), sgp %in% groups$sgp_big
 )
-res_met_graphs[[1]]
+res_met_graphs[[2]]
 
 if (FALSE) {
   iwalk(res_met_graphs, \(graph, name) {
@@ -416,9 +428,7 @@ if (FALSE) {
 res_regimes_graphs <- results$regimes_rmse_graphs(
   estimations_data, simulations_data, n_t = n_t, n_h = n_h,
   #row_number() %in% sample(n(), 1000),
-  rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-  sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
-  models = c("r2_markov", "r2_sbreak", "r2_threshold_x", "r2_stransition")
+  rgp %in% c("r1_no_rs", groups$rgp_sym), sgp %in% groups$sgp_big
 )
 res_regimes_graphs[[1]]
 
@@ -463,8 +473,8 @@ sys_data <- metrics_data |>
     is_mis = str_replace(rgp, "(r[0-9]+_[^_]+)_.+", "\\1") != as.character(model)
   )
 
-abs(metrics_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, Inf)) |> table()
-abs(sys_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, Inf)) |> table()
+abs(metrics_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, 50, Inf)) |> table()
+abs(sys_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, 50, Inf)) |> table()
 
 
 # Correlations:
@@ -477,7 +487,10 @@ cor_mat <- select(sys_data,
 
 cor_mat[upper.tri(cor_mat, diag = TRUE)] <- 0
 which(cor_mat >= 0.8, arr.ind = TRUE) %>%
-  {cbind(row = rownames(cor_mat)[.[, "row"]], col = colnames(cor_mat)[.[, "col"]])}
+  {cbind(
+    row = rownames(cor_mat)[.[, "row"]],
+    col = colnames(cor_mat)[.[, "col"]]
+  )}
 
 
 # Diagnosticos:
@@ -494,28 +507,28 @@ if (FALSE) {
 
 # Models FE:
 sys_model_fe <- list()
-sys_model_fe[[1]] <- lm(mape ~ model - 1, sys_data)
+sys_model_fe[[1]] <- lm(rmse ~ model - 1, sys_data)
 sys_model_fe[[2]] <- lm(
-  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff,
+  rmse ~ model - 1 + regimes_bme + switches_diff + duration_diff,
   sys_data
 )
 sys_model_fe[[3]] <- lm(
-  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2,
+  rmse ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2,
   sys_data
 )
 sys_model_fe[[4]] <- lm(
-  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2 +
+  rmse ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2 +
     mu_diff + rho1_diff + sigma_diff,
   sys_data
 )
 sys_model_fe[[5]] <- lm(
-  mape ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2 +
+  rmse ~ model - 1 + regimes_bme + switches_diff + duration_diff + r2 +
     avg_diff + acf_diff + sd_diff,
   sys_data
 )
 
 if (FALSE) {
-  format_reg_table(
+  results$format_reg_table(
     sys_model_fe, "outputs/systematic/model_fe.tex",
     single.row = TRUE, df = FALSE, omit.stat = c("f")
   )

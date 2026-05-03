@@ -46,7 +46,6 @@ dicts <- list(
   metrics = dict_metrics
 )
 
-
 #' Parameters for each option
 #' @export
 params <- list(
@@ -61,4 +60,13 @@ options <- list(
   models = models$options,
   rgps = rgps$options,
   sgps = sgps$options
+)
+
+#' Groups of options
+#' @export
+groups <- list(
+  rgp_sym = c("r2_markov_symm_high", "r2_threshold_symm_x", "r2_stransition_symm_l"),
+  rgp_asymm = c("r2_markov_asymm_high", "r2_threshold_asymm_x", "r2_stransition_asymm_l"),
+  sgp_big = c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
+  sgp_small = c("r2_ar1_mu1", "r2_ar1_rho1", "r2_ar1_sigma1")
 )

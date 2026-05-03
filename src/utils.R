@@ -24,7 +24,7 @@ box::use(
 
 # Modules for helpers:
 box::use(
-  mirai[mirai_map, mirai_collect = collect_mirai, mirai_daemons = daemons],
+  mirai,
   ggplot2[...]
 )
 
@@ -224,20 +224,30 @@ safely_modify <- function(.f) {
 #'
 #' @returns [`list()`] Results of applying `f` to `x`.
 #' @export
-map_parallel <- function(x, f, ..., parallel, safe, workers = 7) {
+map_parallel <- function(
+  x, f, ...,
+  parallel, safe, workers = 7, cleanup = FALSE,
+  setup_packages = NULL, setup_data = list()
+) {
   if (inherits_any(x, "data.frame")) {
     cli_warn("{.code x} is a dataframe, {.code pmap}-like behavior may occour")
   }
 
-  fn_env(f) <- new_environment(list2(...), pkg_env("base"))
+  setup_expr <- call2(
+    `{`,
+    !!!imap(setup_packages, ~ expr(library(!!.x, character.only = TRUE)))
+  )
+
   f_safe <- if (safe) safely_modify(f) else f
 
   if (parallel) {
-    on.exit(mirai_daemons(0), add = TRUE)
-    mirai_daemons(workers, cleanup = FALSE) # * No worker cleanup between tasks
+    on.exit(mirai$daemons(0), add = TRUE)
 
-    promise <- mirai_map(x, f_safe)
-    results <- mirai_collect(promise, options = c(".progress"))
+    mirai$daemons(workers, cleanup = cleanup) # * No worker cleanup between tasks
+    do.call(mirai$everywhere, c(.expr = setup_expr, setup_data[]))
+
+    promise <- mirai$mirai_map(x, f_safe)
+    results <- mirai$collect_mirai(promise, options = c(".progress"))
 
     results <- map(results, \(x) {
       if (inherits_any(x, "try-error")) list(result = NULL, error = x) else x
@@ -275,6 +285,7 @@ data_lags <- function(data, n_l = 1) {
   data
 }
 fn_env(data_lags) <- new_environment(list(lag = lag), pkg_env("base"))
+# TODO: couldnt it just use lag(., n)?
 
 #' Helper: Add significance stars to p-values
 #' @export

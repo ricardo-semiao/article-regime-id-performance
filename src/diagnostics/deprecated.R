@@ -733,7 +733,7 @@ stats_accumulated <- function(
     group_by(!!!groups) %>%
     reframe(
       map_dfr(1:max(data$t), \(tmax) {
-        stats(y = y[t <= tmax], r = r[t <= tmax], n_r = length(unique(r)))
+        stats(y = y[t <= tmax], r = r[t <= tmax], n_r = max(r))
       }) |>
         `colnames<-`(c("1", "2")),
       t = 1:max(data$t), r = if (length(sims) == 1) r else NA
@@ -772,7 +772,7 @@ stats_density <- function(
   gdata <- data %>%
     group_by(sgp, rgp, sim) %>%
     reframe(
-      map_dfc(stats(y = y, r = r, n_r = length(unique(r))), ~ .x) |>
+      map_dfc(stats(y = y, r = r, n_r = max(r)), ~ .x) |>
         `colnames<-`(c("1", "2"))
     ) %>%
     pivot_longer(
@@ -864,7 +864,7 @@ table_sgps <- function(data, dgps = NULL) {
     group_by(sgp, rgp, sim) %>%
     reframe(
       sgp_metric = sgp_metric(sgp[1], y, r),
-      r = 1:length(unique(r))
+      r = 1:max(r)
     )
 
   data_anova <- data_metrics %>%

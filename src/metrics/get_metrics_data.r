@@ -34,7 +34,6 @@ get_metrics_data <- function(
 ) {
   cat("Getting model metrics...\n")
   metrics_meta <- data_em |>
-    rename(meta_true = meta_sim) |>
     arrange(sgp, rgp, model, sim) |>
     get_meta_metrics()
 
@@ -69,18 +68,20 @@ get_metrics_data <- function(
 
 #' TODO: document
 get_meta_metrics <- function(data_em) {
+  col <- \(x, col) x[, col] # Direct access bug in dtplyr
+
   lazy_dt(data_em) |>
     group_by(sgp, rgp, sim, model, arrange = FALSE) |> # TODO: consider rowwise()
     summarise(
-      avg_true = metrics$analytical_avg(meta_true[[1]]$coefs) |> disp_mpe(),
-      acf_true = metrics$analytical_acf(meta_true[[1]]$coefs) |> disp_mpe(),
-      sd_true = metrics$analytical_sd(meta_true[[1]]$coefs) |> disp_mpe(),
-      mu_est = meta_est[[1]]$coefs |> disp_mpe(),
-      mu_true = meta_true[[1]]$coefs |> disp_mpe(),
-      rho1_est = meta_est[[1]]$coefs |> disp_mpe(),
-      rho1_true = meta_true[[1]]$coefs |> disp_mpe(),
-      sigma_est = meta_est[[1]]$coefs |> disp_mpe(),
-      sigma_true = meta_true[[1]]$coefs |> disp_mpe()
+      avg_true = metrics$analytical_avg(meta_sim[[1]]$coefs) |> disp_mpe(),
+      acf_true = metrics$analytical_acf(meta_sim[[1]]$coefs) |> disp_mpe(),
+      sd_true = metrics$analytical_sd(meta_sim[[1]]$coefs) |> disp_mpe(),
+      mu_est = meta_est[[1]]$coefs |> col("mu") |> disp_mpe(),
+      mu_true = meta_sim[[1]]$coefs |> col("mu") |> disp_mpe(),
+      rho1_est = meta_est[[1]]$coefs |> col("rho1") |> disp_mpe(),
+      rho1_true = meta_sim[[1]]$coefs |> col("rho1") |> disp_mpe(),
+      sigma_est = meta_est[[1]]$coefs |> col("sigma") |> disp_mpe(),
+      sigma_true = meta_sim[[1]]$coefs |> col("sigma") |> disp_mpe()
     ) |>
     ungroup() |>
     as_tibble()
@@ -89,22 +90,25 @@ get_meta_metrics <- function(data_em) {
 #' TODO: document
 get_estimation_metrics <- function(data_s_e, n_t, n_h, n_b) {
   lazy_dt(data_s_e) |>
+    mutate(
+      idx_fit = t > n_b & t <= n_t - n_h,
+      idx_pred = t > n_t - n_h,
+    ) |>
     group_by(sgp, rgp, sim, model, arrange = FALSE) |>
-    filter(t > n_b & t <= n_t - n_h) |>
     summarise(
-      avg_est = metrics$series_avg(y_true, r_est, na.rm = TRUE) |> disp_mpe(),
-      acf_est = metrics$series_acf(y_true, r_est, na.rm = TRUE) |> disp_mpe(),
-      sd_est = metrics$series_sd(y_true, r_est, na.rm = TRUE) |> disp_mpe(),
-      rmse = metrics$performance_rmse(y_est, y_true),
-      mape = metrics$performance_mape(y_est, y_true),
-      r2 = metrics$performance_r2(y_est, y_true),
-      regimes_bme = metrics$performance_bme(r_est, r_true),
-      switches_est = metrics$average_switches(y_est, r_est),
-      duration_est = metrics$duration_diff(y_est, r_est),
-      switches_true = metrics$average_switches(y_true, r_true),
-      duration_true = metrics$duration_diff(y_true, r_true),
-      #skewness = metrics$inconditional_skewness(y_true, na.rm = TRUE),
-      #kurtosis = metrics$inconditional_kurtosis(y_true, na.rm = TRUE)
+      avg_est = metrics$series_avg(y_true[idx_fit], r_est[idx_fit], na.rm = TRUE) |> disp_mpe(),
+      acf_est = metrics$series_acf(y_true[idx_fit], r_est[idx_fit], na.rm = TRUE) |> disp_mpe(),
+      sd_est = metrics$series_sd(y_true[idx_fit], r_est[idx_fit], na.rm = TRUE) |> disp_mpe(),
+      rmse = metrics$performance_rmse(y_est[idx_pred], y_true[idx_pred]),
+      mape = metrics$performance_mape(y_est[idx_pred], y_true[idx_pred]),
+      r2 = metrics$performance_r2(y_est[idx_fit], y_true[idx_fit]),
+      regimes_bme = metrics$performance_bme(r_est[idx_fit], r_true[idx_fit]),
+      switches_est = metrics$average_switches(y_est[idx_fit], r_est[idx_fit]),
+      duration_est = metrics$duration_diff(y_est[idx_fit], r_est[idx_fit]),
+      switches_true = metrics$average_switches(y_true[idx_fit], r_true[idx_fit]),
+      duration_true = metrics$duration_diff(y_true[idx_fit], r_true[idx_fit]),
+      #skewness = metrics$inconditional_skewness(y_true[idx_fit], na.rm = TRUE),
+      #kurtosis = metrics$inconditional_kurtosis(y_true[idx_fit], na.rm = TRUE)
     ) |>
     ungroup() |>
     as_tibble()

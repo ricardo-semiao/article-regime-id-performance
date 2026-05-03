@@ -7,7 +7,7 @@ box::use(
   src/metrics[series_sd]
 )
 # Functions imported via `::`: mbreaks::dofix, tsDyn::setar, tsDyn::lstar,
-# MSwM::msmFit
+# MSwM::msmFit, stats::lm
 
 #' Helper: Order regimes by a varying parameter
 #' TODO: document and think where to put

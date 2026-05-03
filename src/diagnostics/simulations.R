@@ -16,7 +16,7 @@ if (FALSE) {
   data_e = simulations_data; data_m = simulations_meta;
   test = TRUE; cond = TRUE
   filters = exprs(
-    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
+    rgp %in% c("r2_threshold_symm_x", "r2_stransition_symm_l", "r2_markov_symm_high"),
     sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2")
   )
   data = estimations_meta
