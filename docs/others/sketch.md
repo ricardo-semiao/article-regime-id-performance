@@ -14,10 +14,15 @@ format:
     pdf: 
         title-meta: "Thesis sketch"
         keep-tex: true
+        colorlinks: true
+        citecolor: green
+        linkcolor: orange
+        urlcolor: lightblue
         include-in-header:  
             - text: |
                 \usepackage[a4paper, left=2cm, right=2cm, top=2.5cm, bottom=2.5cm]{geometry}
-                \setlength{\parindent}{1.5em}
+                \input{../main/configs/rspalette.tex}
+                \setlength{\parindent}{1.5em}             
                 \usepackage{amsmath}
                 \usepackage{mathtools}
                 \usepackage{tikz}
@@ -30,6 +35,7 @@ format:
                 \usepackage{multicol}
                 \usepackage{booktabs}
                 \usepackage{pdflscape}
+                \usepackage{graphicx}
                 \makeatletter         
                 \renewcommand\maketitle{
                     {\raggedright
@@ -62,14 +68,6 @@ format:
     {\endlist}
 ```
 
-<!-- > Dei uma grande reorganizada no texto seguindo as mudanças que falamos. Na minha visão tem duas coisas separadas: uma é framework do trabalho, seja a parte teórica de definir o DGP geral e o conceito de regime-conditional metrics, seja o framework das simulações; outra é a parte aplicada, seja os DGPs, modelos, e métricas específicas que eu vou considerar, seja os parâmetros e diagnósticos das simulações realizadas. Então organizei dessa forma, mas também daria para organizar como "Theoretica framework" -> "Considered DGPs, ..." -> "Simulation framework" -> "Simulation implementation". Coloquei as definições matemáticas no apêndice.
-
-> Várias outras mudanças, te conto na reunião. A introdução mudou mais o linguajar (learning e não inferência). O framework teorico mudou só a parte de métricas, onde adicionei definições de estacionariedade necessárias. As seções seguintes eu principalmente reorganizei como dito no comentário acima. A "Simulation implementation" é nova, e é aquela versão mais focada dos diagnósticos.
-
-> Fiz a revisão de literatura. -->
-
-
-
 ```{=tex}
 \begingroup
 \renewcommand\section{\oldsection}
@@ -88,8 +86,6 @@ The first focus is common in forecasting econometrics: exactly identifying the d
 The second focus is less orthodox and specific to RS models. These models are special in the sense that they not only identify the series in question but also its states -- its regimes -- thus allowing the econometrician to describe the distribution of each regime and how different they are from each other. This characterization of regimes' distributions might be informative for the model's performance: for example, if the DGP implies different intercepts across regimes, a model whose identified regimes have the same conditional average is probably not capturing that dynamic well; or some class of model can be good at capturing that dynamic but bad at capturing changes on the persistence. These examples might seem obvious, but I will show that there is much useful information to be taken from this kind of analysis.
 
 The nature of this project is explorative. I will simulate a diverse set of DGPs and try to find stylized facts about how each RS model adjusts to them, and how the characteristics of the estimated regimes relate to this adjustment. To make things more concrete, in the remainder of this section I synthesize the methodology, describe the patterns I hope to find, and present some of the actual findings.
-
-<!-- ARCHIVE: Additionally, I briefly present the literature on RS models and how my work contributes to it. -->
 
 
 ## Basic methodology and hypothesis {#sec-intro-method}
@@ -328,15 +324,15 @@ Second, which series to use: the true or estimated ones. One can use the true va
 
 [^order]: This is only possible if $S = \hat{S}$ and there is an unambiguous way to match the estimated and true regimes.
 
-This framework allows for mixing and matching these options, each being useful to answer different questions. In this work, I focus on the estimated series, as they are the only thing available to the econometrician in practice, and on using the dispersion of RC metrics, as it is more comparable across DGPs and models.
-
-<!-- > Não sei se foi uma tangente muito grande falar dessas outras opções que não vou usar, ainda mais porque pode não estar claro pro leitor qual tipo de pergunta cada ajuda a responder. Eu gostaria de informar essa flexibilidade do framework, mas talvez valha mais colocar isso num apêndice. -->
-
 Less generally, sometimes there are other possible estimators for the same population RC metric, instead of simply using $(\hat{y}, \hat{r})$. A special case is when the metric is a moment of the (joint) distribution, and the SGP is simple: one can simply plug the estimated parameters into the analytical formula for the moment, and generally have a better estimator. This is further discussed in @sec-app-metrics.
+
+This framework allows for mixing and matching these options, each being useful to answer different questions. In this work, the estimated ones using $y, \hat(r)$, as these are the values available to the econometrician in practice, while the true metrics are calculated with the analytical approach. Additionally, I ignore the metrics separated by regime, and condense their information via considering only their dispersion, as this is a simpler measure and one more comparable across DGPs and models.
 
 Let the set of metrics $(\disp \circ \met)$ be $C$ (for 'criteria'). These will be defined in @sec-impl-metrics, but are mostly based on the moments of $y_t$ and of the pair $(y_t, y_{t-j})$, $j \in \mathbb{N}$, and the performance metrics for the dependent variable.
 
 One can also be interested in describing the RGP, with information such as the average duration of each regime instance, the transition probabilities and measures derived from it, amongst others. I'll use these as control variables in the regression analysis.
+
+Finally, some regime-inconditional metrics can be useful, specially ones that can denote overall non-linearity, such as the 3rd and fourth moments of the overall series.
 
 
 
@@ -424,7 +420,7 @@ Then, for each model, the dispersion of the RC metrics are calculated and stored
     \State Initialize $D$
     \For{$(p, i, m)$ \textbf{in} $(1:|P|) \times (1:I) \times (1:|M|)$}
         \For{$c$ \textbf{in} $1:|C|$}
-            \State $D_{(p, i, m),~ c} \gets C_c(\hat{Y}_{p, i, m},~ \hat{R}_{p, i, m})$
+            \State $D_{(p, i, m),~ c} \gets C_c(Y_{p, i, m},~ \hat{R}_{p, i, m})$
         \EndFor
         \State $\hat{\Pi}_{p, i, m}$ is appended to $D_{p, i, m}$.
         \State Categorical variables $(p, i, m)$ are appended to $D_{p, i, m}$.
@@ -476,34 +472,47 @@ Several others SGP's could be considered, such as ones with transformations of $
 
 ## Considered RGPs and models {#sec-impl-rgp}
 
-The next 'ingredient' is the RGP. I will consider the options Self-Exciting Threshold (SET), Smooth-Transition (ST), and Markov-Switching (MS). Structural Break (SB) is included to study how RS models perform in the case of breaks without reocurring regimes.
+The next 'ingredient' is the RGP. I will consider the options Self-Exciting Threshold (SET), Smooth-Transition (ST), and Markov-Switching (MS). No regime switching (noRS) is included as a benchmark[^sb].
 
-Each of these RGPs has empirical model counterparts, which are also considered. There is an additional model with an unsupervised approach where the regimes are defined by some clustering technique and each regimes' AR is estimated independently afterwards (Clustering + AR, CAR). Finally, a non-RS Random Forest (RF) model is included as a benchmark.
+[^sb]: A structural breaks model was considered as a benchmanrk of model without reocurring regimes, but was ultimately incomparable with the other models.
+
+Each of these RGPs has empirical model counterparts, which are also considered. <!-- There is an additional model with an unsupervised approach where the regimes are defined by some clustering technique and each regimes' AR is estimated independently afterwards (Clustering + AR, CAR). Finally, a non-RS Random Forest (RF) model is included as a benchmark. -->
 
 The formal definition of each RGP/model is presented in @sec-app-cons, first the RGP hypothesis, then the empirical model's estimation strategy.
 
 For all RGPs, an option with equally likely regimes and an asymmetric variation is considered.
 
-- **Structural Breaks:**
-    - A single break at $T / 2$, and a single break at $2T / 3$.
+<!-- - **Structural Breaks:**
+    - A single break at $T / 2$, and a single break at $2T / 3$. -->
+
+- **No Regime Switching:**
+    - Always in regime 1.
 - **Self Exciting Threshold:**
     - Fixed hyperparameters: switching based on $y_{t-1}$. Different lags are often specific to timing-related issues, and not considered here.
-    - A single threshold at $0$, and a single threshold at $0.5$.
+    - A single threshold at $0.5$, and a single threshold at $0.9$.
 - **Smooth Transition:**
     - Fixed hyperparameters: switching based on $y_{t-1}$, logistic's CDF as transition function.
-    - A single threshold at $0$, and a single threshold at $0.5$.
+    - A single threshold at $0.5$, and a single threshold at $0.9$.
 - **Markov Switching:**
-    - Symmetric matrix, high persistence ($P(s | s) = 0.9$), symmetric matrix, low persistence ($P(s|s) = 0.6$).
-    - Asymmetric matrix, high persistence ($P(1 | 1) = 0.9$, $P(1 | 2) = 0.7$), asymmetric matrix, low persistence ($P(1 | 1) = 0.8$, $P(1 | 2) = 0.6$).
+    - Symmetric matrix, high persistence ($P(s | s) = 0.9$).
+    - Asymmetric matrix, high persistence ($P(1 | 1) = 0.9$, $P(1 | 2) = 0.3$).
 
 <!-- UPDATE -->
 
-<!-- > Tem várias outras parametrizações ja feitas no código e com o texto escrito, mas deixei só essas aqui caso algo mude. Alguma sugestão de formatação melhor do que a atual? -->
+The values were chosen to generate a $50\%$ proportion of regime 1 in the symmetric case, and $75\%$ in the assymetric for each DGP. The @tbl-regimes_sim shows the absolute difference between the regime 1 proportion and 0.5, that is, we would like to have values close to 0 for the symmetric case, and close to 0.25 for the asymmetric case. Note that the RGP and RN interact, in such a way that the same RGP can generate different regime proportions for different RNs.
+
+::: {#tbl-regimes_sim}
+```{=tex}
+\input{../../outputs/diagnostics/regimes_sim.tex}
+```
+
+Proportion of regimes across DGPs
+:::
 
 For the models, most hyperparameters are as follows:
 
 - All the coefficients are assumed to change across regimes, as this is a common assumption, especially in the face of possible mis-specification.
-- The number of regimes $\hat{S}$ is fixed, not estimated. Models are estimated with 2 regimes. <!-- UPDATE -->
+- The number of regimes $\hat{S}$ is fixed, not estimated. Models are estimated with 2 regimes.
 - The values of model-specific hyperparameters are the same as the related RGP's values.
 
 
@@ -513,13 +522,13 @@ The following regime natures are considered, each representing a different way i
 
 - **Mean ($\mu$) change:**
     - Small difference: ($\mu^1 = 0$, $\mu^2 = 0.5$)
-    - Large difference: ($\mu^1 = 0$, $\mu^2 = 2$)
+    - Large difference: ($\mu^1 = 0$, $\mu^2 = 1$)
 - **Persistence ($\rho_1$) change:**
-    - Small difference: ($\rho_1^1 = 0.6$, $\rho_1^2 = 0.4$)
-    - Large difference: ($\rho_1^1 = 0.9$, $\rho_1^2 = 0.1$)
+    - Small difference: ($\rho_1^1 = 0.4$, $\rho_1^2 = 0.6$)
+    - Large difference: ($\rho_1^1 = 0.2$, $\rho_1^2 = 0.8$)
 - **Volatility ($\sigma$) change:**
-    - Small difference: ($\sigma^1 = 1$, $\sigma^2 = 2$)
-    - Large difference: ($\sigma^1 = 1$, $\sigma^2 = 4$)
+    - Small difference: ($\sigma^1 = 1$, $\sigma^2 = 1.5$)
+    - Large difference: ($\sigma^1 = 1$, $\sigma^2 = 2$)
 
 <!-- UPDATE: possibly with:
 - **Sign Switching ($\rho_1$):**
@@ -531,9 +540,9 @@ The following regime natures are considered, each representing a different way i
     - Negative, small: ($\rho_2 = 0$, $\rho_2 = -0.2$)
     - Negative, large: ($\rho_2 = 0$, $\rho_2 = -0.5$) -->
 
-<!-- > Idem, existem outras opções. Alguma sugestão de formatação melhor do que a atual? -->
+Note that the regimes are always ordered increasingly by the parameter of interest. In the asymmetric RGPs, the rarer regime is always the second one, with the higher value of the relevant parameter.
 
-Note that the regimes are always ordered increasingly by the parameter of interest. In general, the large vs. small differences will be interesting to analyze in relation to each other. To compare different types of changes, only the large differences will be considered, for simplicity. In the asymmetric RGPs, the rarer regime is always the second one, with the higher value of the relevant parameter.
+The values were chosen in accordance to the regimes proportion discussed in the last section, and also to generate a reasonable level of regime separation, as described in @sec-exp-sep.
 
 
 ## Considered metrics {#sec-impl-metrics}
@@ -542,17 +551,13 @@ The goal with RC metrics is to capture the change in the series characteristics 
 
 In this work, I focus on the moments of the distribution of $y_t$ and $(y_t, y_{t-j})$. Specifically, the RC metrics considered are the RC mean, RC standard deviation, and RC autocorrelation of lag 1. Higher lags could be considered, but in the simple $AR(1)$ context this would bring little additional information.
 
-<!-- > Talvez o 3ro e 4to momentos sejam interessantes, especialmente o 3ro porque alguns DGPs geram séries assimétricas. UPDATE: 3 and 4 moments if used -->
-
 As stated before, the RC mean and RC SD are simply the mean and SD of each set $R_s$. The autocorrelation is similar, but must be calculated separately for each concurrent set of observations in $R_s$. The formal definitions are stated in the @sec-app-metrics.
 
 As the focus is on the dispersion of RC metrics, two important measures to consider are the standard deviation and the average pairwise absolute difference. For only two regimes, they are very similar and the absolute difference is more intuitive. All the metrics are composed such that all $d \circ c \in C$ return a single real value, and $d(x) = |x_1 - x_2|$.
 
-<!-- UPDATE: update with the chosen dispersion measures, and if more regimes are used -->
+There are some possible expansions on this work's metrics calculation. One is to use non-standard weights for the empirical moments, giving more importance to observations near the edges of regimes' instances. Another is to use a cluster separation measure, such as the silhouette score, instead of a simple absolute distance between the RC metrics. Finally, one can use distribution distance metrics, such as the Earth Mover's Distance, on the empirical distribution of each regime. These are not currently considered.
 
-There are some possible expansions on this work's metrics calculation. One is to use non-standard weights for the empirical moments, giving more importance to observations near the edges of regimes' instances. Another is to use a cluster separation measure, such as the silhouette score, instead of a simple absolute distance between the RC metrics. Finally, one can use distribution distance metrics, such as the Earth Mover's Distance, on the empirical distribution of each regime.
-
-The list of considered metrics is as below:
+No regime-unconditional metrics are considered. The list of considered metrics is as below:
 
 - First moment: RC mean $\hat{\mu}(y | S)$.
 - Second moment: RC standard deviation $\hat{\sigma}(y | S)$.
@@ -561,9 +566,9 @@ The list of considered metrics is as below:
 
 ### Performance and RGP metrics
 
-The performance metrics considered are $R^2$ for fit performance, and RMSE and MAPE for forecasting performance. The MSE is not included, following @Dacco1999.
+The performance metrics considered is the RMSE <!-- and MAPE --> for forecasting performance. The MSE is not included, following @Dacco1999. The fit performance is measured by $R^2$ for $y$ and binary mean error for $r$.
 
-Other metrics pertaining to the RGP will be included as controls in the regression analysis: the number of regime switches divided by $T$, as a measure of switching frequency; the absolute difference between the average duration of regime 1's instances and regime 2's instances, as a measure of regime asymmetry.
+Other metrics pertaining to the RGP will be included in the regression analysis: the number of regime switches divided by $T$, as a measure of switching frequency; the absolute difference between the average duration of regime 1's instances and regime 2's instances, as a measure of regime asymmetry.
 
 For works with more than two regimes, more complex measures of regime asymmetry can be used, ones that consider the whole matrix of transition probabilities.
 
@@ -578,49 +583,45 @@ Following @sec-sim-hyper, the chosen hyperparameters are as below. Some values a
 - Number of simulations: $I = 500$.
 - Forecast horizon: $H = 10$ predictions of $1$-step ahead values.
 - Total number of observations: $T = 100$.
-- Burn-in period: $B = 5$.
+- Burn-in period: $B = 4$.
+- As described above, there are $6$ RNs, $7$ RGPs, and $4$ models.
 
-<!-- > Os valores finais podem mudar. UPDATE -->
-
-The error sequences were generated in parallel, using [`rTRNG::rnorm_trng`](https://github.com/cran/rTRNG). The models were estimated with [`mbreaks::dofix`](https://github.com/cran/mbreaks), [`tsDyn::setar`](https://github.com/cran/tsDyn), [`tsDyn::lstar`](https://github.com/cran/tsDyn), [`MSwM::msmFit`](https://github.com/cran/MSwM).
+The error sequences were generated in parallel, using [`rTRNG::rnorm_trng`](https://github.com/cran/rTRNG). The models were estimated with [`stats::lm`](https://github.com/SurajGupta/r-source/tree/master/src/library/stats), [`mbreaks::dofix`](https://github.com/cran/mbreaks), [`tsDyn::setar`](https://github.com/cran/tsDyn), [`tsDyn::lstar`](https://github.com/cran/tsDyn), [`MSwM::msmFit`](https://github.com/cran/MSwM).
 
 
 ## Simulation diagnostics {#sec-impl-diag}
 
-The errors should be i.i.d. Gaussian with mean $0$ and should not present any pattern, especially across the parallelization structure. This is guaranteed by the TRNG library, and is checked in @sec-app-diag.
+On top of visualizing the series and guaranteeing no missing values, some diagnostics on the simulation, model estimation, and metrics calculation are performed. All of the diagnostics are presented in @sec-app-diag.
 
-On top of visualizing the series, to further check for problems in the series generation, the regime-conditional and unconditional moments are estimated and tested against their true values. The regime-conditional true values are calculated as the standard $AR(1)$ moments. There is only an analytical formula for the unconditional moments of the SB and MS RGP, calculated via iterated expectations.
+The errors should be i.i.d. Gaussian with mean $0$ and should not present any pattern, especially across the parallelization structure. This is guaranteed by the TRNG library, but it is also checked.
 
-The table in @sec-app-diag shows the results. Each group of lines corresponds to the moments of a DGP. The first two columns relate to the values conditional on regime 1 and 2, the third column gives the unconditional values. Each cell has the value of the moment, and in brackets the p-value of the null hypothesis that the moment is equal to its true value.
+Some models estimations had issues and were removed from the analysis: [VAL] models that did not converge; [VAL] models identified only one regime; [VAL] models had regimes with only 1 observation; [VAL] models had RMSEs above $100$ and were deemed to have estimation issues; [VAL] models had unreasonable estimated parameters ($\hat{\mu} > 10 \cdot max(y)$, $\hat{\rho_1} > 1.5$, $\hat{\sigma} > 10$). Graphs showing the distribution of these values can be found in @sec-app-diag. @tbl-estimation_issues summarises the number of observations.
 
-It is expected that models with the same RGP assumption as the DGP return similar moments, so, to check the models' estimation, a similar analysis as above is done. Both diagnoses are generally consistent with the expectations.
+::: {#tbl-estimation_issues tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/diagnostics/estimation_issues.tex}
+```
 
-To target the focus of this work, the forecast performance (RMSE) was regressed agains the index $i$ of the simulation. The table below shows that the coefficient is not statistically different from zero, even with the high power of the test, as expected.
+Estimation issues
+:::
+
+As an additional check on the models, it is expected that ones with the same RGP assumption as the DGP find coefficients similar to the true values. This is generally the case.
+
+To consider the metrics estimation, the regime-conditional and unconditional moments are estimated and tested against their true values. The regime-conditional true values are calculated as the standard $AR(1)$ moments, but the unconditional true values are not calculated. The results are in the appendix.
+
+As a final placebo test, the forecast performance (RMSE) was regressed agains the index $i$ of the simulation. The @tbl-i_independence shows genreally no relation, as expected.
 
 <!-- \begin{equation}
     rmse_{p, i, m} = \beta_0 + \beta_1 i + \varepsilon_{p, i, m} \label{eq-rmse-sim}
 \end{equation} -->
 
-\begin{table}[!htbp] \centering
-    \caption{Regression of forecast RMSE on simulation index}
-\begin{tabular}{@{\extracolsep{5pt}}lc}
-    \\[-1.8ex]\hline
-    \hline \\[-1.8ex]
-    & Forecast RMSE \\
-    \hline \\[-1.8ex]
-    $i$ & 0.006$^{*}$ (0.003) \\
-    Constant & 0.00000 (0.003) \\
-    \hline \\[-1.8ex]
-    Observations & 95,739 \\
-    R$^{2}$ & 0.00004 \\
-    Residual Std. Error & 1.000 (df = 95737) \\
-    \hline
-    \hline \\[-1.8ex]
-    \textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\
-\end{tabular}
-\end{table}
+::: {#tbl-i_independence tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/diagnostics/i_independence.tex}
+```
 
-As a final sanity check, the frequency of improbable events were annotated: $0.008\%$ of the datapoints generated were $3$ standard deviations away from the relevant mean; and $0.64\%$ of the predictions were $3$ standard deviations away from the true value.
+RMSE and simulation index relationship
+:::
 
 <!-- UPDATE -->
 
@@ -643,35 +644,19 @@ The first step is to understand what each DGP implies for the distribution of $y
 
 The approach in this work is instead to characterize each regime distribution with regime-conditional metrics, and to summarize "how different the regimes are" by a dispersion across regimes. As stated before, more metrics than the ones considered here could be necessary to fully capture the differences between regimes.
 
-The first object of this subsection is the table below. It should be read as a compact "profile" of the DGP in terms of regime separation.
+The first object of this subsection is the @tbl-metrics_sep_t. It should be read as a compact "profile" of the DGP in terms of regime separation.
 
 - Each _row_ corresponds to one DGP configuration, grouped by the regime generating process (RGP) and the regime nature (RN).
 - For each RC metric (mean, lag-1 autocorrelation, and standard deviation), there are two _columns_ corresponding to the "small" and "big" parameter changes defined in the RNs.
 - Each _cell_ is the absolute difference of the corresponding RC metric across the two regimes, computed from the generated series and regimes for that DGP.
 
-\begin{table}[t]
-\fontsize{12.0pt}{14.0pt}\selectfont
-\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}ll|rrrrrr}
-\toprule
-RGP & RN & \multicolumn{2}{c}{$\hat{\mu}(.)$} & \multicolumn{2}{c}{$\hat{\rho}_1(.)$} & \multicolumn{2}{c}{$\hat{\sigma}(.)$} \\ 
-\cmidrule(lr){3-4} \cmidrule(lr){5-6} \cmidrule(lr){7-8}
-\multicolumn{2}{c}{} & small & big & small & big & small & big \\
-\midrule\addlinespace[2.5pt]
-MS, symm. & $\mu$ & 3.35 & 0.83 & 0.00 & 0.01 & 0.03 & 0.01 \\
- & $\rho$ & 0.04 & 0.04 & 0.18 & 0.72 & 0.16 & 0.96 \\
- & $\sigma$ & 0.07 & 0.00 & 0.02 & 0.00 & 3.14 & 1.07 \\ [1.8ex]
-SB, mid & $\mu$ & 3.93 & 0.97 & 0.01 & 0.01 & 0.04 & 0.00 \\
- & $\rho$ & 0.01 & 0.01 & 0.19 & 0.78 & 0.16 & 1.21 \\
- & $\sigma$ & 0.03 & 0.00 & 0.01 & 0.00 & 3.43 & 1.16 \\ [1.8ex]
-SET, t = 0 & $\mu$ & 4.29 & 1.60 & 0.18 & 0.12 & 0.11 & 0.04 \\
- & $\rho$ & 0.94 & 1.74 & 0.13 & 0.68 & 0.06 & 0.58 \\
- & $\sigma$ & 2.23 & 1.33 & 0.22 & 0.10 & 2.96 & 0.99 \\ [1.8ex]
-ST, t = 0 & $\mu$ & 0.18 & 0.70 & 0.16 & 0.08 & 0.00 & 0.01 \\
- & $\rho$ & 0.92 & 1.35 & 0.11 & 0.58 & 0.06 & 0.46 \\
- & $\sigma$ & 2.32 & 1.37 & 0.17 & 0.10 & 1.94 & 0.54 \\
-\bottomrule
-\end{tabular*}
-\end{table}
+::: {#tbl-metrics_sep_t tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/exploratory/metrics_sep_t.tex}
+```
+
+Regimes' metrics separation across DGPs
+:::
 
 The second object studies the interaction between the sample size $T$, the RGP, and the RN. There is an important interaction between these components that governs that separation, and thus, the models' ability to learn the regime dynamics. I calculate each metric with the data up to each time-point ($1:2$, $1:3$, $\dots$, $1:T$). By graphing the last time-point considered on the x-axis, and the difference of the RC metric between regimes on the y-axis, we can see how the separation evolves across sample size.
 
@@ -683,11 +668,11 @@ The regime-separation graphs should be read as follows.
 - The y-axis is the dispersion of the relevant RC metric across the two regimes, computed on the prefix sample.
 - Column-panels separate the different metrics, and the rows correspond to the different RNs (only 'big' versions considered); different colors/line types separate alternative hyperparameterizations within the same RGP (symmetric vs. asymmetric regime frequencies).
 
-![Regime separation - SET](../../outputs/exploratory_series/set.png){#fig-rs-set height=40%}
+![Regime separation - SET](../../outputs/exploratory/metrics_sep_set.pdf){#fig-rs-set height=40%}
 
-![Regime separation - ST](../../outputs/exploratory_series/st.png){#fig-rs-st height=40%}
+![Regime separation - ST](../../outputs/exploratory/metrics_sep_st.pdf){#fig-rs-st height=40%}
 
-![Regime separation - MS](../../outputs/exploratory_series/ms.png){#fig-rs-ms height=40%}
+![Regime separation - MS](../../outputs/exploratory/metrics_sep_ms.pdf){#fig-rs-ms height=40%}
 
 
 ## Models' performance {#sec-exp-perf}
@@ -700,26 +685,13 @@ The first object of this subsection targets regime identification error. The gra
 - Within each panel, forecast errors are split by an indicator of regime correctness (correct vs. incorrect regime assignment), so the comparison is between two conditional error distributions.
 - Each figure corresponds to one empirical model class (SET/ST/MS), making it possible to compare how the same diagnostic behaves across models.
 
-![Regime and series prediction - SET](../../outputs/exploratory_models/forecast_regime_threshold.png){#fig-rp-set height=40%}
+![Regime and series prediction - SET](../../outputs/exploratory/rmse_regimes_r1_nors.pdf){#fig-rp-set height=40%}
 
-![Regime and series prediction - ST](../../outputs/exploratory_models/forecast_regime_stransition.png){#fig-rp-st height=40%}
+![Regime and series prediction - SET](../../outputs/exploratory/rmse_regimes_r2_set_x.pdf){#fig-rp-set height=40%}
 
-![Regime and series prediction - MS](../../outputs/exploratory_models/forecast_regime_ms.png){#fig-rp-ms height=40%}
+![Regime and series prediction - ST](../../outputs/exploratory/rmse_regimes_r2_st.pdf){#fig-rp-st height=40%}
 
-The second object targets parameter estimation error. Since parameter errors and forecast errors are both continuous, the basic diagnostic is a scatterplot relating the two. These scatterplots should be read as follows.
-
-- Each point corresponds to one estimated model in one simulation run (i.e., an observation indexed by $(p, i, m)$ in the simulation dataset).
-- The x-axis is the estimation error of a given coefficient (e.g., $\hat{\mu}^s - \mu^s$ or $\hat{\rho}_1^s - \rho_1^s$, depending on the panel).
-- The y-axis is the corresponding forecasting error (or an aggregated forecast-loss measure, depending on the figure definition).
-- Colors and/or facets separate DGP features (RGP and RN), so that the same relationship can be compared across different regime-change mechanisms and regime natures.
-
-![Prediction and coefficient errors - SET](../../outputs/exploratory_models/scatter_threshold.png){#fig-scat-set height=40%}
-
-![Prediction and coefficient errors - ST](../../outputs/exploratory_models/scatter_stransition.png){#fig-scat-st height=40%}
-
-![Prediction and coefficient errors - MS](../../outputs/exploratory_models/scatter_markov.png){#fig-scat-ms height=40%}
-
-A complementary identification-style visualization would be to plot the empirical distribution of the estimated parameters against the true parameter values. The scatterplot diagnostics used here are more directly aligned with the learning objective of this thesis, which is to connect estimation errors to forecasting performance.
+![Regime and series prediction - MS](../../outputs/exploratory/rmse_regimes_r2_ms.pdf){#fig-rp-ms height=40%}
 
 
 
@@ -738,31 +710,15 @@ The results are simply presented in the current state of this work, not discusse
 
 ## Models' fixed effects {#sec-sys-general}
 
-The first object is a simple fixed-effects regression, where forecast RMSE is regressed on model indicators. This summarizes how each model performs on average across the full population of simulated series.
+The first object is @tbl-model_fe, a simple fixed-effects regression, where forecast RMSE is regressed on model indicators. This summarizes how each model performs on average across the full population of simulated series.
 
-\begin{table}[!htbp] \centering
-  \caption{Simple fixed effects}
-  \label{}
-\begin{tabular}{@{\extracolsep{5pt}}lc}
-\\[-1.8ex]\hline 
-\hline \\[-1.8ex]
- & Forecast RMSE \\
-\hline \\[-1.8ex]
-  SB & 0.012$^{*}$ (0.006) \\ 
-  SET & $-$0.037$^{***}$ (0.006) \\ 
-  ST & 0.076$^{***}$ (0.006) \\
-  MS & $-$0.050$^{***}$ (0.006) \\ 
- \hline \\[-1.8ex]
-Observations & 95,739 \\ 
-R$^{2}$ & 0.002 \\ 
-Adjusted R$^{2}$ & 0.002 \\
-Residual Std. Error & 0.999 (df = 95735) \\
-F Statistic & 58.259$^{***}$ (df = 4; 95735) \\ 
-\hline 
-\hline \\[-1.8ex]
-\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\
-\end{tabular}
-\end{table}
+::: {#tbl-model_fe tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/model_fe.tex}
+```
+
+Models fixed effects
+:::
 
 
 ## Mis-specification of RGP {#sec-sys-rgp}
@@ -773,48 +729,45 @@ The next tables are presented as coefficient matrices. Each matrix is a compact 
 
 The first table considers only the symmetric regime frequencies and the "big" version of the regime natures. The second table changes to assymetric regimes, while the third changes to "small" regime natures.
 
-\begin{table}[!htbp] \centering
-  \caption{Mis-specification model \& RGP - symmetric regimes}
-  \label{}
-\begin{tabular}{@{\extracolsep{5pt}} rllll}
-\\[-1.8ex]\hline
-\hline \\[-1.8ex]
- & SET & ST & MS \\\hline
-SET & 0.019 (0.019) & 0.007 (0.007) & 0.007 (0.007) \\
-ST & 0.152 (0.152) & 0.001 (0.001) & 0.122 (0.122) \\
-MS & 0.037 (0.037) & 0.012 (0.012) & 0.01 (0.01) \\
-\hline \\[-1.8ex]
-\end{tabular}
-\end{table}
+::: {#tbl-mis_is tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_is.tex}
+```
 
-\begin{table}[!htbp] \centering
-  \caption{Mis-specification model \& RGP - asymmetric regimes}
-  \label{}
-\begin{tabular}{@{\extracolsep{5pt}} rllll}
-\\[-1.8ex]\hline
-\hline \\[-1.8ex]
- & SET & ST & MS \\\hline
-SET & -0.003 (-0.003) & -0.004 (-0.004) & 0.004 (0.004) \\
-ST & 0.193 (0.193) & 0.01 (0.01) & 0.145 (0.145) \\
-MS & -0.002 (-0.002) & -0.001 (-0.001) & 0.012 (0.012) \\
-\hline \\[-1.8ex]
-\end{tabular}
-\end{table}
+RGP mis-specification overall effect
+:::
 
+::: {#tbl-mis_sym tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_sym.tex}
+```
 
-\begin{table}[!htbp] \centering
-  \caption{Mis-specification model \& RGP - small RN}
-  \label{}
-\begin{tabular}{@{\extracolsep{5pt}} rllll}
-\\[-1.8ex]\hline
-\hline \\[-1.8ex]
- & SET & ST & MS \\\hline
-SET & 0.014 (0.014) & 0.007 (0.007) & 0.013 (0.013) \\
-ST & 0.193 (0.193) & -0.027 (-0.027) & 0.236 (0.236) \\
-MS & 0.047 (0.047) & 0.003 (0.003) & 0.004 (0.004) \\ 
-\hline \\[-1.8ex]
-\end{tabular}
-\end{table}
+RGP mis-specification - symmetric regimes
+:::
+
+::: {#tbl-mis_asym tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_asym.tex}
+```
+
+RGP mis-specification - asymmetric regimes
+:::
+
+::: {#tbl-mis_rn tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_rn.tex}
+```
+
+RGP mis-specification - big RNs
+:::
+
+::: {#tbl-mis_asym_rn tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_asym_rn.tex}
+```
+
+RGP mis-specification - asymmetric regimes and big RNs
+:::
 
 
 ## Mis-specification via RC metrics {#sec-sys-metrics}
@@ -823,80 +776,60 @@ The previous subsection uses DGP labels (RGP and RN) to stratify performance. Th
 
 In this subsection, the same idea of interacting "model" with "DGP" is reformulated as interacting "model" with the estimated regime characteristics, as proxied by the dispersion of RC metrics. This yields a more general description of where models perform well or poorly, but the conclusions remain conditional on the limited set of DGPs considered in @sec-impl.
 
-\begin{table}[!htbp] \centering 
-  \caption{Mis-specification via RC metrics}
-  \label{}
-\begin{tabular}{@{\extracolsep{5pt}} rllll}
-\\[-1.8ex]\hline
-\hline \\[-1.8ex]
- & SET & ST & MS \\\hline
-SET & -0.32 (-0.32) & -0.049 (-0.049) & 0.019 (0.019) \\
-ST & -0.162 (-0.162) & -0.117 (-0.117) & 0.043 (0.043) \\
-MS & -0.326 (-0.326) & -0.107 (-0.107) & 0.029 (0.029) \\
-\hline \\[-1.8ex]
-\end{tabular}
-\end{table}
+::: {#tbl-mis_metrics_sim tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_metrics_sim.tex}
+```
 
-\begin{table}[!htbp] \centering
-  \caption{Mis-specification via RC metrics - with interactions}
-  \label{}
-\begin{tabular}{@{\extracolsep{5pt}} rllll}
-\\[-1.8ex]\hline
-\hline \\[-1.8ex]
- & SET & ST & MS \\\hline
-SET & -1.213 (-1.213) & -1.002 (-1.002) & 0.105 (0.105) \\ 
-ST & -0.105 (-0.105) & -0.716 (-0.716) & -0.006 (-0.006) \\
-MS & 0.211 (0.211) & -1.026 (-1.026) & 0.067 (0.067) \\
-\hline \\[-1.8ex]
-\end{tabular}
-\end{table}
+Mis-specification via true RC metrics
+:::
+
+::: {#tbl-mis_metrics_sim_int tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_metrics_sim_int.tex}
+```
+
+Mis-specification via true RC metrics - with interactions
+:::
+
+::: {#tbl-mis_metrics tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_metrics.tex}
+```
+
+Mis-specification via estimated RC metrics
+:::
+
+::: {#tbl-mis_metrics_int tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_metrics_int.tex}
+```
+
+Mis-specification via estimated RC metrics - with interactions
+:::
 
 
 ## Identification of components and performance {#sec-sys-id}
 
 The final object relates performance to the two estimation-error components highlighted in @sec-exp-perf: regime identification and parameter estimation. The motivation is not to evaluate identification per se, but to connect these errors to forecasting outcomes.
 
-\begin{table}[!htbp] \centering
-  \caption{}
-  \label{}
-\begin{tabular}{@{\extracolsep{5pt}}lc}
-\\[-1.8ex]\hline 
-\hline \\[-1.8ex]
- & Forecast RMSE \\
-\hline \\[-1.8ex]
-  $R^2$ & $-$0.048$^{***}$ (0.003) \\ 
-  $E[\text{error}(r)]$ & $-$0.040$^{***}$ (0.003) \\
-  $\Delta sd(\mu)$ & 0.165$^{***}$ (0.003) \\
-  $\Delta sd(\rho_1)$ & 0.249$^{***}$ (0.003) \\ 
-  $\Delta sd(\sigma)$ & 0.0003 (0.003) \\
-  Constant & $-$0.002 (0.003) \\
- \hline \\[-1.8ex]
-Observations & 95,711 \\ 
-R$^{2}$ & 0.106 \\
-Adjusted R$^{2}$ & 0.106 \\
-Residual Std. Error & 0.925 (df = 95705) \\
-F Statistic & 2,272.862$^{***}$ (df = 5; 95705) \\ 
-\hline
-\hline \\[-1.8ex]
-\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\
-\end{tabular}
-\end{table}
+::: {#tbl-match tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/match.tex}
+```
+
+RMSE and identification
+:::
 
 To relate with the RC metrics, we can analyze the effect of matching each metric's dispersion (row) to the true value, stratified by model (column). This is a more direct way to connect the RC metrics to performance, and thus, to the econometrician's model selection process.
 
-\begin{table}[!htbp] \centering
-  \caption{}
-  \label{}
-\begin{tabular}{@{\extracolsep{5pt}} ccccc}
-\\[-1.8ex]\hline
-\hline \\[-1.8ex]
-SB & SET & ST & MS \\\hline
-$\hat{\mu}$ & 0.236 (0.236) & 0.038 (0.038) & 0.213 (0.213) & -0.096 (-0.096) \\
-$\hat{\rho}_1$ & 0.033 (0.033) & 0.193 (0.193) & 0.261 (0.261) & -0.021 (-0.021) \\
-$\hat{\sigma}$ & 0.18 (0.18) & 0.254 (0.254) & -0.052 (-0.052) & -0.12 (-0.12) \\
-\hline \\[-1.8ex]
-\end{tabular}
-\end{table}
+::: {#tbl-match_metrics tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/match_metrics.tex}
+```
+
+RMSE and metrics identification
+:::
 
 
 
@@ -929,13 +862,27 @@ AI disclaimer: this work was generated generally without the help of large langu
 
 ```{=tex}
 \appendix
-\addcontentsline{toc}{section}{Apêndices}
+\addcontentsline{toc}{section}{Appendix}
 \renewcommand{\thesubsection}{\Alph{section}.\arabic{subsection}}
 ```
 
 # DGPs, models, and metrics {#sec-app-cons}
 
 ## RGPs and models
+
+### No RS (noRS)
+
+**Hypothesis:** No regime switching, always at regime '1'.
+
+\begin{equation}
+\begin{array}{ll}
+    &r^1_t(.) = 1\\
+    &r^s_t(.) = 0, ~ s \in \{2, \dots, S\}
+\end{array}
+\end{equation}
+
+**Empirical model:** a simple $AR(1)$ model, estimated via OLS, with no regime-switching component.
+
 
 ### Structural break (SB)
 
@@ -1005,7 +952,7 @@ Similarly defined by @Terasvirta1994. Review of other options by @Dijk2002
 Similarly defined by @Hamilton1989. Review of other options by @Song2021.
 
 
-### Unsupervisioned clustering (UC)
+<!-- ### Unsupervisioned clustering (UC)
 
 **Hypothesis:** no hypothesis on the RGP.
 
@@ -1018,14 +965,14 @@ Similarly defined by @Hamilton1989. Review of other options by @Song2021.
 \end{array}
 \end{equation}
 
-Similarly defined by @Akioyamen2020. More clustering techniques reviewd by @Paparrizos2024.
+Similarly defined by @Akioyamen2020. More clustering techniques reviewd by @Paparrizos2024. -->
 
 
-### Random forests (RF)
+<!-- ### Random forests (RF)
 
 **Hypothesis:** there is no RS, the non-linearity is captured by the tree and ensamble structure of the RF. @Hu2022 presents a review of the time series RF literature.
 
-**Model:** a RF is estimated based on $y_t$, its lags, and rolling moments.
+**Model:** a RF is estimated based on $y_t$, its lags, and rolling moments. -->
 
 
 ## Metrics {#sec-app-metrics}
@@ -1055,6 +1002,8 @@ Note the absence of bias correction. While it could be present, it can generate 
 
 For binary regimes, this is equivalent to calculating the unweighted autocorrelation of every concurrent window of regime $s$.
 
+In this work, I am currently using the binary version of the RC metrics, calculated after binaryzing $r$.
+
 Recall that a RC metric returns a sequence with entries for each regime, so when describing the e.g. RC mean $\mu(y, r)$, I am refering to:
 
 \begin{align}
@@ -1083,67 +1032,68 @@ As described in @sec-theory-usage, there can be better estimators for population
 
 The @fig-diag-errors-dependence shows the correlation of the errors across the parallelization structure. A simple visual check shows no evident patterns and an overall low correlation, as expected.
 
-![Errors - Correlation across parallelization structure](../../outputs/diagnostics/error_dependence.png){#fig-diag-errors-dependence height=45%}
+![Random errors - Correlation across parallelization structure](../../outputs/diagnostics/error_dependence.pdf){#fig-diag-errors-dependence height=30%}
 
 The @fig-diag-errors-distribution shows the distribution of a size 3000 sample of the errors, via the usual histogram and QQ-plot. The distribution is very close to normal, as expected.
 
-![Errors - Distribution](../../outputs/diagnostics/error_distribution.png){#fig-diag-errors-distribution height=45%}
+![Random errors - Distribution](../../outputs/diagnostics/error_distribution.pdf){#fig-diag-errors-distribution height=30%}
 
 
-## Series generation and model estimation
+## Estimated errors
 
-The series diagnostics as described in @sec-impl-diag are shown in the first table. The second table is similar, but shows the estimated moments of the model that matched its line's RGP assumption. The values are the average across simulations of the moments calculated with the estimated parameters. Note that the moments don't need to be exactly the same, since all the models allow for all the parameters to change, a different assumption than that of the regime natures.
+The figure @fig-residuals_distribution shows the distribution of the estimation errors (residuals) across models, while figure @fig-forecast_errors_distribution shows the distribution of forecasting errors. Overall the distributions are as expected, and we can see that the former has fatter tails than the latter. In the former, approximately 10k observations are outside the range of the x-axis, some of which were considered outliers.
 
-<!-- > Os valores finais dos diagnósticos podem mudar. Essas tabelas ainda não estão com o teste. UPDATE -->
+![Residuals - Distribution](../../outputs/diagnostics/residuals_distribution.pdf){#fig-residuals_distribution height=35%}
 
+![Forecasting errors - Distribution](../../outputs/diagnostics/forecast_errors_distribution.pdf){#fig-forecast_errors_distribution height=35%}
+
+
+## Regime proportions
+
+The figure @fig-regimes_est shows the distribution of the proportion of the lowest frequent estimated regime, separated per model. Estimations below the dashed line had only two observations in the regime and had to be removed.
+
+![Regime proportion - Distribution](../../outputs/diagnostics/regimes_est.pdf){#fig-regimes_est height=25%}
+
+
+## Parameters and model metadata
+
+Figure @fig-parameters_distribution shows the distribution of the estimated parameters across models and parameter. All the by-regime values of a parameter are clumped together in the same panel. Overall, the distributions are as expected, with approximately TODO values being outside the range of the x-axis, some of which were considered outliers.
+
+![Parameters - Distribution](../../outputs/diagnostics/parameters_distribution.pdf){#fig-parameters_distribution height=40%}
+
+Figure @fig-metadata_distribution shows the distribution of RGP-related metadata, such as the MS transition probabilities, ST $\gamma$, and $SET$ $\tau$. Overall, the distributions are as expected.
+
+![Model metadata - Distribution](../../outputs/diagnostics/metadata_distribution.pdf){#fig-metadata_distribution height=35%}
+
+Table @tbl-coefs_table compares the models parameters to the true values of the DGPs. Each group of lines corresponds to the moments of a DGP. The first two columns relate to the values conditional on regime 1 and 2, the third column gives the unconditional values. Each cell has the value of the moment, and in brackets the p-value of the null hypothesis that the moment is equal to its true value. Note that the moments don't need to be exactly the same, since all the models allow for all the parameters to change, a different assumption than that of the regime natures.
+
+
+## Metrics calculation
+
+Table @tbl-regimes_sim.
+
+Each group of lines corresponds to the moments of a DGP. The first two columns relate to the values conditional on regime 1 and 2, the third column gives the unconditional values. Each cell has the value of the moment, and in brackets the p-value of the null hypothesis that the moment is equal to its true value. Note that the moments don't need to be exactly the same, since all the models allow for all the parameters to change, a different assumption than that of the regime natures.
+
+```{=tex}
 \begin{landscape}
+```
 
-\begin{table}[t]
-    \fontsize{12.0pt}{14.0pt}\selectfont
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}ll|llllllllll}
-    \toprule
-    & & \multicolumn{3}{c}{$\hat{\mu}(.)$} & \multicolumn{3}{c}{$\hat{\rho}_1(.)$} & \multicolumn{3}{c}{$\hat{\sigma}(.)$} \\ 
-    \cmidrule(lr){3-5} \cmidrule(lr){6-8} \cmidrule(lr){9-11}
-    RGP & RN & s = 1 & s = 2 & $\perp$s & s = 1 & s = 2 & $\perp$s & s = 1 & s = 2 & $\perp$s \\ 
-    \midrule\addlinespace[2.5pt]
-    MS, symm. & \ensuremath{\mu}, (0, 2) & .3 (.27) & 3.6 (.29) & 1.85 (.55) & .42 (.12) & .42 (.13) & .78 (.05) & 1.26 (.16) & 1.29 (.16) & 2.04 (.19) \\ 
-    MS, symm. & \ensuremath{\rho}, (0.4, 0.6) & .01 (.21) & -.04 (.33) & -.02 (.2) & .32 (.13) & .48 (.14) & .48 (.09) & 1.07 (.12) & 1.2 (.17) & 1.14 (.11) \\ 
-    MS, symm. & \ensuremath{\sigma}, (1, 4) & 0 (.29) & .05 (.97) & .03 (.49) & .43 (.12) & .4 (.14) & .47 (.11) & 1.35 (.21) & 4.4 (.55) & 3.18 (.55) \\ 
-    SB, mid & \ensuremath{\mu}, (0, 2) & -.01 (.28) & 3.92 (.24) & 1.99 (.19) & .45 (.12) & .47 (.12) & .87 (.03) & 1.12 (.14) & 1.17 (.14) & 2.28 (.16) \\ 
-    SB, mid & \ensuremath{\rho}, (0.4, 0.6) & .01 (.2) & 0 (.31) & .01 (.19) & .36 (.13) & .55 (.11) & .49 (.09) & 1.07 (.12) & 1.21 (.16) & 1.16 (.1) \\ 
-    SB, mid & \ensuremath{\sigma}, (1, 4) & .02 (.27) & .05 (.95) & .03 (.5) & .46 (.11) & .46 (.12) & .47 (.11) & 1.13 (.13) & 4.5 (.48) & 3.33 (.33) \\ 
-    SET, \ensuremath{\tau} = 0 & \ensuremath{\mu}, (0, 2) & .17 (.79) & 3.96 (.19) & 3.87 (.22) & .04 (.71) & .47 (.08) & .55 (.11) & .93 (.4) & 1.15 (.09) & 1.3 (.19) \\ 
-    SET, \ensuremath{\tau} = 0 & \ensuremath{\rho}, (0.4, 0.6) & -.32 (.18) & .59 (.19) & .18 (.19) & .13 (.14) & .26 (.13) & .49 (.08) & 1.02 (.1) & 1.08 (.11) & 1.15 (.1) \\ 
-    SET, \ensuremath{\tau} = 0 & \ensuremath{\sigma}, (1, 4) & -.85 (.15) & 1.28 (.83) & .03 (.47) & .04 (.11) & .24 (.15) & .47 (.1) & 1.27 (.13) & 4.16 (.49) & 2.99 (.42) \\ 
-    ST, \ensuremath{\tau} = 0 & \ensuremath{\mu}, (0, 2) & 1.14 (.11) & .97 (.23) & 1.12 (.11) & .12 (.1) & -.07 (.24) & .15 (.09) & 1.02 (.07) & 1 (.18) & 1.02 (.07) \\ 
-    ST, \ensuremath{\tau} = 0 & \ensuremath{\rho}, (0.4, 0.6) & .37 (.16) & -.52 (.19) & -.11 (.2) & .15 (.14) & .24 (.14) & .48 (.08) & 1.03 (.1) & 1.08 (.11) & 1.14 (.09) \\ 
-    ST, \ensuremath{\tau} = 0 & \ensuremath{\sigma}, (1, 4) & .94 (.23) & -1.31 (.7) & -.05 (.46) & .08 (.1) & .23 (.15) & .47 (.1) & 1.77 (.16) & 3.66 (.47) & 2.97 (.37) \\ 
-    \bottomrule
-    \end{tabular*}
-\end{table}
+::: {#tbl-coefs_table tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/diagnostics/coefs_table.tex}
+```
 
-\begin{table}[t]
-    \fontsize{12.0pt}{14.0pt}\selectfont
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}ll|llllllllll}
-    \toprule
-    & & \multicolumn{3}{c}{$\hat{\mu}(.)$} & \multicolumn{3}{c}{$\hat{\rho}_1(.)$} & \multicolumn{3}{c}{$\hat{\sigma}(.)$} \\ 
-    \cmidrule(lr){3-5} \cmidrule(lr){6-8} \cmidrule(lr){9-11}
-    RGP & RN & s = 1 & s = 2 & $\perp$s & s = 1 & s = 2 & $\perp$s & s = 1 & s = 2 & $\perp$s \\ 
-    \midrule\addlinespace[2.5pt]
-    MS, symm. & \ensuremath{\mu}, (0, 2) & 1.97 (.73) & 1.94 (.71) & 1.95 (.58) & .52 (.28) & .55 (.28) & .77 (.05) & 1.54 (.33) & 1.49 (.31) & 1.58 (.24) \\ 
-    MS, symm. & \ensuremath{\rho}, (0.4, 0.6) & -.02 (.26) & -.02 (.27) & -.01 (.21) & .36 (.23) & .14 (.27) & .47 (.1) & .54 (.17) & .53 (.17) & .55 (.15) \\ 
-    MS, symm. & \ensuremath{\sigma}, (1, 4) & .04 (.89) & .02 (.64) & .02 (.54) & .35 (.27) & .04 (.33) & .46 (.11) & 1.65 (.76) & 1.68 (.62) & 1.54 (.52) \\ 
-    SB, mid & \ensuremath{\mu}, (0, 2) & 3.69 (.65) & .09 (.74) & 2.19 (.2) & .73 (.1) & .46 (.15) & .96 (.01) & .89 (.2) & .52 (.21) & 2.05 (.19) \\ 
-    SB, mid & \ensuremath{\rho}, (0.4, 0.6) & -.12 (.44) & .16 (.48) & 0 (.21) & .55 (.13) & .31 (.28) & .65 (.1) & .64 (.24) & .36 (.22) & .64 (.15) \\ 
-    SB, mid & \ensuremath{\sigma}, (1, 4) & -.79 (1.22) & .92 (1.22) & .05 (.6) & .49 (.18) & .48 (.19) & .64 (.12) & 1.68 (.82) & 1.47 (.77) & 1.86 (.5) \\ 
-    SET, \ensuremath{\tau} = 0 & \ensuremath{\mu}, (0, 2) & 4.03 (.38) & 3.93 (.39) & 3.99 (.2) & .15 (.28) & .27 (.22) & .44 (.19) & .41 (.17) & .67 (.21) & .6 (.14) \\ 
-    SET, \ensuremath{\tau} = 0 & \ensuremath{\rho}, (0.4, 0.6) & .26 (.4) & .15 (.42) & .19 (.21) & .29 (.23) & .14 (.26) & .47 (.18) & .7 (.2) & .4 (.17) & .61 (.13) \\ 
-    SET, \ensuremath{\tau} = 0 & \ensuremath{\sigma}, (1, 4) & .45 (1.07) & -.07 (1.12) & .02 (.51) & .24 (.21) & .1 (.29) & .44 (.18) & 1.8 (.72) & 1.16 (.66) & 1.6 (.45) \\ 
-    ST, \ensuremath{\tau} = 0 & \ensuremath{\mu}, (0, 2) & 18.65 (31.2) & 1 (.26) & 18.68 (39.19) & .3 (.28) & .19 (.3) & .35 (.17) & 65.36 (74.29) & .38 (2.06) & 65.31 (42.84) \\ 
-    ST, \ensuremath{\tau} = 0 & \ensuremath{\rho}, (0.4, 0.6) & .19 (.5) & -.42 (.48) & -.1 (.21) & .14 (.28) & .34 (.24) & .48 (.19) & .4 (.13) & .49 (.15) & .59 (.13) \\ 
-    ST, \ensuremath{\tau} = 0 & \ensuremath{\sigma}, (1, 4) & -.15 (1.49) & 1.78 (5.89) & 2.61 (1.85) & .08 (.27) & .3 (.25) & .45 (.19) & 1.14 (.58) & 23.8 (3.17) & 21.9 (3.17) \\ 
-    \bottomrule
-    \end{tabular*}
-\end{table}
+Estimated coefficients across DGPs
+:::
 
+::: {#tbl-metrics_table tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/diagnostics/metrics_table.tex}
+```
+
+Estimated metrics across DGPs
+:::
+
+```{=tex}
 \end{landscape}
+```

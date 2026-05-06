@@ -20,12 +20,12 @@ if (FALSE) {
   )
   n = 2; test = TRUE
   filters = quos(
-    sim %in% filter_sim_i, sgp %in% groups$sgp_big
+    sim %in% filter_sim_i, sgp %in% groups$sgp_big, rgp != "r1_nors"
   )
-  opts = c("r2_threshold_symm_x", "r2_threshold_asymm_x")
+  opts = c("r2_set_symm_x", "r2_set_asymm_x")
   filters = quos(
     sim %in% filter_sim_i,
-    rgp %in% c("r1_no_rs", groups$rgp_sym), sgp %in% groups$sgp_big
+    rgp %in% c("r1_nors", groups$rgp_sym), sgp %in% groups$sgp_big
   )
   trim = 0.005
   mod_name = set_names(unique(data_e$model))[[1]]
@@ -49,7 +49,7 @@ glue_test <- function(x, r, formula, n = 2, test = TRUE) {
     ""
   }
 
-  glue("{fmt_decimal(m, n)} ({fmt_decimal(s, n)}){stars}")
+  glue("{fmt_decimal(m, n)}{stars} ({fmt_decimal(s, n)})")
 }
 
 
@@ -85,25 +85,35 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
     ungroup()
 
   data_raw |>
-    relocate(rgp, sgp) |>
-    arrange(rgp, sgp) |>
     mutate(
       big_rn = c("small", "big")[grepl("2$", sgp) + 1],
-      sgp = dicts$sgps$gt[sgp]
+      sgp = dicts$sgps$gt[sgp] |> fct(unique(dicts$sgps$gt)),
+      rgp = fct(rgp, unique(dicts$rgps$gt))
     ) |>
     pivot_wider(names_from = big_rn, values_from = c(avg, acf, sd)) |>
+    relocate(rgp, sgp) |>
+    arrange(rgp, sgp) |>
     gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
-    tab_stubhead(c("RGP", "Param. \\ RN")) |>
+    tab_stubhead(c("RGP", "RN")) |>
     reduce_spanners(cols, dicts$metrics$disp_gt) |>
+    cols_align("left", list_c(cols)) |>
     cols_label(
       .list = set_names(
         map(dicts$sgps$gt_param, ~ md(str_replace(.x, ".+ ~ ", "$"))),
         list_c(cols)
       )
     ) |>
-    fmt_markdown(c("rgp", "sgp"))
+    fmt_markdown(c("rgp", "sgp")) |>
+    tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01")) |>
+    tab_style(
+      style = cell_borders(sides = "bottom", color = "black", weight = px(2)),
+      locations = list(
+        cells_stub(rows = seq(3, 6, 3), "rgp"),
+        cells_stub(rows = seq(3, 6, 3), "sgp"),
+        cells_body(rows = seq(3, 6, 3))
+      )
+    )
 }
-
 
 
 # Metrics Separation across t ----------------------------------------------------------
@@ -121,13 +131,12 @@ metrics_sep_graphs <- function(data_s, ...) {
   }
 
   rgp_list <- list(
-    nors = c("r1_no_rs"),
-    set = c("r2_threshold_symm_x", "r2_threshold_asymm_x"),
-    st = c("r2_stransition_symm_l", "r2_stransition_asymm_l"),
-    ms = c("r2_markov_symm_high", "r2_markov_asymm_high")
+    set = c("r2_set_symm_x", "r2_set_asymm_x"),
+    st = c("r2_st_symm_l", "r2_st_asymm_l"),
+    ms = c("r2_ms_symm_high", "r2_ms_asymm_high")
   )
 
-  rgp_sym <- map_chr(rgp_list[-1], 2)
+  rgp_sym <- map_chr(rgp_list, 2)
 
   data_raw <- data_s |>
     filter(!!!filters) |>
@@ -159,19 +168,22 @@ metrics_sep_graphs <- function(data_s, ...) {
     ) |>
     mutate(
       sym_rgp = c("Symm.", "Asymm.")[rgp %in% rgp_sym + 1],
-      stat = dicts$metrics$disp_gg[stat] |> fct(unique(dicts$metrics$disp_gg))
+      stat = dicts$metrics$disp_gg[stat] |> fct(unique(dicts$metrics$disp_gg)),
+      rgp = dicts$rgps$gg[rgp] |> fct(unique(dicts$rgps$gg))
     )
 
   map(rgp_list, function(opts) {
-    ggplot(filter(data_formatted, rgp %in% opts), aes(t, avg)) +
+    ggplot(filter(data_formatted, rgp %in% dicts$rgps$gg[opts]), aes(t, avg)) +
       geom_line(aes(color = sym_rgp)) +
       geom_ribbon(aes(ymin = avg - sd * 1.96, ymax = avg + sd, fill = sym_rgp), alpha = 0.1) +
       geom_hline(yintercept = 0) +
       xlim(10, n_t) +
       labs(color = "DGP symmetry", fill = "DGP symmetry", x = "Time", y = "Moment's dispersion") +
       facet_grid2(
-        vars(sgp), vars(stat), scales = "free_y", labeller = label_parsed
-      )
+        vars(sgp), vars(stat), labeller = label_parsed # Consider scales = "free_y"
+      ) +
+      scale_fill_manual(values = unname(pal$main)) +
+      scale_color_manual(values = unname(pal$main))
   })
 }
 
@@ -192,7 +204,7 @@ regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
     mutate(
       correct_r = c("Correct", "Incorrect")[r_err + 1],
       sgp = dicts$sgps$gg[sgp] |> fct(unique(dicts$sgps$gg)),
-      rgp = dicts$rgps$gg[rgp] # * Clumps RGPs by symmetry and SGPs by RN Parameter
+      rgp = dicts$rgps$gg[rgp] |> fct(unique(dicts$rgps$gg)) # * Clumps RGPs by symmetry and SGPs by RN Parameter
     ) |>
     group_by(sgp, rgp) |>
     filter(
@@ -208,6 +220,7 @@ regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
         vars(sgp), vars(rgp),
         scales = "free", independent = "all", labeller = label_parsed
       ) +
-      labs(y = "Density", x = "Forecasting error", color = "Regime ID")
+      labs(y = "Density", x = "Forecasting error", color = "Regime ID") +
+      scale_color_manual(values = unname(pal$main))
   })
 }

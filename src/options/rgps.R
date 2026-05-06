@@ -68,15 +68,15 @@ transmat_main_col <- function(p, n_r, col = 1) {
 #' @export
 dict <- list3(
   gt_param = c(
-    r1_no_rs = r"(No RS)",
-    r2_markov_symm_high = r"(MS, $p_{21} = 0.1$)",
-    r2_markov_asymm_high = r"(MS, $p_{21} = 0.3$)",
-    r2_threshold_symm_x = r"(SET, $\tau = 0.5$)",
-    r2_threshold_asymm_x = r"(SET, $\tau = 0.9$)",
-    r2_stransition_symm_l = r"(ST, $\tau = 0.5$)",
-    r2_stransition_asymm_l = r"(ST, $\tau = 0.9$)",
+    r1_nors = r"(No RS)",
+    r2_ms_symm_high = r"(MS, $p_{21} = 0.1$)",
+    r2_ms_asymm_high = r"(MS, $p_{21} = 0.3$)",
     r2_sbreak_symm = r"(SB, mid)",
-    r2_sbreak_asymm = r"(SB, end)"
+    r2_sbreak_asymm = r"(SB, end)",
+    r2_set_symm_x = r"(SET, $\tau = 0.5$)",
+    r2_set_asymm_x = r"(SET, $\tau = 0.9$)",
+    r2_st_symm_l = r"(ST, $\tau = 0.5$)",
+    r2_st_asymm_l = r"(ST, $\tau = 0.9$)"
   ),
   gt = map_chr(gt_param, ~ str_replace(.x, "([^,]+),?.*$", "\\1")), # Map to keep names
   gg_param = map_chr(gt_param, ~ TeX(.x) %@% "plotmath"),
@@ -88,7 +88,7 @@ dict <- list3(
 #' @export
 params <- list2(
   # No-RS AR:
-  r1_no_rs = list3(
+  r1_nors = list3(
     n_r = 1, rgp = "no_rs", r_start = 1
   ),
   # Multinomial:
@@ -101,20 +101,20 @@ params <- list2(
   #   r_start = sample(1:2, 1)
   # ),
   # Markov, high persistence:
-  r2_markov_symm_high = list3(
+  r2_ms_symm_high = list3(
     n_r = 2, rgp = "markov", args = list(transmat_diag(0.9, n_r)),
     r_start = sample(1:2, 1)
   ),
-  r2_markov_asymm_high = list3(
+  r2_ms_asymm_high = list3(
     n_r = 2, rgp = "markov", args = list(transmat_main_col(c(0.9, 0.3), n_r)),
     r_start = sample(1:2, 1)
   ),
   # Markov, low persistence:
-  # r2_markov_symm_low = list3(
+  # r2_ms_symm_low = list3(
   #   n_r = 2, rgp = "markov", args = list(transmat_diag(0.6, n_r)),
   #   r_start = sample(1:2, 1)
   # ),
-  # r2_markov_asymm_low = list3(
+  # r2_ms_asymm_low = list3(
   #   n_r = 2, rgp = "markov", args = list(transmat_main_col(c(0.8, 0.6), n_r)),
   #   r_start = sample(1:2, 1)
   # ),
@@ -128,56 +128,56 @@ params <- list2(
   #   r_start = 1
   # ),
   # Threshold x:
-  r2_threshold_symm_x = list3(
+  r2_set_symm_x = list3(
     n_r = 2, rgp = "threshold", args = list(c(0.5)),
     r_start = expr(fun(y, r, t_start))
   ),
-  r2_threshold_asymm_x = list3(
+  r2_set_asymm_x = list3(
     n_r = 2, rgp = "threshold", args = list(c(0.9)),
     r_start = expr(fun(y, r, t_start))
   ),
   # Threshold |x|:
-  # r2_threshold_symm_abs = list3(
+  # r2_set_symm_abs = list3(
   #   n_r = 2, rgp = "threshold", args = list(c(0.5), g = \(y, t) abs(y[t - 1])),
   #   r_start = expr(fun(y, r, t_start))
   # ),
-  # r2_threshold_asymm_abs = list3(
+  # r2_set_asymm_abs = list3(
   #   n_r = 2, rgp = "threshold", args = list(c(2), g = \(y, t) abs(y[t - 1])),
   #   r_start = expr(fun(y, r, t_start))
   # ),
   # Threshold Dx:
-  # r2_threshold_symm_diff = list3(
+  # r2_set_symm_diff = list3(
   #   n_r = 2, rgp = "threshold", args = list(
   #     c(0.5), g = \(y, t) diff(y[(t-2):(t-1)])
   #   ),
   #   r_start = expr(fun(y, r, t_start))
   # ),
-  # r2_threshold_asymm_diff = list3(
+  # r2_set_asymm_diff = list3(
   #   n_r = 2, rgp = "threshold", args = list(
   #     c(2), g = \(y, t) diff(y[(t-2):(t-1)])
   #   ),
   #   r_start = expr(fun(y, r, t_start))
   # ),
   # LSTAR, ESTAR:
-  r2_stransition_symm_l = list3(
+  r2_st_symm_l = list3(
     n_r = 2, rgp = "stransition", args = list(
       c(0.5), g = \(y, t, breaks) 1 / (1 + exp(- (y[t-1] - breaks) / 1))
     ),
     r_start = expr(fun(y, r, t_start))
   ),
-  r2_stransition_asymm_l = list3(
+  r2_st_asymm_l = list3(
     n_r = 2, rgp = "stransition", args = list(
       c(0.9), g = \(y, t, breaks) 1 / (1 + exp(- (y[t-1] - breaks) / 1))
     ),
     r_start = expr(fun(y, r, t_start))
   ),
-  # r2_stransition_symm_e = list3(
+  # r2_st_symm_e = list3(
   #   n_r = 2, rgp = "stransition", args = list(
   #     c(0), g = \(y, t, breaks) 1 - exp(- (y[t-1] - breaks)^2 / 1)
   #   ),
   #   r_start = expr(fun(y, r, t_start))
   # ),
-  # r2_stransition_asymm_e = list3(
+  # r2_st_asymm_e = list3(
   #   n_r = 2, rgp = "stransition", args = list(
   #     c(0.5), g = \(y, t, breaks) 1 - exp(- (y[t-1] - breaks)^2 / 1)
   #   ),

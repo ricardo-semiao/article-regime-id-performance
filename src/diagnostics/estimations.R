@@ -23,6 +23,10 @@ if (FALSE) {
   residuals = FALSE; bins = 50; rmv_out = TRUE
 }
 
+filt_sim <- function(sim) {
+  sim %in% global_env()$filter_sim_i2
+}
+
 
 
 # NAs ----------------------------------------------------------
@@ -36,7 +40,7 @@ nas_on_fit <- function(data_e) {
       na_r = sum(is.na(r_est)),
     )
 
-  cat("NAs in fit counts:")
+  cat("NAs in fit counts:\n")
   data |>
     group_by(model) |>
     summarise(
@@ -61,7 +65,7 @@ nas_on_coefs <- function(meta_e, data_e) {
     ) |>
     ungroup()
 
-  cat("NAs in coefs counts:")
+  cat("NAs in coefs counts:\n")
   coefs |>
     pivot_longer(c(na_mu, na_rho1, na_sigma)) |>
     filter(value) |>
@@ -140,7 +144,7 @@ erros_distribution_est <- function(
     ungroup() |>
     mutate(outlier = rmse > breaks[length(breaks) - cut_n])
 
-  cat("RMSE counts:")
+  cat("RMSE counts:\n")
   with(diag_high_rmse, {
     cuts <- cut(rmse, breaks = breaks)
     tab <- table(cuts)
@@ -177,12 +181,13 @@ regimes_proportions_est <- function(data_e, n_l, bins = 50) {
     ) |>
     ungroup()
 
-  cat("Amount of regime obs:")
+  cat("Amount of regime obs:\n")
   diag_regime_data |>
     with(table(cut(n_rare, c(0, 1, 2, 3, Inf), include.lowest = TRUE))) |>
     print()
 
   g <- diag_regime_data |>
+    filter(filt_sim(sim)) |>
     mutate(model = dicts$models$gg[model] |> fct(dicts$models$gg)) |>
     ggplot(aes(n_rare_prop)) +
     geom_histogram(bins = 50) +
@@ -216,7 +221,7 @@ parameters_distribution <- function(meta_e, data_e, q = 0.95, k = 20, rmv_out = 
     ungroup() |>
     pivot_longer(c(mu, rho1, sigma), names_to = "param")
 
-  cat("Parameters' statistics:")
+  cat("Parameters' statistics:\n")
   diag_param_data |>
     group_by(param) |>
     summarise(
@@ -240,13 +245,14 @@ parameters_distribution <- function(meta_e, data_e, q = 0.95, k = 20, rmv_out = 
     ) |>
     ungroup()
 
-  cat("\nParameters' outliers counts:")
+  cat("\nParameters' outliers counts:\n")
   diag_param_data_filt |>
     filter(out) |>
     with(table(model, param)) |>
     print()
 
-  g <- diag_param_data_filt %>%
+  g <- diag_param_data_filt |>
+    filter(filt_sim(sim)) %>%
     {if (rmv_out) filter(., !out) else .} |>
     mutate(
       model = dicts$models$gg[model] |> fct(dicts$models$gg),
@@ -266,7 +272,7 @@ parameters_distribution <- function(meta_e, data_e, q = 0.95, k = 20, rmv_out = 
 #' @export
 meta_distribution <- function(meta_e) {
   data_gamma <- meta_e |>
-    filter(model == "r2_stransition") |>
+    filter(model == "r2_st") |>
     mutate(
       gamma = map_dbl(meta_est, ~ .x$gamma %||% NA),
       model = dicts$models$gg[model] |> fct(dicts$models$gg)
@@ -278,7 +284,7 @@ meta_distribution <- function(meta_e) {
     labs(x = "Gamma")
 
   data_tau <- meta_e |>
-    filter(model %in% c("r2_threshold_x", "r2_stransition")) |>
+    filter(model %in% c("r2_set_x", "r2_st")) |>
     mutate(
       tau = map_dbl(meta_est, ~ .x$switches %||% NA),
       model = dicts$models$gg[model] |> fct(dicts$models$gg)
@@ -290,7 +296,7 @@ meta_distribution <- function(meta_e) {
     labs(x = "Tau")
 
   data_p <- meta_e |>
-    filter(model == "r2_markov") |>
+    filter(model == "r2_ms") |>
     mutate(
       p = map(meta_est, ~ .x$switches %>% {c(.[1, 1], .[2, 2])}),
       model = dicts$models$gg[model] |> fct(dicts$models$gg)
@@ -302,7 +308,8 @@ meta_distribution <- function(meta_e) {
   g3 <- ggplot(data_p, aes(value, after_stat(count / sum(count)), fill = name)) +
     geom_histogram(position = "stack") +
     facet_wrap(vars(model), nrow = 1) +
-    labs(x = "Probability", fill = "")
+    labs(x = "Probability", fill = "") +
+    scale_fill_manual(values = unname(pal$main))
 
   g <- g2 / (g1 + g3) & labs(y = "Frequency")
   plot(g + plot_layout(axis_titles = "collect"))

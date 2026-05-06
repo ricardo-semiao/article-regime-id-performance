@@ -119,9 +119,10 @@ regimes_proportions_sim <- function(data_s, n = 2) {
 
   data |>
     mutate(
-      rgp = dicts$rgps$gt_param[rgp],
+      rgp = dicts$rgps$gt_param[rgp] |> fct(dicts$rgps$gt_param),
       across(-rgp, ~ fmt_decimal(.x, n, trail_0 = TRUE))
     ) |>
+    arrange(rgp) |>
     rename_with(~ dicts$sgps$gt_param[.x], .cols = -c(rgp, prop_base)) |>
     rename("RGP" = rgp, "Uncond." = prop_base) |>
     gt(rowname_col = "RGP", groupname_col = NULL) |>

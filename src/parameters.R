@@ -31,16 +31,16 @@ menu$dgps <- expand_grid(
     NULL  # To correct trailing comma
   ),
   rgp = c(
-    "r1_no_rs",
+    "r1_nors",
     #"r2_multinomial_symm", "r2_multinomial_asymm",
-    "r2_markov_symm_high", "r2_markov_asymm_high",
-    #"r2_markov_symm_low", "r2_markov_asymm_low",
+    "r2_ms_symm_high", "r2_ms_asymm_high",
+    #"r2_ms_symm_low", "r2_ms_asymm_low",
     #"r2_sbreak_symm", "r2_sbreak_asymm",
-    "r2_threshold_symm_x", "r2_threshold_asymm_x",
-    #"r2_threshold_symm_abs", "r2_threshold_asymm_abs",
-    #"r2_threshold_symm_diff", "r2_threshold_asymm_diff",
-    "r2_stransition_symm_l", "r2_stransition_asymm_l",
-    #"r2_stransition_symm_e", "r2_stransition_asymm_e",
+    "r2_set_symm_x", "r2_set_asymm_x",
+    #"r2_set_symm_abs", "r2_set_asymm_abs",
+    #"r2_set_symm_diff", "r2_set_asymm_diff",
+    "r2_st_symm_l", "r2_st_asymm_l",
+    #"r2_st_symm_e", "r2_st_asymm_e",
     NULL
   )
 ) |>
@@ -58,13 +58,13 @@ n_s <- nrow(menu$sims)
 menu$ests <- expand_grid(
   menu$sims,
   model = c(
-    "r1_no_rs",
+    "r1_nors",
     #"r2_sbreak",
-    "r2_threshold_x",
-    #"r2_threshold_abs",
-    #"r2_threshold_diff",
-    "r2_stransition",
-    "r2_markov",
+    "r2_set_x",
+    #"r2_set_abs",
+    #"r2_set_diff",
+    "r2_st",
+    "r2_ms",
     NULL
   )
 ) |>

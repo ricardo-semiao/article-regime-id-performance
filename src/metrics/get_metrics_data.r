@@ -86,19 +86,21 @@ get_estimation_metrics <- function(data_e) {
       idx_pred = t > n_t - n_h,
     ) |>
     group_by(sgp, rgp, sim, model, arrange = FALSE) |>
+    mutate( # Unsure if it hels or hurts performance
+      n_r = max(r_est[idx_fit])
+    ) |>
     summarise(
-      n_r = max(r_est[idx_fit]),
-      avg_est = metrics$series_avg(y_sim[idx_fit], r_est[idx_fit], n_r = n_r) |> disp_mpe(),
-      acf_est = metrics$series_acf(y_sim[idx_fit], r_est[idx_fit], n_r = n_r) |> disp_mpe(),
-      sd_est = metrics$series_sd(y_sim[idx_fit], r_est[idx_fit], n_r = n_r) |> disp_mpe(),
+      avg_est = metrics$series_avg(y_sim[idx_fit], r_est[idx_fit], n_r = n_r[1]) |> disp_mpe(),
+      acf_est = metrics$series_acf(y_sim[idx_fit], r_est[idx_fit], n_r = n_r[1]) |> disp_mpe(),
+      sd_est = metrics$series_sd(y_sim[idx_fit], r_est[idx_fit], n_r = n_r[1]) |> disp_mpe(),
       rmse = metrics$performance_rmse(y_err[idx_pred]),
       mape = metrics$performance_mape(y_err[idx_pred], y_sim[idx_pred]),
       r2 = metrics$performance_r2(y_est[idx_fit], y_sim[idx_fit]),
       regimes_bme = metrics$performance_bme(r_err[idx_fit]),
-      switches_est = metrics$average_switches(y_sim[idx_fit], r_est[idx_fit], n_r = n_r),
-      duration_est = metrics$duration_diff(y_sim[idx_fit], r_est[idx_fit], n_r = n_r),
-      switches_sim = metrics$average_switches(y_sim[idx_fit], r_sim[idx_fit], n_r = n_r),
-      duration_sim = metrics$duration_diff(y_sim[idx_fit], r_sim[idx_fit], n_r = n_r),
+      switches_est = metrics$average_switches(y_sim[idx_fit], r_est[idx_fit], n_r = n_r[1]),
+      duration_est = metrics$duration_diff(y_sim[idx_fit], r_est[idx_fit], n_r = n_r[1]),
+      switches_sim = metrics$average_switches(y_sim[idx_fit], r_sim[idx_fit], n_r = n_r[1]),
+      duration_sim = metrics$duration_diff(y_sim[idx_fit], r_sim[idx_fit], n_r = n_r[1]),
       #skewness = metrics$inconditional_skewness(y_sim[idx_fit]),
       #kurtosis = metrics$inconditional_kurtosis(y_sim[idx_fit])
     ) |>

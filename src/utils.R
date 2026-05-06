@@ -9,7 +9,7 @@ box::use(
   r/core[...],
   cli = cli[cli_abort, cli_warn, cli_inform],
   glue[glue],
-  gt[gtsave]
+  ggplot2[last_plot]
 )
 
 #' Modules: Tidyverse
@@ -184,7 +184,40 @@ ggsave2 <- function(filename, width = NA, ratio = 1, scale = 1, ...) {
     glue(filename, .envir = env),
     width = width, height = width * ratio, scale = scale, ...
   )
+  cli$cli_alert_success("File saved: {.file {filename}}")
 }
+
+#' @export
+gtsave2 <- function(data, filename, ...) {
+  args <- list2(...)
+  args[["latex.tbl.pos"]] <- args[["latex.tbl.pos"]] %||% "!htbp"
+
+  data %>%
+    {inject(tab_options(., !!!args))} |>
+    gtsave(filename)
+
+  table <- readLines(filename)
+
+  content_idx <- grep(r"(\\begin\{tabular\*?\})", table):(grep(r"(\\end\{table\})", table) - 1)
+  table <- table[content_idx]
+
+  #table[table == "\\fontsize{12.0pt}{14.0pt}\\selectfont"] <- "\\centering"
+  table[table == "\\begin{minipage}{\\linewidth}"] <- "\\begin{minipage}{\\linewidth}\\centering"
+
+  pat <- "(\\\\begin\\{tabular\\*\\})(\\{\\\\linewidth\\})(.+)"
+  table[grepl(pat, table)] <- table[grepl(pat, table)] |>
+    str_match(pat) %>%
+    {paste0("\\begin{tabular}", .[1, 4])}
+  table[table == "\\end{tabular*}"] <- "\\end{tabular}"
+
+  #label <- str_split_1(filename, "/") %>% .[length(.)] %>% str_remove("\\.tex$")
+  #table <- append(table, glue("\\label{{tbl-{label}}}"), after = 1)
+
+  writeLines(table, filename)
+  cli$cli_alert_success("File saved: {.file {filename}}")
+}
+
+
 
 #' Helper: write_rds wrapper with success message
 #'

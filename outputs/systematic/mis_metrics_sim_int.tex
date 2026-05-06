@@ -1,17 +1,15 @@
-\begin{table}[t]
-\fontsize{12.0pt}{14.0pt}\selectfont
-\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}l|rrr}
+\begin{tabular}{@{\extracolsep{\fill}}l|rrr}
 \toprule
-RGP \(\diagdown\) Model & SET & ST & MS \\ 
+ & \multicolumn{3}{c}{{Metric}} \\ 
+\cmidrule(lr){2-4}
+Model & Avg & ACF & SD \\ 
 \midrule\addlinespace[2.5pt]
-SET & -0.054 (0.09) & -0.001 (0.068) & -0.009 (0.084) \\ 
-ST & 1.482 (0.09)*** & -0.052 (0.068) & 0.157 (0.084)* \\ 
-MS & 0.002 (0.091) & 0 (0.068) & -0.013 (0.084) \\ 
+SET & -0.001 (0.687) & 2.083 (0.065) & 1.711 (0.662) \\ 
+ST & 1.878*** (0.065) & 1.278 (0.665) & 2.349 (0.113) \\ 
+MS & 1.627*** (0.067) & 2.922* (0.684) & 2.386 (0.117) \\ 
 \bottomrule
-\end{tabular*}
-\begin{minipage}{\linewidth}
+\end{tabular}
+\begin{minipage}{\linewidth}\centering
 \vspace{.05em}
-\emph{Note:}  \(^{*}\)p\$\textless{}\$0.1; \(^{**}\)p\$\textless{}\$0.05; \(^{***}\)p\$\textless{}\$0.01\\
+\emph{Note:}  \(^{*}\)p\textless{}0.1; \(^{**}\)p\textless{}0.05; \(^{***}\)p\textless{}0.01\\
 \end{minipage}
-\end{table}
-

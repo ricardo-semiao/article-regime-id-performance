@@ -20,9 +20,9 @@ if (FALSE) {
   filters = quos(
     rgp %in% groups$rgp_sym,
     sgp %in% groups$sgp_big,
-    (rgp == "r2_markov_symm_high" & model == "r2_markov") |
-      (rgp == "r2_threshold_symm_x" & model == "r2_threshold_x") |
-      (rgp == "r2_stransition_symm_l" & model == "r2_stransition")
+    (rgp == "r2_ms_symm_high" & model == "r2_ms") |
+      (rgp == "r2_set_symm_x" & model == "r2_set_x") |
+      (rgp == "r2_st_symm_l" & model == "r2_st")
   )
 }
 
@@ -53,7 +53,7 @@ glue_test <- function(x, h0, n = 2, test = TRUE) {
     ""
   }
 
-  glue("{round(m, n)} ({round(s / sqrt(ndf), n + 1)}){stars}")
+  glue("{round(m, n)}{stars} ({round(s / sqrt(ndf), n + 1)})")
 }
 
 
@@ -101,6 +101,10 @@ format_gt_metrics <- function(moments_conditional, moments_unconditional) {
   )
 
   bind_rows(moments_conditional, moments_unconditional) |>
+    mutate(
+      rgp = fct(rgp, unique(dicts$rgps$gt_param)),
+      sgp = fct(sgp, unique(dicts$sgps$gt_param))
+    ) |>
     pivot_wider(names_from = r, values_from = c(avg, acf, sd)) |>
     relocate(rgp, sgp) |>
     arrange(rgp, sgp) |>
@@ -116,7 +120,8 @@ format_gt_metrics <- function(moments_conditional, moments_unconditional) {
     reduce_spanners(cols, dicts$metrics$cond_gt) |>
     fmt_markdown(c("rgp", "sgp")) |>
     cols_align(align = "left", columns = list_c(cols)) |>
-    fmt(columns = list_c(cols), fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x))
+    fmt(columns = list_c(cols), fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x)) |>
+    tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01"))
 }
 
 #' @export
@@ -179,7 +184,8 @@ format_gt_coefs <- function(meta_e) {
     reduce_spanners(cols, dicts$params$gt_s) |>
     fmt_markdown(c("rgp", "sgp")) |>
     cols_align(align = "left", columns = list_c(cols)) |>
-    fmt(columns = list_c(cols), fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x))
+    fmt(columns = list_c(cols), fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x)) |>
+    tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01"))
 }
 
 #' @export
@@ -189,8 +195,8 @@ coefs_table <- function(meta_e, ..., test = TRUE) {
   meta_e <- meta_e |>
     filter(!!!filters) |>
     mutate(
-      rgp = dicts$rgps$gt_param[rgp],
-      sgp = dicts$sgps$gt_param[sgp]
+      rgp = dicts$rgps$gt_param[rgp] |> fct(dicts$rgps$gt_param),
+      sgp = dicts$sgps$gt_param[sgp] |> fct(dicts$sgps$gt_param)
     ) |>
     relocate(rgp, sgp) |>
     mutate(
@@ -206,7 +212,9 @@ coefs_table <- function(meta_e, ..., test = TRUE) {
       r1_sigma = glue_test(sigma_R1_est, unique(sigma_R1_sim), test = test),
       r2_sigma = glue_test(sigma_R2_est, unique(sigma_R2_sim), test = test)
     ) |>
-    ungroup()
+    ungroup() |>
+    arrange(rgp, sgp)
+
 
   format_gt_coefs(meta_e)
 }
