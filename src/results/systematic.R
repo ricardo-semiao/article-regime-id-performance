@@ -40,7 +40,7 @@ format_reg_matrix <- function(
     tab_stubhead(md("RGP $\\diagdown$ Model")) |>
     tab_footnote(md("_Note:_  $^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01"))
 
-  writeLines(table, out)
+  gtsave(table, out)
   cat("File written to", out, "\n")
   invisible(table)
 }

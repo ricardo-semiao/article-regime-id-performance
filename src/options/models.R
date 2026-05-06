@@ -4,8 +4,11 @@
 # Loading dependencies:
 box::use(
   src/utils[...],
-  create_model = src/creators/models
+  create_model = src/creators/models,
+  latex2exp[TeX]
 )
+
+# ! SGPs, RGPs, and models names must not contain hiphens
 
 
 
@@ -13,9 +16,15 @@ box::use(
 
 #' Models' names dictionary
 #' @export
-dict <- list(
-  gt = c(),
-  gg = c()
+dict <- list3(
+  gt = c(
+    r1_no_rs = "No RS",
+    r2_markov = "MS",
+    r2_threshold_x = "SET",
+    r2_stransition = "ST",
+    r2_sbreak = "SB"
+  ),
+  gg = map_chr(gt, ~ TeX(.x) %@% "plotmath")
 )
 
 #' Models' parameters

@@ -19,7 +19,7 @@ fn_env(regimes_order) <- pkg_env("base")
 
 # Temporary example:
 if (FALSE) {
-  n_h <- 10; n_b <- 10; n_t <- 100 + n_h + n_b
+  n_h <- 10; n_b <- 4; n_t <- 100 + n_h + n_b
   n_l <- 1; n_r <- 2
   min_r_size <- 0.1; tol <- 1e-5; max_iter <- 10
   g <- \(x) x; gamma <- NULL; rn_par = "rho1"
@@ -79,7 +79,7 @@ get_results$stats_lm <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) {
     coefs = `dimnames<-`(coefs, dims)
   )
 
-  list(y = y, r = r, meta = meta)
+  list(y = unname(y), r = r, meta = meta)
 }
 
 
@@ -214,10 +214,11 @@ get_results$tsdyn_lstar <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
   }
 
   y <- c(rep(NA, n_b + n_l + 1), mod$fitted.values, preds)
+  r_cat <- (r <= 0.5) + 1
 
   # Meta information:
   idx_fit <- (n_b + 1):(n_t - n_h)
-  coefs <- cbind(coefs, series_sd(data[idx_fit, 1] - y[idx_fit], r, n_r, na.rm = TRUE))
+  coefs <- cbind(coefs, series_sd(data[idx_fit, 1] - y[idx_fit], r_cat, n_r, na.rm = TRUE))
   ord <- regimes_order(coefs, rn_par, dims)
 
   meta <- list(
@@ -226,7 +227,7 @@ get_results$tsdyn_lstar <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
     gamma = gamma
   )
 
-  list(y = y, r = ord[(r <= 0.5) + 1], meta = meta)
+  list(y = y, r = ord[r_cat], meta = meta)
 }
 
 
@@ -260,11 +261,11 @@ get_results$mswm_msmfit <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
   }
 
   y <- c(rep(NA, n_b + n_l), mod@model$fitted.values, preds)
-  r <- max.col(r)
+  r_cat <- max.col(r, ties.method = "first")
 
   # Meta information:
   idx_fit <- (n_b + 1):(n_t - n_h)
-  coefs <- cbind(coefs, series_sd(data[idx_fit, 1] - y[idx_fit], r, n_r, na.rm = TRUE))
+  coefs <- cbind(coefs, series_sd(data[idx_fit, 1] - y[idx_fit], r_cat, n_r, na.rm = TRUE))
   ord <- regimes_order(coefs, rn_par, dims)
 
   meta <- list(
@@ -272,7 +273,7 @@ get_results$mswm_msmfit <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
     switches = mod@transMat
   )
 
-  list(y = y, r = ord[r], meta = meta)
+  list(y = unname(y), r = ord[r_cat], meta = meta)
 }
 
 

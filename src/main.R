@@ -12,75 +12,21 @@ if (FALSE) {
 box::purge_cache()
 box::use(
   src/utils[...],
-  src/utils2[...],
   src/options[dicts, params, options, groups],
   src/diagnostics,
   src/metrics,
-  src/results
+  src/results,
+  src/parameters[...]
 )
 box::use(
-  RcppParallel[setThreadOptions], rTRNG[rnorm_trng],
-  gt[gtsave]
+  RcppParallel[setThreadOptions],
+  rTRNG[rnorm_trng]
 )
 
 
-# Simulation parameters:
-n_s <- 500L # Number of simulations
-n_b <- 4L # Burn-in periods
-n_h <- 10L # Number of periods to predict
-n_t <- 100L + n_b + n_h # Number of time periods
-
-
-
-# Simulation: Considered Options -----------------------------------------------
-
-# Used combinations:
-walk(list(options$sgps, options$rgps), ~ dput(names(.x)))
-
-dgp_names <- expand_grid(
-  sgp = c(
-    "r2_ar1_mu1", "r2_ar1_mu2",
-    "r2_ar1_rho1", "r2_ar1_rho2",
-    #"r2_ar1_sign1", "r2_ar1_sign2",
-    #"r2_ar2_pos1", "r2_ar2_pos2",
-    #"r2_ar2_neg1", "r2_ar2_neg2",
-    "r2_ar1_sigma1", "r2_ar1_sigma2",
-    NULL  # To correct trailing comma
-  ),
-  rgp = c(
-    "r1_no_rs",
-    #"r2_multinomial_symm", "r2_multinomial_asymm",
-    "r2_markov_symm_high", "r2_markov_asymm_high",
-    #"r2_markov_symm_low", "r2_markov_asymm_low",
-    #"r2_sbreak_symm", "r2_sbreak_asymm",
-    "r2_threshold_symm_x", "r2_threshold_asymm_x",
-    #"r2_threshold_symm_abs", "r2_threshold_asymm_abs",
-    #"r2_threshold_symm_diff", "r2_threshold_asymm_diff",
-    "r2_stransition_symm_l", "r2_stransition_asymm_l",
-    #"r2_stransition_symm_e", "r2_stransition_asymm_e",
-    NULL
-  )
-) |>
-  mutate(dgp = str_c(sgp, "-", rgp))
-
-sim_names <- expand_grid(dgp_names, sim = 1:n_s) |>
-  mutate(dgp_sim = str_c(dgp, "-", sim))
-
-n_p <- nrow(sim_names)
-
-simulations_meta <- params$sgps[unique(dgp_names$sgp)] |>
-  map(\(xsgp) {
-    map(xsgp$args, \(x) {
-      x$mu <- x$mu %||% 0
-      x$sigma <- x$sigma %||% 1
-      unlist(x)
-    }) |>
-      do.call(rbind, args = _) |>
-      `rownames<-`(c("R1", "R2"))
-  }) |>
-  map(~ list(coefs = .x)) %>%
-  {tibble(sgp = names(.), meta = .)} |>
-  full_join(select(dgp_names, sgp, rgp), by = "sgp")
+# RNG:
+set.seed(10126271)
+filter_sim_i <- sample(n_i, 20)
 
 
 
@@ -88,11 +34,16 @@ simulations_meta <- params$sgps[unique(dgp_names$sgp)] |>
 
 # Generation:
 setThreadOptions(numThreads = 6L)
-errors_raw <- rnorm_trng(n_t * n_p, parallelGrain = 100L)
+errors_raw <- rnorm_trng(n_t * n_s, parallelGrain = 100L)
+
+if (FALSE) {
+  #write_rds2(errors_raw, "data/errors_raw.rds")
+  errors_raw <- read_rds("data/errors_raw.rds")
+}
 
 errors <- errors_raw |>
-  matrix(nrow = n_t, ncol = n_p) |>
-  `colnames<-`(sim_names$dgp_sim)
+  matrix(nrow = n_t, ncol = n_s) |>
+  `colnames<-`(menu$sims$dgp_sim)
 
 
 # Diagnostics:
@@ -101,7 +52,7 @@ if (FALSE) {
   ggsave2("outputs/diagnostics/error_dependence.pdf", 10, 0.9)
 }
 
-diagnostics$error_distribution(errors_raw)
+diagnostics$error_distribution_sim(errors_raw)
 if (FALSE) {
   ggsave2("outputs/diagnostics/error_distribution.pdf", 15, 0.4)
 }
@@ -110,18 +61,16 @@ if (FALSE) {
 
 # Simulation: Series -----------------------------------------------------------
 
-# Simulation inputs:
-sim_inputs <- pmap(sim_names, \(sgp, rgp, dgp, sim, dgp_sim) {
+# Simulation inputs and function:
+sim_inputs <- pmap(menu$sims, \(sgp, rgp, dgp, sim, dgp_sim) {
   list(
     sgp = options$sgps[[sgp]],
     rgp = options$rgps[[rgp]],
     errors = errors[, dgp_sim]
   )
 }) |>
-  set_names(sim_names$dgp_sim)
+  set_names(menu$sims$dgp_sim)
 
-# Simulation function:
-# Example: `input <- sim_inputs[["r2_ar1_sigma2-r2_lstar_05-14"]]`
 simulate_serie <- function(input) {
   sfun <- input$sgp$fun
   rfun <- input$rgp$fun
@@ -142,17 +91,17 @@ simulate_serie <- function(input) {
     y[t] <- sfun(y, r, t)
   }
 
-  list(r = r, y = y)
+  list(r = max.col(r), y = y)
 }
+
 
 # Running simulations:
 safe <- TRUE
 simulations <- map_parallel(
-  sim_inputs %>% sample(NULL %||% length(.)), simulate_serie,
+  sim_inputs, simulate_serie,
   parallel = TRUE, safe = safe,
   setup_data = list(n_t = n_t)
 )
-
 
 # Saving results:
 if (FALSE) {
@@ -166,87 +115,85 @@ if (safe) {
   simulations <- map(simulations, "result")
 }
 
+
 # Collecting results: (result order is scrambled because of parallelization)
+simulations_meta <- params$sgps[unique(menu$dgps$sgp)] |>
+  map(\(xsgp) {
+    map(xsgp$args, \(x) {
+      x$mu <- x$mu %||% 0
+      x$sigma <- x$sigma %||% 1
+      unlist(x)
+    }) |>
+      do.call(rbind, args = _) |>
+      `rownames<-`(c("R1", "R2"))
+  }) |>
+  map(~ list(coefs = .x)) %>%
+  {tibble(sgp = names(.), meta = .)} |>
+  full_join(select(menu$dgps, sgp, rgp), by = "sgp") |>
+  relocate(sgp, rgp, meta) |>
+  arrange(sgp, rgp)
+
 simulations_data <- simulations |>
-  imap_dfr(~ {.x$sim_name <- .y; .x}) |> # Recicles r's n. of columns
+  imap_dfr(~ c(sim_name = .y, .x[])) |>
   mutate( # Faster than separate
     sim_name = str_split_fixed(sim_name, "-", 3),
     sgp = sim_name[, 1], rgp = sim_name[, 2], sim = as.integer(sim_name[, 3]),
     sim_name = NULL
   ) |>
-  mutate(
-    r = max.col(r, ties.method = "first"), # Solves 1 to n recicling
-    #sgp = factor(sgp, unique(dgp_names$sgp)),
-    #rgp = factor(rgp, unique(dgp_names$rgp))
-  ) |>
   group_by(sgp, rgp, sim) |>
   mutate(t = 1:n_t) |>
   ungroup() |>
-  select(sgp, rgp, sim, t, y, r) |>
+  relocate(sgp, rgp, sim, t, r, y) |>
   arrange(sgp, rgp, sim, t)
 
 
-# Proportions of regimes:
-regimes_prop_table <- with(global_env(), {
-  data <- simulations_data |>
-    group_by(rgp, sgp) |>
-    summarise(prop_sgp = abs(sum(r == 1) / n() - 0.5) |> round(2)) |>
-    group_by(rgp) |>
-    mutate(prop_base = mean(prop_sgp) |> round(2)) |>
-    pivot_wider(names_from = sgp, values_from = prop_sgp)
 
-  data |>
-    mutate(rgp = dicts$rgps$gt[rgp]) |>
-    rename_with(~ dicts$sgps$gt[.x] %>% ifelse(is.na(.), .x, .)) |>
-    rename("RGP" = rgp, "Uncond." = prop_base) |>
-    gt(rowname_col = "RGP", groupname_col = NULL) |>
-    cols_label_with(fn = md) |>
-    fmt_markdown(RGP)
+# Diagnostics: Simulations ----------------------------------------------------------
+
+diag_obs_remove <- list()
+
+# NAs:
+with(simulations_data, {
+  print(glue("NAs in r: {any(is.na(r))}\nNAs in y: {any(is.na(y))}"))
 })
-regimes_prop_table
+
+
+# Remove sims with only 1 r:
+simulations_data |>
+  filter(t > n_b) |>
+  group_by(sgp, rgp, sim) |>
+  summarise(
+    n_r_rgp = as.integer(gsub("r([0-9])+_.+", "\\1", rgp[1])),
+    n_r_sim = length(unique(r))
+  ) |>
+  filter(n_r_sim != n_r_rgp)
+# Currently they are not removed
+
+
+# Proportions of regimes:
+diag_regimes_sim <- diagnostics$regimes_proportions_sim(simulations_data)
+diag_regimes_sim
 
 if (FALSE) {
-  gtsave(regimes_prop_table, "outputs/diagnostics/regimes_proportions.tex")
+  gtsave(diag_regimes_sim, "outputs/diagnostics/regimes_sim.tex")
 }
 
 
 
-# Estimation: Models -----------------------------------------------------------
 
-# Used models:
-dput(names(options$models))
+# Simulation: Estimations ------------------------------------------------------
 
-model_names <- expand_grid(
-  sim_names,
-  model = c(
-    "r1_no_rs",
-    #"r2_sbreak",
-    "r2_threshold_x",
-    #"r2_threshold_abs",
-    #"r2_threshold_diff",
-    "r2_stransition",
-    "r2_markov",
-    NULL
-  )
-) |>
-  mutate(dgp_sim_model = str_c(dgp_sim, "-", model))
-
-n_l <- 1 # Can be arbitrarily large, must be at least the max n_l used in models
-n_m <- length(unique(model_names$model))
-
-
-# Estimation inputs:
+# Estimation inputs and function:
 est_inputs <- map2(
   simulations,
   get_varying_param(names(simulations)),
   \(sim, rn_par) list(y = sim$y, rn_par = rn_par)
 )
 
+n_l_max <- map_dbl(options$models, ~ fn_env(.x)$n_l) |> max()
 
-# Estimation function:
-# Example: `input <- est_inputs[["r2_ar1_rho2-r2_threshold_x_0-2"]]`
 estimate_models <- function(input) {
-  data <- data_lags(data.frame(y = input$y), n_l = n_l)
+  data <- data_lags(data.frame(y = input$y), n_l = n_l_max)
 
   results <- vector("list", n_m)
   names(results) <- names(mods)
@@ -258,21 +205,22 @@ estimate_models <- function(input) {
   results
 }
 
+
 # Running estimations:
-considered_models <- options$models[unique(model_names$model)]
+est_models <- options$models[unique(menu$ests$model)]
 safe <- TRUE
-if (safe) considered_models <- map(considered_models, safely_modify)
+if (safe) est_models <- map(est_models, safely_modify)
+if (FALSE) est_inputs <- est_inputs[as.integer(str_split_i(names(est_inputs), "-", 3)) %in% filter_sim_i]
 
 estimations <- map_parallel(
-  est_inputs %>% sample(100 %||% length(.)), estimate_models,
-  parallel = TRUE, safe = FALSE, workers = 7,
-  setup_packages = c("mbreaks", "tsDyn", "MSwM", "stats"),
+  est_inputs, estimate_models,
+  parallel = TRUE, safe = FALSE,
+  setup_packages = c("tsDyn", "MSwM", "stats"), # Packages used in estimation functions
   setup_data = list(
-    mods = considered_models, data_lags = data_lags,
-    n_b = n_b, n_h = n_h, n_t = n_t, n_l = n_l, n_m = n_m
+    mods = est_models, data_lags = data_lags,
+    n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = n_m
   )
 )
-
 
 # Saving results:
 if (FALSE) {
@@ -283,115 +231,187 @@ if (FALSE) {
 # Checking errors:
 if (safe) {
   compact(map(estimations, ~ compact(map(.x, "error")))) |>
-    cli_alert_items(flatten = TRUE)
+    cli_alert_items("outputs/diagnostics/estimation_errors.md", flatten = TRUE)
   estimations <- map(estimations, ~ compact(map(.x, "result")))
 }
 
-# Checking regimes:
-.regimes_per_model <- imap_dfr(estimations, \(sim, name) {
-  imap(sim, \(model, mname) {
-    tab <- tabulate(model$r)
-    list(model = mname, n_r = length(tab), min = min(tab))
-  }) |>
-    bind_rows() |>
-    mutate(name = name, .before = 1)
-}) |>
-  mutate(correct_regimes = as.integer(gsub("r([0-9]+)_.+", "\\1", model))) |>
-  filter(correct_regimes != n_r | min <= 1)
-# Consider `| is.na(n_r)`
-
-table(.regimes_per_model$model, .regimes_per_model$value)
-for (l in split(.regimes_per_model, seq_len(nrow(.regimes_per_model)))) {
-  estimations[[l$name]][[l$model]] <- NULL
-}
-estimations <- map(estimations, compact)
 
 # Collecting results:
 estimations_flat <- list_flatten(estimations, name_spec = "{outer}-{inner}")
 
 estimations_meta <- estimations_flat |>
-  purrr::imap(~ c(dgp_sim_model = .y, meta = list(list(.x$meta)))) |>
-  bind_rows() |>
-  separate_wider_delim(
-    dgp_sim_model, delim = "-",
-    names = c("sgp", "rgp", "sim", "model")
-  ) |>
+  imap_dfr(~ c(dgp_sim_model = .y, meta = list(list(.x$meta)))) |>
   mutate(
-    across(c(sim), as.integer)
+    dgp_sim_model = str_split_fixed(dgp_sim_model, "-", 4),
+    sgp = dgp_sim_model[, 1], rgp = dgp_sim_model[, 2],
+    sim = as.integer(dgp_sim_model[, 3]), model = dgp_sim_model[, 4],
+    dgp_sim_model = NULL
   ) |>
-  left_join(
-    simulations_meta, by = c("sgp", "rgp"), suffix = c("_est", "_sim")
-  )
+  left_join( # * More memory usage, but avoids repeating the join
+    simulations_meta,
+    by = c("sgp", "rgp"), suffix = c("_est", "_sim"),
+    na_matches = "never", relationship = "many-to-one", unmatched = "error"
+  ) |>
+  relocate(sgp, rgp, sim, model, meta_sim, meta_est) |>
+  arrange(sgp, rgp, sim)
 
 estimations_data <- estimations_flat |>
-  purrr::imap(~ c(dgp_sim_model = .y, t = list(1:n_t), .x[c("y", "r")][])) |>
-  bind_rows() |>
-  separate_wider_delim(
-    dgp_sim_model, delim = "-",
-    names = c("sgp", "rgp", "sim", "model")
-  ) |>
+  imap_dfr(~ c(dgp_sim_model = .y, t = list(1:n_t), .x[c("y", "r")][])) |>
   mutate(
-    across(c(sgp, rgp, model), fct),
-    across(c(sim, r), as.integer)
-  )
+    dgp_sim_model = str_split_fixed(dgp_sim_model, "-", 4),
+    sgp = dgp_sim_model[, 1], rgp = dgp_sim_model[, 2],
+    sim = as.integer(dgp_sim_model[, 3]), model = dgp_sim_model[, 4],
+    dgp_sim_model = NULL
+  ) |>
+  left_join( # * More memory usage, but avoids repeating the join
+    simulations_data,
+    by = c("sgp", "rgp", "sim", "t"), suffix = c("_est", "_sim"),
+    na_matches = "never", relationship = "many-to-one", unmatched = "error"
+  ) |>
+  mutate(y_err = y_est - y_sim, r_err = r_sim != r_est) |>
+  relocate(sgp, rgp, sim, model, t, r_sim, y_sim, r_est, y_est) |>
+  arrange(sgp, rgp, sim, model, t)
 
 
 
-# Estimation: Metrics ----------------------------------------------------------
+# Diagnostics: Estimations -----------------------------------------------------
 
-metrics_data <- metrics$get_metrics_data(
-  simulations_data, estimations_data, estimations_meta,
-  n_t = n_t, n_b = n_b + n_l + 1, n_h = n_h
+# NAs:
+diagnostics$nas_on_fit(estimations_data)
+# Personal diagnostic: Ok
+
+diag_na_coef <- diagnostics$nas_on_coefs(estimations_meta, estimations_data)
+diag_obs_remove$na_coefs <- diag_na_coef |>
+  filter(na_mu | na_rho1 | na_sigma) |>
+  with(paste(sgp, rgp, sim, model, sep = "-"))
+# Personal diagnostic: Can happen on n_r_est = 1 or regimes with only one obs.
+# Must investigate if it is the case (see diagnostics/estimations.R)
+
+
+# Fit and forecasting errors distributions:
+diagnostics$erros_distribution_est(
+  estimations_data, residuals = TRUE, lims = c(x = 20, y = 0.08)
 )
 
 if (FALSE) {
-  #write_rds2(metrics_data, "data/metrics_data.rds")
-  metrics_data <- read_rds("data/metrics_data.rds")
+  ggsave2("outputs/diagnostics/residuals_distribution.pdf", 15, 0.8)
 }
 
-
-
-# Results: Diagnostics ---------------------------------------------------------
-
-# Simulation metrics:
-diag_sim <- diagnostics$moments_table(simulations_data, simulations_meta,
-  rgp %in% groups$rgp_sym, sgp %in% groups$sgp_big,
-  test = TRUE
+diag_high_rmse <- diagnostics$erros_distribution_est(
+  estimations_data, residuals = FALSE, lims = c(x = 20, y = 0.08), cut_n = 4
 )
-diag_sim
+# Personal diagnostic: currently ~10k obs. outside the bounds. Hugh errors
+# are considered estimation issues and are removed as below
+
+diag_obs_remove$high_error <- diag_high_rmse |>
+  filter(outlier) |>
+  with(paste(sgp, rgp, sim, model, sep = "-"))
 
 if (FALSE) {
-  gtsave(diag_sim, "outputs/diagnostics/simulations_metrics.tex")
+  ggsave2("outputs/diagnostics/forecast_errors_distribution.pdf", 15, 0.8)
 }
 
 
-# Estimations coefficients:
-diag_est <- diagnostics$coefs_table(estimations_meta,
+# Regimes proportions:
+diag_regimes_est <- diagnostics$regimes_proportions_est(
+  estimations_data, n_l = n_l_max
+)
+# Personal diagnostic: Must remove obs. with n_r_est = 1 and n_smallest = 1
+
+diag_obs_remove$few_r_obs <- diag_regimes_est |>
+  filter(n_rare %in% c(0, 1)) |>
+  with(paste(sgp, rgp, sim, model, sep = "-"))
+
+if (FALSE) {
+  ggsave2("outputs/diagnostics/regimes_est.pdf", 15, 0.7)
+}
+
+
+# Parameters distribution:
+diagnostics$parameters_distribution(
+  estimations_meta, estimations_data, rmv_out = FALSE
+)
+diag_param_data <- diagnostics$parameters_distribution(
+  estimations_meta, estimations_data,
+  q = 0.95, k = 20, rmv_out = TRUE
+)
+# Personal diagnostic: removed (mu / rho1/ sd): 414, 195 / 190, 0 / 0, 0
+
+diag_obs_remove$high_params <- diag_param_data |>
+  filter(out) |>
+  distinct(sgp, rgp, sim, model) |>
+  with(paste(sgp, rgp, sim, model, sep = "-"))
+
+if (FALSE) {
+  ggsave2("outputs/diagnostics/parameters_distribution.pdf", 15, 0.8)
+}
+
+
+# Other metadata distribution:
+diagnostics$meta_distribution(estimations_meta)
+# Personal diagnostic: Ok
+
+if (FALSE) {
+  ggsave2("outputs/diagnostics/metadata_distribution.pdf", 15, 0.8)
+}
+
+# Removing issues:
+diag_obs_remove_table <- diagnostics$save_obs_removed(diag_obs_remove)
+diag_obs_remove_table
+
+if (FALSE) {
+  gtsave(diag_obs_remove_table, "outputs/diagnostics/estimation_issues.tex")
+}
+
+estimations_meta <- estimations_meta |>
+  filter(! paste(sgp, rgp, sim, model, sep = "-") %in% reduce(diag_obs_remove, union))
+estimations_data <- estimations_data |>
+  filter(! paste(sgp, rgp, sim, model, sep = "-") %in% reduce(diag_obs_remove, union))
+
+
+
+# Diagnostics: Tests -----------------------------------------------------------
+
+# Metrics' analytical test:
+diag_metrics_table <- diagnostics$metrics_table(
+  simulations_data, simulations_meta,
+  rgp %in% groups$rgp_sym, sgp %in% groups$sgp_big
+)
+# * Currently only for symmetric RGPs and big SGPs
+diag_metrics_table
+
+if (FALSE) {
+  gtsave(diag_metrics_table, "outputs/diagnostics/metrics_table.tex")
+}
+
+
+# Coefficients' analytical test:
+diag_coefs_table <- diagnostics$coefs_table(estimations_meta,
   rgp %in% groups$rgp_sym,
   sgp %in% groups$sgp_big,
   (rgp == "r2_markov_symm_high" & model == "r2_markov") |
     (rgp == "r2_threshold_symm_x" & model == "r2_threshold_x") |
-    (rgp == "r2_stransition_symm_l" & model == "r2_stransition"),
-  test = TRUE
+    (rgp == "r2_stransition_symm_l" & model == "r2_stransition")
 )
-diag_est
+# * Currently only for symmetric RGPs and big SGPs, and 'correct' model-RGP pairs
+diag_coefs_table
 
 if (FALSE) {
-  gtsave(diag_est, "outputs/diagnostics/estimations_coefs.tex")
+  gtsave(diag_coefs_table, "outputs/diagnostics/coefs_table.tex")
 }
 
 
-# Improbable counts:
-diag_counts <- diagnostics$improbable_counts(
-  estimations_data, simulations_data,
-  n_b = n_b, n_t = n_t, n_h = n_h
-)
-diag_counts
+# Independence of simulation index
+diag_i_independence <- estimations_data |>
+  group_by(sgp, rgp, sim, model) |>
+  summarise(rmse = sqrt(mean(y_err^2, na.rm = TRUE))) |>
+  lm(rmse ~ poly(sim, 3) + log(sim), data = _) |> # Also consider lm(rmse) and MAPE
+  print_summary()
 
 if (FALSE) {
-  writeLines(
-    imap_chr(diag_counts, ~ glue("{.y}: {formatC(.x, 8, format = 'f')}")),
-    "outputs/diagnostics/improbable_counts.txt"
+  results$format_reg_table(
+    diag_i_independence, "outputs/diagnostics/i_independence.tex",
+    single.row = TRUE, df = FALSE
   )
 }
 
@@ -400,40 +420,41 @@ if (FALSE) {
 # Results: Exploratory Analysis ------------------------------------------------
 
 # Metrics separation in T:
-res_met_table <- results$metrics_sep_table(simulations_data,
-  sim %in% sample(n_s, 20), rgp %in% groups$rgp_sym
+exp_met_table <- results$metrics_sep_table(simulations_data,
+  sim %in% filter_sim_i, rgp %in% groups$rgp_sym
 )
-res_met_table
+# * Currently only for symmetric RGPs
+exp_met_table
 
 if (FALSE) {
-  gtsave(res_met_table, "outputs/exploratory/metrics_sep_t.tex")
+  gtsave(exp_met_table, "outputs/exploratory/metrics_sep_t.tex")
 }
 
 
 # Metrics separation across t:
-res_met_graphs <- results$metrics_sep_graphs(simulations_data,
-  n_t = n_t,
-  sim %in% sample(n_s, 10), sgp %in% groups$sgp_big
+exp_met_graphs <- results$metrics_sep_graphs(simulations_data,
+  sim %in% filter_sim_i, sgp %in% groups$sgp_big
 )
-res_met_graphs[[2]]
+# * Currently only for big SGPs
+exp_met_graphs[[3]]
 
 if (FALSE) {
-  iwalk(res_met_graphs, \(graph, name) {
+  iwalk(exp_met_graphs, \(graph, name) {
     ggsave2(plot = graph, glue("outputs/exploratory/metrics_sep_{name}.pdf"), 8, 1)
   })
 }
 
 
 # Forecasting errors and regimes:
-res_regimes_graphs <- results$regimes_rmse_graphs(
-  estimations_data, simulations_data, n_t = n_t, n_h = n_h,
-  #row_number() %in% sample(n(), 1000),
+exp_regimes_graphs <- results$regimes_rmse_graphs(
+  estimations_data, simulations_data,
+  sim %in% filter_sim_i,
   rgp %in% c("r1_no_rs", groups$rgp_sym), sgp %in% groups$sgp_big
 )
-res_regimes_graphs[[1]]
+exp_regimes_graphs[[2]]
 
 if (FALSE) {
-  iwalk(res_regimes_graphs, \(graph, name) {
+  iwalk(exp_regimes_graphs, \(graph, name) {
     ggsave2(plot = graph, glue("outputs/exploratory/rmse_regimes_{name}.pdf"), 8, 1)
   })
 }
@@ -442,39 +463,42 @@ if (FALSE) {
 
 # Results: Systematic Analysis -------------------------------------------------
 
-# Setup:
-colnames(metrics_data)
+# Data:
+metrics_data <- metrics$get_metrics_data(estimations_data, estimations_meta)
 
-imap_dfr(select(metrics_data, where(is.numeric)), \(col, col_name) {
+if (FALSE) {
+  #write_rds2(metrics_data, "data/metrics_data.rds")
+  metrics_data <- read_rds("data/metrics_data.rds")
+}
+
+imap_dfr(select(metrics_data, -(sgp:model)), \(col, col_name) {
   c(
     col = col_name,
     class = class(col),
     nas = sum(is_na(col) & ! is.nan(col)),
     nans = sum(is.nan(col)),
     infs = sum(is.infinite(col)),
-    outliers = sum(abs(col) > 30 * trimmed_sd(col), na.rm = TRUE)
+    outliers = ifelse(grepl("_sim$", col_name),
+      0,
+      sum(abs(col) - median(col) > 100 * mad(col), na.rm = TRUE)
+    )
   )
 }) |>
   print(n = Inf)
 
 sys_data <- metrics_data |>
   mutate(
-    across(where(is.numeric), ~ ifelse(!is.finite(.x), NA_real_, .x)),
+    across(-(sgp:model), ~ ifelse(!is.finite(.x), NA_real_, .x)),
+    #across(-(sgp:model), ~ ifelse(abs(.x) <= 30 * mad(.x), .x, NA_real_)),
     across(
-      c(mu_est, rho1_est, sigma_est, mu_diff, rho1_diff, sigma_diff, rmse, mape, r2),
-      ~ ifelse(abs(.x) <= 30 * trimmed_sd(.x), .x, NA_real_)
-    ),
-    across(
-      c(where(is.numeric), -sim, -rmse, -mape, -r2),
+      c(-(sgp:model), -rmse, -mape), # r2 is only used as control
       ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)
     ),
-    model = fct(model, unique(model_names$model)),
-    rgp = fct(rgp, unique(model_names$rgp)),
+    model = fct(model, unique(menu$ests$model)),
+    rgp = fct(rgp, unique(menu$ests$rgp)),
+    sgp = fct(sgp, unique(menu$ests$sgp)),
     is_mis = str_replace(rgp, "(r[0-9]+_[^_]+)_.+", "\\1") != as.character(model)
   )
-
-abs(metrics_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, 50, Inf)) |> table()
-abs(sys_data$rmse) |> cut(breaks = c(0, 0.5, 1, 5, 10, 20, 50, Inf)) |> table()
 
 
 # Correlations:
@@ -492,17 +516,6 @@ which(cor_mat >= 0.8, arr.ind = TRUE) %>%
     col = colnames(cor_mat)[.[, "col"]]
   )}
 
-
-# Diagnosticos:
-lm(log(rmse) ~ poly(sim, 3) + log(sim), sys_data) |> print_summary()
-sys_i <- lm(rmse ~ poly(sim, 3) + log(sim), sys_data) |> print_summary()
-
-if (FALSE) {
-  format_reg_table(
-    sys_i, "outputs/systematic/i.tex",
-    single.row = TRUE, df = FALSE
-  )
-}
 
 
 # Models FE:
@@ -536,12 +549,6 @@ if (FALSE) {
 
 
 # Models misspecifications:
-mods_groups <- list(
-  sym = c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-  asym = c("r2_markov_symm_low", "r2_sbreak_end", "r2_threshold_x_05", "r2_stransition_l05"),
-  rn = c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0")
-)
-
 sys_mis <- list()
 
 sys_mis$is <- lm(
@@ -550,7 +557,7 @@ sys_mis$is <- lm(
 ) |> print_summary()
 
 if (FALSE) {
-  format_reg_table(
+  results$format_reg_table(
     sys_mis$is, out = "outputs/systematic/mis_is.tex",
     single.row = TRUE, df = FALSE
   )
@@ -558,11 +565,11 @@ if (FALSE) {
 
 sys_mis$sym <- lm(
   rmse ~ model * rgp - 1,
-  filter(sys_data, rgp %in% mods_groups$sym)
+  filter(sys_data, rgp %in% c("r1_no_rs", groups$rgp_sym))
 ) |> print_summary()
 
 if (FALSE) {
-  format_reg_matrix(
+  results$format_reg_matrix(
     sys_mis$sym, out = "outputs/systematic/mis_sym.tex"
   )
 }
@@ -570,11 +577,11 @@ if (FALSE) {
 
 sys_mis$asym <- lm(
   rmse ~ model * rgp - 1,
-  filter(sys_data, rgp %in% mods_groups$asym)
+  filter(sys_data, rgp %in% c("r1_no_rs", groups$rgp_asym))
 ) |> print_summary()
 
 if (FALSE) {
-  format_reg_matrix(
+  results$format_reg_matrix(
     sys_mis$asym, out = "outputs/systematic/mis_asym.tex"
   )
 }
@@ -582,36 +589,36 @@ if (FALSE) {
 
 sys_mis$rn <- lm(
   rmse ~ model * rgp - 1,
-  filter(sys_data, rgp %in% mods_groups$rn, grepl("2$", sgp))
+  filter(sys_data, rgp %in% c("r1_no_rs", groups$rgp_sym), grepl("2$", sgp))
 ) |> print_summary()
 
 if (FALSE) {
-  format_reg_matrix(
+  results$format_reg_matrix(
     sys_mis$rn, out = "outputs/systematic/mis_rn.tex"
   )
 }
 
 
 # Model mis. with true metrics:
-sys_mis$metrics_true <- lm(
-  rmse ~ model * (avg_true + acf_true + sd_true) - 1,
-  filter(sys_data, rgp %in% mods_groups$sym)
+sys_mis$metrics_sim <- lm(
+  rmse ~ model * (avg_sim + acf_sim + sd_sim) - 1,
+  filter(sys_data, rgp %in% c("r1_no_rs", groups$rgp_sym))
 ) |> print_summary()
 
 if (FALSE) {
-  format_reg_matrix(
-    sys_mis$metrics_true, out = "outputs/systematic/mis_metrics_true.tex"
+  results$format_reg_matrix(
+    sys_mis$metrics_sim, out = "outputs/systematic/mis_metrics_sim.tex"
   )
 }
 
-sys_mis$metrics_true_int <- lm(
-  rmse ~ model * (avg_true + acf_true + sd_true) - 1,
-  filter(sys_data, rgp %in% mods_groups$sym)
+sys_mis$metrics_sim_int <- lm(
+  rmse ~ model * (avg_sim + acf_sim + sd_sim) - 1,
+  filter(sys_data, rgp %in% c("r1_no_rs", groups$rgp_sym))
 ) |> print_summary()
 
 if (FALSE) {
-  format_reg_matrix(
-    sys_mis$metrics_true_int, out = "outputs/systematic/mis_metrics_true_int.tex"
+  results$format_reg_matrix(
+    sys_mis$metrics_sim_int, out = "outputs/systematic/mis_metrics_sim_int.tex"
   )
 }
 
@@ -619,11 +626,11 @@ if (FALSE) {
 # Model mis. with estimated metrics:
 sys_mis$metrics <- lm(
   rmse ~ model * (avg_est + acf_est + sd_est) - 1,
-  filter(sys_data, rgp %in% mods_groups$sym)
+  filter(sys_data, rgp %in% c("r1_no_rs", groups$rgp_sym))
 ) |> print_summary()
 
 if (FALSE) {
-  format_reg_matrix(
+  results$format_reg_matrix(
     sys_mis$metrics, out = "outputs/systematic/mis_metrics.tex"
   )
 }
@@ -655,12 +662,11 @@ sys_match$coefs <- lm(rmse ~ mu_diff + rho1_diff + sigma_diff - 1, sys_data)
 sys_match$metrics <- lm(rmse ~ avg_diff + acf_diff + sd_diff - 1, sys_data)
 
 if (FALSE) {
-  format_reg_table(
+  results$format_reg_table(
     sys_match, out = "outputs/systematic/match.tex", type = "text",
     single.row = TRUE, df = FALSE
   )
 }
-
 
 sys_match$metrics_int <- lm(
   rmse ~ model:(avg_diff + acf_diff + sd_diff) - 1,
@@ -668,7 +674,7 @@ sys_match$metrics_int <- lm(
 ) |> print_summary()
 
 if (FALSE) {
-  format_reg_matrix(
+  results$format_reg_matrix(
     sys_match$metrics_int, out = "outputs/systematic/match_metrics.tex", type = "text",
     rows = 1:9
   )

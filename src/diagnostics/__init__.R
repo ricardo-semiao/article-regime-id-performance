@@ -1,6 +1,7 @@
 
 #' @export
 box::use(
-  ./errors[...],
-  ./simulations[...]
+  ./simulations[...],
+  ./estimations[...],
+  ./metrics_coefs[...]
 )

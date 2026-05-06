@@ -40,7 +40,7 @@ bare_cor <- function(x, y, ...) {
 fn_env(bare_cor) <- pkg_env("base")
 
 bare_stats <- new_environment(
-  list(cov = bare_cov, cor = bare_cor, sd = bare_sd, lag = lag),
+  list(cov = bare_cov, cor = bare_cor, sd = bare_sd, lag = lag, acor = acor),
   pkg_env("base")
 )
 
@@ -101,24 +101,22 @@ fn_env(performance_r2) <- pkg_env("base")
 
 #' Metrics - performance: RMSE
 #' @export
-performance_rmse <- function(y_est, y_true, ...) {
-  error <- y_est - y_true
-  sqrt(mean(error^2, ...))
+performance_rmse <- function(y_err, ...) {
+  sqrt(mean(y_err^2, ...))
 }
 fn_env(performance_rmse) <- pkg_env("base")
 
 #' Metrics - performance: MAPE
 #' @export
-performance_mape <- function(y_est, y_true, ...) {
-  error <- y_est - y_true
-  mean(abs(error) / abs(y_true), ...)
+performance_mape <- function(y_err, y_true, ...) {
+  mean(abs(y_err) / abs(y_true), ...)
 }
 fn_env(performance_mape) <- pkg_env("base")
 
 #' Metrics - performance: Binary ME (for r)
 #' @export
-performance_bme <- function(r_est, r_true, ...) {
-  mean(r_est != r_true, ...)
+performance_bme <- function(r_err, ...) {
+  mean(r_err, ...)
 }
 fn_env(performance_bme) <- pkg_env("base")
 
@@ -131,7 +129,7 @@ fn_env(performance_bme) <- pkg_env("base")
 
 #' Metrics - series: Conditional average
 #' @export
-series_avg <- function(y, r, n_r = max(r), ...) {
+series_avg <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
     mean(y[r == s], ...)
   })
@@ -141,7 +139,7 @@ fn_env(series_avg) <- pkg_env("base")
 #' Metrics - series: Conditional ACF
 #' @param n [`integer(1)`] Lag order.
 #' @export
-series_acf <- function(y, r, n_r = max(r), n = 1, ...) {
+series_acf <- function(y, r, n_r = max(r, na.rm = TRUE), n = 1, ...) {
   t <- 1:length(y)
 
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
@@ -149,7 +147,7 @@ series_acf <- function(y, r, n_r = max(r), n = 1, ...) {
 
     cors <- vapply(instances, FUN.VALUE = double(1), \(yi) {
       if (length(yi) <= n + 1) return(0)
-      cor(yi[-(1:n)], lag(yi, n)[-(1:n)], ...)
+      acor(yi, p = n, ...)
     })
 
     weigths <- vapply(seq_along(instances), FUN.VALUE = double(1), \(i) {
@@ -163,15 +161,16 @@ fn_env(series_acf) <- bare_stats
 
 #' Metrics - series: Conditional ACF
 #' @export
-series_sign_prop <- function(y, r, n_r = max(r), ...) {
+series_sign_prop <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
     mean(diff(y[r == s]) >= 0, ...)
   })
 }
+fn_env(series_sign_prop) <- bare_stats
 
 #' Metrics - series: Conditional SD
 #' @export
-series_sd <- function(y, r, n_r = max(r), ...) {
+series_sd <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
     sd(y[r == s], ...)
   })
@@ -186,7 +185,7 @@ fn_env(series_sd) <- bare_stats
 
 #' Metrics - series: Conditional average
 #' @export
-analytical_avg <- function(coefs, n_r = max(r)) {
+analytical_avg <- function(coefs, n_r = max(r, na.rm = TRUE)) {
   apply(coefs, 1, \(coefs_s) {
     coefs_s["mu"] / (1 - coefs_s["rho1"])
   })
@@ -196,7 +195,7 @@ fn_env(analytical_avg) <- pkg_env("base")
 #' Metrics - series: Conditional ACF
 #' @param n [`integer(1)`] Lag order.
 #' @export
-analytical_acf <- function(coefs, n_r = max(r), lag = 1) {
+analytical_acf <- function(coefs, n_r = max(r, na.rm = TRUE), lag = 1) {
   apply(coefs, 1, \(coefs_s) {
     coefs_s["rho1"]^lag
   })
@@ -205,7 +204,7 @@ fn_env(analytical_acf) <- pkg_env("base")
 
 #' Metrics - series: Conditional SD
 #' @export
-analytical_sd <- function(coefs, n_r = max(r)) {
+analytical_sd <- function(coefs, n_r = max(r, na.rm = TRUE)) {
   apply(coefs, 1, \(coefs_s) {
     sqrt(coefs_s["sigma"]^2 / (1 - coefs_s["rho1"]^2))
   })
@@ -223,18 +222,19 @@ fn_env(analytical_sd) <- pkg_env("base")
 #' For each regime's observations, counts how many had a different previous
 #'  value
 #' @export
-regimes_instances <- function(y, r, n_r = max(r), ...) {
+regimes_instances <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
     sum((c(1, diff(r)) != 0)[r == s], ...)
   })
 }
+fn_env(regimes_instances) <- pkg_env("base")
 
 #' Metrics - regimes: Average duration of regimes' instances
 #' The cumulative sum of absolute differences generates a unique id for each
 #'  instance (across all regimes). `r == s` subsets the ones for a specific
 #'  regime, and table counts how many observations each instance had.
 #' @export
-regimes_duration <- function(y, r, n_r = max(r), ...) {
+regimes_duration <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
     mean(table(cumsum(abs(c(0, diff(r))))[r == s]), ...)
   })
@@ -247,7 +247,7 @@ fn_env(regimes_duration) <- pkg_env("base")
 #' @param prop [`logical(1)`] Whether to return transition probabilities
 #' @returns [`matrix(, n_r, n_r)`]
 #' @export
-regimes_transmat <- function(y, r, n_r = max(r), prop = TRUE, ...) {
+regimes_transmat <- function(y, r, n_r = max(r, na.rm = TRUE), prop = TRUE, ...) {
   if (n_r < 2) {
     n_r <- 2
     cli_warn("{.arg n_r} must be atleast 2, assuming {.code n_r = 2}.")
@@ -261,17 +261,18 @@ regimes_transmat <- function(y, r, n_r = max(r), prop = TRUE, ...) {
 
   if (prop) counts / rowSums(counts) else counts
 }
+fn_env(regimes_transmat) <- pkg_env("base")
 
 #' TODO: document
 #' @export
-average_switches <- function(y, r, n_r = max(r), ...) {
+average_switches <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   sum(diff(r) != 0) / length(y)
 }
 fn_env(average_switches) <- pkg_env("base")
 
 #' TODO: document
 #' @export
-duration_diff <- function(y, r, n_r = max(r), ...) {
+duration_diff <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   durations <- regimes_duration(y, r, n_r, ...)
   abs(durations[1] - durations[2])
 }

@@ -145,7 +145,7 @@ data_tmp <- imap(simulations_tmp[sample(length(simulations_tmp), 5000)], \(res, 
   tibble(
     sgp = fct(sim_opts[1]), rgp = fct(sim_opts[2]),
     sim = as.integer(sim_opts[3]),
-    t = 1:n_t, y = res$y, r = max.col(res$r)
+    t = 1:n_t, y = res$y, r = max.col(res$r, ties.method = "first")
   )
 }) |>
   bind_rows()

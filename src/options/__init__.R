@@ -1,5 +1,6 @@
 
 box::use(
+  src/utils[...],
   ./models,
   ./rgps,
   ./sgps,
@@ -8,32 +9,28 @@ box::use(
 )
 
 
-# * Based on n_r = 2, can be expanded
-dict_regimes <- list(
-  metrics = list(
-    avg_1 = md("$s = 1$"), avg_2 = md("$s = 2$"), avg_0 = md("$\\perp s$"),
-    acf_1 = md("$s = 1$"), acf_2 = md("$s = 2$"), acf_0 = md("$\\perp s$"),
-    sd_1 =  md("$s = 1$"), sd_2 =  md("$s = 2$"), sd_0 =  md("$\\perp s$")
+dict_metrics <- list3(
+  cond_gt = c(
+    avg = r"($\hat{\mu}(. | s)$)",
+    acf = r"($\hat{\rho}_1(. | s)$)",
+    sd = r"($\hat{\sigma}(. | s)$)"
   ),
-  coefs = list(
-    r1_mu = md("$s = 1$"), r2_mu = md("$s = 2$"),
-    r1_rho1 = md("$s = 1$"), r2_rho1 = md("$s = 2$"),
-    r1_sigma =  md("$s = 1$"), r2_sigma =  md("$s = 2$")
-  )
+  disp_gt = c(
+    avg = r"($d(\hat{\mu}(.))$)",
+    acf = r"($d(\hat{\rho}_1(.))$)",
+    sd = r"($d(\hat{\sigma}(.))$)"
+  ),
+  disp_gg = map_chr(disp_gt, \(x) attr(TeX(x), "plotmath"))
 )
 
-dict_metrics <- list(
-  gt = list(
-    avg = md("$\\hat{\\mu}(.)$"),
-    acf = md("$\\hat{\\rho}_1(.)$"),
-    sd = md("$\\hat{\\sigma}(.)$")
+dict_params <- list3(
+  gt_s = c(
+    mu = r"($\mu^s$)", rho1 = r"($\rho^s_1$)", sigma = r"($\sigma^s$)"
   ),
-  gg = list(
-    avg = "$\\hat{\\mu}(.)$",
-    acf = "$\\hat{\\rho}_1(.)$",
-    sd = "$\\hat{\\sigma}(.)$"
-  ) |>
-    vapply(\(x) attr(TeX(x), "plotmath"), character(1))
+  gt = c(
+    mu = r"($\mu$)", rho1 = r"($\rho_1$)", sigma = r"($\sigma$)"
+  ),
+  gg = map_chr(gt, \(x) attr(TeX(x), "plotmath"))
 )
 
 #' Names' dictionaries for each option
@@ -42,8 +39,8 @@ dicts <- list(
   models = models$dict,
   rgps = rgps$dict,
   sgps = sgps$dict,
-  regimes = dict_regimes,
-  metrics = dict_metrics
+  metrics = dict_metrics,
+  params = dict_params
 )
 
 #' Parameters for each option

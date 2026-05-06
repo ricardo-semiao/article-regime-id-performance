@@ -1,243 +1,130 @@
 
-
-# Setup ----------------------------------------------------------
+# Setup ------------------------------------------------------------------------
 
 box::use(
   src/utils[...],
   src/options[dicts],
-  src/metrics[analytical_avg, analytical_acf, analytical_sd],
+  ggplot2[...],
   gt[...],
-  ggplot2[...]
+  patchwork[...]
 )
 
 
-# Temporary example:
+# Temporary example
 if (FALSE) {
-  data_e = simulations_data; data_m = simulations_meta;
-  test = TRUE; cond = TRUE
-  filters = exprs(
-    rgp %in% c("r2_threshold_symm_x", "r2_stransition_symm_l", "r2_markov_symm_high"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2")
-  )
-  data = estimations_meta
-  filters = exprs(
-    rgp %in% c("r2_markov_symm_high", "r2_sbreak_mid", "r2_threshold_x_0", "r2_stransition_l0"),
-    sgp %in% c("r2_ar1_mu2", "r2_ar1_rho2", "r2_ar1_sigma2"),
-    (rgp == "r2_markov_symm_high" & model == "r2_markov") |
-      (rgp == "r2_sbreak_mid" & model == "r2_sbreak") |
-      (rgp == "r2_threshold_x_0" & model == "r2_threshold_x") |
-      (rgp == "r2_stransition_l0" & model == "r2_stransition")
-  )
+  errors = errors_raw; data_s = simulations_data
+  sample_size = 3000; sd = 1; title = NULL
 }
 
 
+# Dependence and Distribution --------------------------------------------------
 
-# Helpers ----------------------------------------------------------
-
-matrix_to_vec <- function(x, sep = "_", pref = "", suf = "") {
-  structure(x,
-    dim = NULL,
-    names = pmap_chr(
-      expand_grid(colnames(x), rownames(x)),
-      ~ paste0(pref, .x, sep, .y, suf)
-    )
-  )
-}
-
-glue_test <- function(x, h0, n = 2, test = TRUE) {
-  m <- mean(x, na.rm = TRUE)
-  s <- sd(x, na.rm = TRUE)
-  ndf <- sum(!is.na(x))
-
-  stars <- if (test) {
-    # t <- sqrt(ndf) * (m - h0) / s
-    # p <- 2 * pt(-abs(t), df = ndf - 1)
-    add_star(t.test(x, mu = h0, conf.level = 0.95)$p.value)
+#' Diagnostics - errors: Dependence between error segments
+#'
+#' @param errors [`numeric()`]
+#' @param grain [`integer(1)`] Number of segments to divide the errors by.
+#'  Often the number of parallel tasks used to create them, assuming they
+#'  weren't reordered.
+#' @param simmetric, triangular [`logical(1)`] Whether to use absolute
+#'  correlation and whether to show the top triangular matrix only.
+#'
+#' @returns [`ggplot()`] Correlation matrix heatmap of error segments.
+#' @export
+error_dependence <- function(
+  errors, grain = 100,
+  simmetric = TRUE, triangular = TRUE, title = NULL
+) {
+  if (simmetric) {
+    get_cor <- function(matrix) abs(cor(matrix))
+    limits <- c(0, 1)
   } else {
-    ""
+    get_cor <- function(matrix) cor(matrix)
+    limits <- c(-1, 1)
   }
 
-  glue("{round(m, n)} ({round(s / sqrt(ndf), n + 1)}){stars}")
-}
+  error_cor <- errors %>%
+    matrix(nrow = length(.) / grain, ncol = grain) |>
+    get_cor() |>
+    `dim<-`(NULL) |>
+    tibble(x = rep(1:grain, each = grain), y = rep(1:grain, grain), cor = _) |>
+    filter(if(triangular) y > x else x != y)
 
-get_moments <- function(data_e, data_m, cond = TRUE, test = cond) {
-  add_r <- if (cond) expr(r)
-
-  x <- data_e |>
-    group_by(sgp, rgp, sim, !!add_r) |>
-    summarise(
-      avg = mean(y, na.rm = TRUE),
-      acf = cor(y[-n()], y[-1], use = "na.or.complete"),
-      sd = sd(y, na.rm = TRUE)
+  ggplot(error_cor, aes(x, y, fill = cor)) +
+    geom_tile() +
+    scale_fill_viridis_c(option = "plasma", limits = limits) +
+    coord_equal() +
+    labs(
+      title = title, x = "Parallel task N°", y = "Parallel task N°",
+      fill = "Absolute\nCorrelation"
     )
+}
 
-  opts <- expand_grid(
-    sgp = unique(x$sgp),
-    rgp = unique(x$rgp),
-    r = if (cond) unique(x$r) else NULL
-  )
+#' Diagnostics - errors: Error distribution
+#'
+#' @param errors [`numeric()`]
+#'
+#' @returns [`patchwork`] Combined QQ plot and histogram of error distribution.
+#' @export
+error_distribution_sim <- function(
+  errors, sample_size = 3000, sd = 1,
+  title = NULL
+) {
+  g_qq <- ggplot(tibble(x = sample(errors, sample_size))) +
+    geom_abline(
+      slope = 1, intercept = 0,
+      color = pal$main["orange"], linewidth = 1
+    ) +
+    geom_qq(aes(sample = x), alpha = 0.3, color = pal$gray["blackgray"]) +
+    coord_equal() +
+    labs(title = "A - QQ plot", x = "Theoretical Quantiles", y = "Sample Quantiles")
 
-  pmap_dfr(opts, \(sgp, rgp, r = NULL) {
-    x_sub <- x |> filter(sgp == !!sgp, rgp == !!rgp, if (cond) r == !!r else TRUE)
-    xh0 <- data_m |> filter(sgp == !!sgp, rgp == !!rgp, if (cond) r == !!r else TRUE)
+  g_hist <- ggplot(tibble(x = sample(errors, sample_size))) +
+    geom_histogram(
+      aes(x, after_stat(density)), bins = 70,
+      fill = pal$gray["blackgray"], color = "black"
+    ) +
+    stat_function(
+      fun = dnorm, args = list(mean = 0, sd = sd),
+      color = pal$main["orange"], linewidth = 1
+    ) +
+    xlim(-4 * sd, 4 * sd) +
+    labs(title = "B - Histogram", x = "Value", y = "Density")
 
-    c(
-      sgp = sgp, rgp = rgp, r = r,
-      avg = glue_test(x_sub$avg, xh0$avg, test = test & cond),
-      acf = glue_test(atan(x_sub$acf), xh0$acf, test = test & cond), # Consider removing atan()
-      sd = glue_test(x_sub$sd, xh0$sd, test = test & cond)
+  ((g_hist - g_qq) * theme(plot.title = element_text(size = 12))) +
+    plot_annotation(
+      title = title,
+      caption = glue("Sample of {sample_size} errors from total of \\
+      {formatC(length(errors), format = 'd', big.mark = ',')}.")
     )
-  })
-}
-
-format_gt_metrics <- function(moments_conditional, moments_unconditional) {
-  cols <- list(
-    avg = c("avg_1", "avg_2", "avg_0"),
-    acf = c("acf_1", "acf_2", "acf_0"),
-    sd = c("sd_1", "sd_2", "sd_0")
-  )
-
-  bind_rows(moments_conditional, moments_unconditional) |>
-    pivot_wider(
-      names_from = r,
-      values_from = c(avg, acf, sd),
-    ) |>
-    relocate(rgp, sgp) |>
-    arrange(rgp, sgp) |>
-    gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) %>%
-    {do.call(cols_label, c(.data = list(.), dicts$regimes$metrics[]))} |>
-    tab_spanner(label = "DGP", columns = c("rgp", "sgp")) |>
-    tab_spanner(label = md("$\\hat{\\mu}(.)$"), columns = cols$avg) |>
-    tab_spanner(label = md("$\\hat{\\rho}_1(.)$"), columns = cols$acf) |>
-    tab_spanner(label = md("$\\hat{\\sigma}(.)$"), columns = cols$sd) |>
-    fmt_markdown(c("rgp", "sgp")) |>
-    cols_align(align = "left", columns = list_c(cols)) |>
-    fmt(columns = list_c(cols), fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x))
-}
-
-format_gt_coefs <- function(data) {
-  cols <- list(
-    mu = c("r1_mu", "r2_mu"),
-    rho1 = c("r1_rho1", "r2_rho1"),
-    sigma = c("r1_sigma", "r2_sigma")
-  )
-
-  data |>
-    relocate(rgp, sgp) |>
-    arrange(rgp, sgp) |>
-    gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) %>%
-    {do.call(cols_label, c(.data = list(.), dicts$regimes$coefs[]))} |>
-    tab_stubhead(c("RGP", "RN")) |>
-    tab_spanner(label = dicts$metrics$gt$avg, columns = cols$mu) |>
-    tab_spanner(label = dicts$metrics$gt$acf, columns = cols$rho1) |>
-    tab_spanner(label = dicts$metrics$gt$sd, columns = cols$sigma) |>
-    fmt_markdown(c("rgp", "sgp")) |>
-    cols_align(align = "left", columns = list_c(cols)) |>
-    fmt(columns = list_c(cols), fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x))
 }
 
 
 
-# Moments Table ----------------------------------------------------------
+# Regimes Proportions ----------------------------------------------------------
 
 #' @export
-moments_table <- function(data_e, data_m, ..., test = TRUE) {
-  filters <- enquos(...)
-  meta_names <- c("r1_avg", "r2_avg", "r1_acf", "r2_acf", "r1_sd", "r2_sd")
-
-  data_m <- data_m |>
-    mutate(
-      map_dfr(meta, \(x) {
-        coefs <- x$coefs
-        metrics <- set_names(
-          c(analytical_avg(coefs), analytical_acf(coefs), analytical_sd(coefs)),
-          meta_names
-        )
-      })
-    ) |>
-    pivot_longer(r1_avg:r2_sd, names_to = c("r", ".value"), names_sep = "_") |>
-    mutate(r = as.integer(str_remove(r, "r"))) |>
-    mutate(
-      rgp = dicts$rgp$gt[rgp],
-      sgp = dicts$sgp$gt[sgp]
-    )
-
-  data_e <- data_e |>
-    filter(!!!filters) |>
-    mutate(
-      rgp = dicts$rgp$gt[rgp],
-      sgp = dicts$sgp$gt[sgp]
-    )
-
-  moments_conditional <- get_moments(data_e, data_m, cond = TRUE, test = test)
-  moments_unconditional <- get_moments(data_e, data_m, cond = FALSE, test = test) |>
-    mutate(r = "0")
-
-  format_gt_metrics(moments_conditional, moments_unconditional)
-}
-
-
-
-# Coefficients Table ----------------------------------------------------------
-
-#' @export
-coefs_table <- function(data, ..., test = test) {
-  filters <- enquos(...)
-
-  data_formatted <- data |>
-    filter(!!!filters) |>
-    mutate(
-      rgp = dicts$rgp$gt[rgp],
-      sgp = dicts$sgp$gt[sgp]
-    ) |>
-    relocate(rgp, sgp) |>
-    mutate(
-      map_dfr(meta_est, ~ matrix_to_vec(.x$coefs, suf = "_est")),
-      map_dfr(meta_sim, ~ matrix_to_vec(.x$coefs, suf = "_sim"))
-    ) |>
-    #na.omit() |> # TODO: check reason, clean up earlier maybe
+regimes_proportions_sim <- function(data_s, n = 2) {
+  data <- data_s |>
     group_by(rgp, sgp) |>
     summarise(
-      r1_mu = glue_test(mu_R1_est, unique(mu_R1_sim), test = test),
-      r2_mu = glue_test(mu_R2_est, unique(mu_R2_sim), test = test),
-      r1_rho1 = glue_test(rho1_R1_est, unique(rho1_R1_sim), test = test),
-      r2_rho1 = glue_test(rho1_R2_est, unique(rho1_R2_sim), test = test),
-      r1_sigma = glue_test(sigma_R1_est, unique(sigma_R1_sim), test = test),
-      r2_sigma = glue_test(sigma_R2_est, unique(sigma_R2_sim), test = test)
-    )
-
-  format_gt_coefs(data_formatted)
-}
-
-
-
-# Improbable Things ----------------------------------------------------------
-
-#' @export
-improbable_counts <- function(data_e, data_s, n_b, n_t, n_h) {
-  te1 <- n_b + 1
-  te2 <- n_t - n_h
-  tp1 <- te2 + 1
-
-  left_join(
-    data_e, data_s,
-    by = c("sgp", "rgp", "sim", "t"), suffix = c("_est", "_sim")
-  ) |>
-    group_by(sgp, rgp, sim) |>
-    summarise(
-      fit = sum(
-        y_est[t %in% te1:te2] > mean(y_sim, na.rm = TRUE) + 3 * sd(y_sim, na.rm = TRUE),
-        na.rm = TRUE
-      ) / sum(!is.na(y_est[t %in% te1:te2])),
-      pred = sum(
-        y_est[t %in% tp1:n_t] > y_sim[t %in% tp1:n_t] + 3 * sd(y_sim, na.rm = TRUE),
-        na.rm = TRUE
-      ) / sum(!is.na(y_est[t %in% tp1:n_t]))
+      prop_sgp = {
+        tab <- tabulate(r)
+        max(tab) / sum(tab) - 0.5
+      }
     ) |>
+    group_by(rgp) |>
+    mutate(prop_base = mean(prop_sgp)) |>
     ungroup() |>
-    summarise(
-      fit = mean(fit, na.rm = TRUE),
-      pred = mean(pred, na.rm = TRUE)
-    )
+    pivot_wider(names_from = sgp, values_from = prop_sgp)
+
+  data |>
+    mutate(
+      rgp = dicts$rgps$gt_param[rgp],
+      across(-rgp, ~ fmt_decimal(.x, n, trail_0 = TRUE))
+    ) |>
+    rename_with(~ dicts$sgps$gt_param[.x], .cols = -c(rgp, prop_base)) |>
+    rename("RGP" = rgp, "Uncond." = prop_base) |>
+    gt(rowname_col = "RGP", groupname_col = NULL) |>
+    cols_label_with(fn = md) |>
+    fmt_markdown(RGP)
 }
-# TODO: optimize

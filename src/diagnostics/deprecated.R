@@ -64,7 +64,7 @@ plot_sgps_sim <- function(
         legend.position = "none", axis.title.x = element_blank(),
         axis.text.x = element_blank(), axis.ticks.x = element_blank()
         )
-      g1 / (g2 + xlim(lims[1], lims[2])) # TODO: make dynamic
+      g1 / (g2 + xlim(lims[1], lims[2])) # Make dynamic
     }) +
     plot_annotation(
       caption = glue("SGPs (top to bottom): \u03bc change, \u03c1 change, \u03c3 change")
@@ -705,7 +705,7 @@ panel_simulations <- function(
       theme = theme(legend.position = "bottom")
     )
 }
-# TODO: allow aesthetics customization; standardize y_lims betweem sims and also
+# Allow aesthetics customization; standardize y_lims betweem sims and also
 # between panels
 
 
@@ -872,7 +872,7 @@ table_sgps <- function(data, dgps = NULL) {
     summarise(
       pvalue = t.test(sgp_metric ~ r)[["p.value"]]
     )
-  # TODO: consider `anova(lm(sgp_metric ~ r))[["Pr(>F)"]][1]`
+  # Consider `anova(lm(sgp_metric ~ r))[["Pr(>F)"]][1]`
 
   data_final <- data_metrics %>%
     group_by(sgp, rgp, r) %>%

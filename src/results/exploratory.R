@@ -5,8 +5,10 @@ box::use(
   src/utils[...],
   src/options[dicts],
   src/metrics,
+  src/parameters[n_t, n_h],
   ggplot2[...],
-  gt[...]
+  gt[...],
+  ggh4x[facet_grid2]
 )
 
 
@@ -14,12 +16,18 @@ box::use(
 if (FALSE) {
   data_s = simulations_data; data_e = estimations_data
   filters = quos(
-    sim %in% sample(n_s, 10),
-    rgp %in% c("r1_no_rs", groups$rgp_sym),
-    sgp %in% groups$sgp_big
+    sim %in% filter_sim_i, rgp %in% groups$rgp_sym
+  )
+  n = 2; test = TRUE
+  filters = quos(
+    sim %in% filter_sim_i, sgp %in% groups$sgp_big
+  )
+  opts = c("r2_threshold_symm_x", "r2_threshold_asymm_x")
+  filters = quos(
+    sim %in% filter_sim_i,
+    rgp %in% c("r1_no_rs", groups$rgp_sym), sgp %in% groups$sgp_big
   )
   trim = 0.005
-  opts = c("r2_threshold_symm_x", "r2_threshold_asymm_x")
   mod_name = set_names(unique(data_e$model))[[1]]
 }
 
@@ -34,14 +42,14 @@ glue_test <- function(x, r, formula, n = 2, test = TRUE) {
   stars <- if (test) {
     p <- tryCatch(
       anova(lm(formula))[["Pr(>F)"]][1],
-      error = function(e) NA_real_
+      error = \(e) NA_real_
     )
     add_star(p)
   } else {
     ""
   }
 
-  glue("{round(m, n)} ({round(s, n)}){stars}")
+  glue("{fmt_decimal(m, n)} ({fmt_decimal(s, n)}){stars}")
 }
 
 
@@ -64,6 +72,10 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
       sd = metrics$series_sd(y, r, na.rm = TRUE),
       r = 1:max(r)
     ) |>
+    ungroup() |>
+    mutate(
+      rgp = dicts$rgps$gt[rgp], # * Clumps RGPs by symmetry
+    ) |>
     group_by(sgp, rgp) |>
     summarise(
       avg = glue_test(avg, r, avg ~ r, n, test = test),
@@ -77,19 +89,15 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
     arrange(rgp, sgp) |>
     mutate(
       big_rn = c("small", "big")[grepl("2$", sgp) + 1],
-      rgp = dicts$rgp$gt[rgp],
-      sgp = dicts$sgp$gt[sgp] %>%
-        {str_replace(as.character(.), " ~ .+", "$")}
+      sgp = dicts$sgps$gt[sgp]
     ) |>
     pivot_wider(names_from = big_rn, values_from = c(avg, acf, sd)) |>
     gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
-    tab_stubhead(c("RGP", "RN")) |>
-    tab_spanner(label = dicts$metrics$gt$avg, columns = cols$avg) |>
-    tab_spanner(label = dicts$metrics$gt$acf, columns = cols$acf) |>
-    tab_spanner(label = dicts$metrics$gt$sd, columns = cols$sd) |>
+    tab_stubhead(c("RGP", "Param. \\ RN")) |>
+    reduce_spanners(cols, dicts$metrics$disp_gt) |>
     cols_label(
       .list = set_names(
-        map(dicts$sgp$gt, ~ md(str_replace(.x, ".+ ~ ", "$"))),
+        map(dicts$sgps$gt_param, ~ md(str_replace(.x, ".+ ~ ", "$"))),
         list_c(cols)
       )
     ) |>
@@ -101,7 +109,7 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
 # Metrics Separation across t ----------------------------------------------------------
 
 #' @export
-metrics_sep_graphs <- function(data_s, ..., n_t) {
+metrics_sep_graphs <- function(data_s, ...) {
   filters <- enquos(...)
 
   stats <- function(y, r, n) {
@@ -131,8 +139,9 @@ metrics_sep_graphs <- function(data_s, ..., n_t) {
       }),
       t = 1:n_t
     ) |>
+    ungroup() |>
     mutate(
-      sgp = dicts$sgp$gg[sgp] |> fct(unique(dicts$sgp$gg)) # * Clumps SGPs by RN Parameter
+      sgp = dicts$sgps$gg[sgp] |> fct(unique(dicts$sgps$gg)) # * Clumps SGPs by RN Parameter
     ) |>
     group_by(rgp, sgp, t) |>
     reframe(
@@ -140,7 +149,8 @@ metrics_sep_graphs <- function(data_s, ..., n_t) {
         c(avg, acf, sd),
         list(avg = ~ mean(.x, na.rm = TRUE), sd = ~ sd(.x, na.rm = TRUE))
       )
-    )
+    ) |>
+    ungroup()
 
   data_formatted <- data_raw |>
     pivot_longer(
@@ -149,8 +159,7 @@ metrics_sep_graphs <- function(data_s, ..., n_t) {
     ) |>
     mutate(
       sym_rgp = c("Symm.", "Asymm.")[rgp %in% rgp_sym + 1],
-      stat = fct(stat, c("avg", "acf", "sd")) |>
-        fct_recode(!!!(dicts$metrics$gg %>% {set_names(names(.), .)}))
+      stat = dicts$metrics$disp_gg[stat] |> fct(unique(dicts$metrics$disp_gg))
     )
 
   map(rgp_list, function(opts) {
@@ -160,17 +169,18 @@ metrics_sep_graphs <- function(data_s, ..., n_t) {
       geom_hline(yintercept = 0) +
       xlim(10, n_t) +
       labs(color = "DGP symmetry", fill = "DGP symmetry", x = "Time", y = "Moment's dispersion") +
-      ggh4x::facet_grid2(
+      facet_grid2(
         vars(sgp), vars(stat), scales = "free_y", labeller = label_parsed
       )
   })
 }
 
 
+
 # Forecasting errors and regime prediction ----------------------------------------------------------
 
 #' @export
-regimes_rmse_graphs <- function(data_e, data_s, n_t, n_h, ..., trim = 0.0005) {
+regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
   filters <- enquos(...)
 
   data_formatted <- data_e |>
@@ -180,21 +190,21 @@ regimes_rmse_graphs <- function(data_e, data_s, n_t, n_h, ..., trim = 0.0005) {
       suffix = c("_est", "_sim")
     ) |>
     mutate(
-      error = y_est - y_sim,
-      correct_r = c("Correct", "Incorrect")[(r_est == r_sim) + 1],
+      correct_r = c("Correct", "Incorrect")[r_err + 1],
       sgp = dicts$sgps$gg[sgp] |> fct(unique(dicts$sgps$gg)),
-      rgp = dicts$rgps$gg[rgp]
+      rgp = dicts$rgps$gg[rgp] # * Clumps RGPs by symmetry and SGPs by RN Parameter
     ) |>
     group_by(sgp, rgp) |>
     filter(
-      error >= quantile(error, trim, na.rm = TRUE),
-      error <= quantile(error, 1 - trim, na.rm = TRUE)
-    )
+      y_err >= quantile(y_err, trim, na.rm = TRUE),
+      y_err <= quantile(y_err, 1 - trim, na.rm = TRUE)
+    ) |>
+    ungroup()
 
   map(set_names(unique(data_e$model)), \(mod_name) {
-    ggplot(filter(data_formatted, model == mod_name), aes(x = error)) +
+    ggplot(filter(data_formatted, model == mod_name), aes(x = y_err)) +
       geom_density(aes(color = correct_r)) +
-      ggh4x::facet_grid2(
+      facet_grid2(
         vars(sgp), vars(rgp),
         scales = "free", independent = "all", labeller = label_parsed
       ) +

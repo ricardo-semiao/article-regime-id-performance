@@ -9,7 +9,7 @@ box::use(
   r/core[...],
   cli = cli[cli_abort, cli_warn, cli_inform],
   glue[glue],
-  patchwork[...]
+  gt[gtsave]
 )
 
 #' Modules: Tidyverse
@@ -21,11 +21,11 @@ box::use(
   purrr[...], rlang[...]
 )
 
-
 # Modules for helpers:
 box::use(
   mirai,
-  ggplot2[...]
+  ggplot2[...],
+  gt[...]
 )
 
 
@@ -100,7 +100,7 @@ test_conditions <- function(..., call = caller_env()) {
 
 #' Helper: Custom [cli::cli_alert()]
 #' @export
-cli_alert_items <- function(failed_items, flatten = FALSE) {
+cli_alert_items <- function(failed_items, out = NULL, flatten = FALSE) {
   if (flatten) failed_items <- list_flatten(failed_items)
 
   if (length(failed_items) == 0) {
@@ -109,6 +109,7 @@ cli_alert_items <- function(failed_items, flatten = FALSE) {
   }
 
   items_unique <- unique(failed_items)
+  items_per_error <- list()
 
   cli$cli_alert_danger("There were {.val {length(items_unique)}} errors across \\
   {.val {length(failed_items)}} item{?s}.")
@@ -118,6 +119,7 @@ cli_alert_items <- function(failed_items, flatten = FALSE) {
 
   iwalk(unique(failed_items), \(error, i) {
     is_of_error <- map_lgl(failed_items, ~ identical(.x, error))
+    items_per_error[[error$message]] <<- names(failed_items)[is_of_error]
 
     cli$cli_li("Error {.val {i}}:")
     cli$cli_text("Occurances: {.val {sum(is_of_error)}}. On item{?s}: \\
@@ -125,6 +127,21 @@ cli_alert_items <- function(failed_items, flatten = FALSE) {
     print(error)
     cli$cli_par()
   })
+
+  if (! is_null(out)) {
+    imap_chr(items_per_error, \(items, error) {
+      paste0(
+        "Error: ", error, "\n",
+        "- Occurences: ", length(items), "\n",
+        "- Items: ", str_c(items, collapse = ", ")
+      )
+    }) |>
+      str_c(collapse = "\n\n") |>
+      str_c("Total: ", length(failed_items), "\n\n", .x = _) |>
+      writeLines(out)
+  }
+
+  invisible(items_per_error)
 }
 
 #' Helper: list2 with tibble-like self referencing
@@ -309,3 +326,36 @@ trimmed_sd <- function(x, trim = 0.01, na.rm = TRUE) {
     x <= quantile(x, 1 - trim, na.rm = na.rm)
   sd(x[idx], na.rm = na.rm)
 }
+
+#' @export
+reduce_spanners <- function(table, cols, dict) {
+  reduce(names(cols), .init = table, \(table, label) {
+    tab_spanner(table, label = md(dict[label]), columns = cols[[label]])
+  })
+}
+
+#' @export
+fmt_decimal <- function(x, n = 2, lead_0 = FALSE, trail_0 = FALSE) {
+  x <- round(x, n) |> as.character()
+
+  if (!lead_0) x <- gsub("^0\\.", ".", x)
+  if (trail_0) x <- ifelse((nchar(x) == n + 1) & grepl("\\.", x), x, paste0(x, "0"))
+
+  x
+}
+
+#' @export
+acor <- function(y, p = 1, na.rm = FALSE) {
+  idx <- which(is.na(y))
+
+  if (na.rm && length(idx) > 0) {
+    y <- y[-c(idx, idx - p)]
+  }
+
+  n <- length(y)
+  if (n - p <= 1) return(NA_real_)
+
+  y_bar <- mean(y)
+  sum((y[(p + 1):n] - y_bar) * (y[1:(n - p)] - y_bar)) / sum((y - y_bar)^2)
+}
+fn_env(acor) <- pkg_env("base")

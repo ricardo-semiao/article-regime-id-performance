@@ -8,6 +8,7 @@ box::use(
   create_sgp = src/creators/sgps
 )
 
+# ! SGPs, RGPs, and models names must not contain hiphens
 
 
 # Helpers ----------------------------------------------------------------------
@@ -60,30 +61,18 @@ standardize_params_sgp <- function(args) {
 
 #' SGPs' names dictionary
 #' @export
-dict <- list(
-  gt = c(
-    "r2_ar1_mu1" = r"($\mu ~ (0, 0.5)$)",
-    "r2_ar1_mu2" = r"($\mu ~ (0, 1)$)",
-    "r2_ar1_rho1" = r"($\rho_{1} ~ (0.1, 0.9)$)",
-    "r2_ar1_rho2" = r"($\rho_{1} ~ (0.4, 0.6)$)",
-    "r2_ar1_sigma1" = r"($\sigma ~ (1, 1.5)$)",
-    "r2_ar1_sigma2" = r"($\sigma ~ (1, 2)$)"
+dict <- list3(
+  gt_param = c(
+    r2_ar1_mu1 = r"($\mu ~ (0, 0.5)$)",
+    r2_ar1_mu2 = r"($\mu ~ (0, 1)$)",
+    r2_ar1_rho1 = r"($\rho_{1} ~ (0.1, 0.9)$)",
+    r2_ar1_rho2 = r"($\rho_{1} ~ (0.4, 0.6)$)",
+    r2_ar1_sigma1 = r"($\sigma ~ (1, 1.5)$)",
+    r2_ar1_sigma2 = r"($\sigma ~ (1, 2)$)"
   ),
-  gg = c(
-    r2_ar1_mu1 = r"($\mu$)",
-    r2_ar1_mu2 = r"($\mu$)",
-    r2_ar1_rho1 = r"($\rho_{1}$)",
-    r2_ar1_rho2 = r"($\rho_{1}$)",
-    r2_ar1_sigma1 = r"($\sigma$)",
-    r2_ar1_sigma2 = r"($\sigma$)"
-    # r2_ar1_mu1 = r"($\mu ~ (0, 0.5)$)",
-    # r2_ar1_mu2 = r"($\mu ~ (0, 2)$)",
-    # r2_ar1_rho1 = r"($\rho_{1} ~ (0.1, 0.9)$)",
-    # r2_ar1_rho2 = r"($\rho_{1} ~ (0.4, 0.6)$)",
-    # r2_ar1_sigma1 = r"($\sigma ~ (1, 2)$)",
-    # r2_ar1_sigma2 = r"($\sigma ~ (1, 4)$)"
-  ) |>
-    map_chr(~ TeX(.x) %@% "plotmath")
+  gt = map_chr(gt_param, ~ str_replace(.x, " ~ .+$", "$")),
+  gg_param = map_chr(gt_param, ~ TeX(.x) %@% "plotmath"),
+  gg = map_chr(gt, ~ TeX(.x) %@% "plotmath")
 )
 
 
