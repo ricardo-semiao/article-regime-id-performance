@@ -108,6 +108,9 @@ format_gt_metrics <- function(moments_conditional, moments_unconditional) {
     pivot_wider(names_from = r, values_from = c(avg, acf, sd)) |>
     relocate(rgp, sgp) |>
     arrange(rgp, sgp) |>
+    mutate(across(everything(), as.character)) |>
+    reduce(c(3, 7), .init = _, ~ add_row(.x, .after = .y)) |>
+    mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) |>
     gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) %>%
     cols_label_with(fn = \(x) {
       md(str_replace_all(x, c(
@@ -174,6 +177,9 @@ format_gt_coefs <- function(meta_e) {
   meta_e |>
     relocate(rgp, sgp) |>
     arrange(rgp, sgp) |>
+    mutate(across(everything(), as.character)) |>
+    reduce(c(3, 7), .init = _, ~ add_row(.x, .after = .y)) |>
+    mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) |>
     gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
     cols_label_with(fn = \(x) {
       md(str_replace_all(x, c(

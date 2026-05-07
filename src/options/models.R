@@ -21,8 +21,8 @@ dict <- list3(
     r1_nors = "No RS",
     r2_ms = "MS",
     r2_sbreak = "SB",
-    r2_st = "ST",
-    r2_set_x = "SET"
+    r2_set_x = "SET",
+    r2_st = "ST"
   ),
   gg = map_chr(gt, ~ TeX(.x) %@% "plotmath")
 )

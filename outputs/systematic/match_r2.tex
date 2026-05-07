@@ -1,19 +1,24 @@
-\begin{tabular}{@{\extracolsep{5pt}}lc} 
+\begin{tabular}{@{\extracolsep{5pt}}lcc} 
 \\[-1.8ex]\hline 
 \hline \\[-1.8ex] 
-\\[-1.8ex] & RMSE \\ 
+\\[-1.8ex] & \multicolumn{2}{c}{RMSE} \\ 
+\\[-1.8ex] & (1) & (2)\\ 
 \hline \\[-1.8ex] 
- modelr1\_nors:r2 & 4.654$^{***}$ (0.018) \\ 
-  modelr2\_set\_x:r2 & 4.322$^{***}$ (0.019) \\ 
-  modelr2\_st:r2 & 4.893$^{***}$ (0.021) \\ 
-  modelr2\_ms:r2 & 4.664$^{***}$ (0.019) \\ 
+ $R^2 ~ \cdot$ No RS & 0.858$^{***}$ (0.008) &  \\ 
+  $R^2 ~ \cdot$ MS & 0.858$^{***}$ (0.008) &  \\ 
+  $R^2 ~ \cdot$ SET & 0.942$^{***}$ (0.009) &  \\ 
+  $R^2 ~ \cdot$ ST & 1.151$^{***}$ (0.011) &  \\ 
+  $BME(r) ~ \cdot$ No RS &  & $-$1.009$^{***}$ (0.013) \\ 
+  $BME(r) ~ \cdot$ MS &  & 0.232$^{***}$ (0.023) \\ 
+  $BME(r) ~ \cdot$ SET &  & 0.134$^{***}$ (0.020) \\ 
+  $BME(r) ~ \cdot$ ST &  & 0.288$^{***}$ (0.014) \\ 
  \hline \\[-1.8ex] 
-Observations & 80,167 \\ 
-R$^{2}$ & 0.745 \\ 
-Adjusted R$^{2}$ & 0.745 \\ 
-Residual Std. Error & 1.173 \\ 
-F Statistic p-value & <0.001 \\ 
+Observations & 80,167 & 80,167 \\ 
+R$^{2}$ & 0.366 & 0.076 \\ 
+Adjusted R$^{2}$ & 0.366 & 0.076 \\ 
+Residual Std. Error & 1.849 & 2.233 \\ 
+F Statistic p-value & <0.001 & <0.001 \\ 
 \hline 
 \hline \\[-1.8ex] 
-\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\textit{Note:}  & \multicolumn{2}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
 \end{tabular} 

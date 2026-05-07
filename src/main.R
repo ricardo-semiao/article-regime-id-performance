@@ -291,7 +291,7 @@ diag_obs_remove$na_coefs <- diag_na_coef |>
 
 # Fit and forecasting errors distributions:
 diagnostics$erros_distribution_est(
-  filter(estimations_data, sim %in% filter_sim_i2),
+  estimations_data,
   residuals = TRUE, lims = c(x = 20, y = 0.05), bins = 80
 )
 diag_g_residuals <- last_plot()
@@ -453,7 +453,7 @@ exp_met_graphs <- results$metrics_sep_graphs(simulations_data,
   sim %in% filter_sim_i,
   sgp %in% groups$sgp_big, rgp != "r1_nors"
 )
-# * Currently only for big SGPs
+# * Currently only for big SGPs and for 100 obs.
 exp_met_graphs[[2]]
 
 if (FALSE) {
@@ -527,13 +527,10 @@ sys_data <- metrics_data |>
       str_replace(rgp, "(r[0-9]+_[^_]+)_*.*", "\\1") !=
         str_replace(as.character(model), "(r[0-9]+_[^_]+)_*.*", "\\1")
     ),
-    model = fct(model, unique(menu$ests$model)),
-    rgp = fct(rgp, unique(menu$ests$rgp)),
-    sgp = fct(sgp, unique(menu$ests$sgp))
+    model = fct(model, names(dicts$model[[1]]) %>% .[. %in% unique(menu$ests$model)]),
+    rgp = fct(rgp, names(dicts$rgp[[1]]) %>% .[. %in% unique(menu$ests$rgp)]),
+    sgp = fct(sgp, names(dicts$sgp[[1]]) %>% .[. %in% unique(menu$ests$sgp)])
   )
-
-#na.omit(sys_data) |> nrow()
-#with(sys_data, hist(avg_est, breaks = 40))
 
 # Correlations:
 sys_cor_mat <- select(sys_data,
@@ -591,17 +588,6 @@ if (FALSE) {
   )
 }
 
-# sys_model_fe$rgp <- lm(
-#   rmse ~ model * rgp - 1,
-#   sys_data |> clump_dgps()
-# ) |> print_summary()
-
-# if (FALSE) {
-#   results$format_reg_matrix(
-#     sys_model_fe$rgp, "outputs/systematic/fe_rgp.tex", FALSE
-#   )
-# }
-
 
 # Model FE - stratified
 # Models FE - Base:
@@ -609,7 +595,7 @@ sys_model_fe_strat <- list()
 
 sys_model_fe_strat$none <- lm(
   rmse ~ model - 1,
-  filter(sys_data, model != "r1_nors")
+  sys_data |> filter(model != "r1_nors")
 )
 sys_model_fe_strat$asym <- lm(
   rmse ~ model - 1,
@@ -625,7 +611,7 @@ sys_model_fe_strat$mu <- lm(
 )
 sys_model_fe_strat$rho <- lm(
   rmse ~ model - 1,
-  sys_data |> clump_dgps("var", "fam") |> filter(sgp == "r2_ar1_mu", model != "r1_nors")
+  sys_data |> clump_dgps("var", "fam") |> filter(sgp == "r2_ar1_rho", model != "r1_nors")
 )
 sys_model_fe_strat$sigma <- lm(
   rmse ~ model - 1,
@@ -639,24 +625,21 @@ if (FALSE) {
   )
 }
 
-# Models FE - appendix:
-#...
-
 
 # Misspecification - base:
 sys_mis_is <- list()
 
 sys_mis_is$is <- lm(
   rmse ~ is_mis,
-  sys_data
+  sys_data |> filter(model != "r1_nors")
 ) |> print_summary()
 sys_mis_is$mod <- lm(
   rmse ~ is_mis : model,
-  sys_data
+  sys_data |> filter(model != "r1_nors")
 ) |> print_summary()
 sys_mis_is$rgpfam <- lm(
   rmse ~ is_mis:rgp,
-  sys_data |> clump_dgps("fam", "all")
+  sys_data |> filter(model != "r1_nors") |> clump_dgps("fam", "all")
 ) |> print_summary()
 sys_mis_is$sym <- lm(
   rmse ~ is_mis:rgp,
@@ -664,26 +647,19 @@ sys_mis_is$sym <- lm(
 ) |> print_summary()
 sys_mis_is$sgpfam <- lm(
   rmse ~ is_mis:sgp,
-  sys_data |> clump_dgps("all", "fam")
+  sys_data |> filter(model != "r1_nors") |> clump_dgps("all", "fam")
 ) |> print_summary()
 sys_mis_is$size <- lm(
   rmse ~ is_mis:sgp,
-  sys_data |> clump_dgps("all", "var")
+  sys_data |> filter(model != "r1_nors") |> clump_dgps("all", "var")
 ) |> print_summary()
 
 if (FALSE) {
   results$format_reg_table(
-    sys_mis_is, out = "outputs/systematic/mis_is_sgp.tex",
+    sys_mis_is, out = "outputs/systematic/mis_is.tex",
     single.row = FALSE, df = FALSE, no.space = TRUE
   )
 }
-# if (FALSE) {
-#   results$format_reg_table(
-#     sys_mis_is[c("mod", "rgpfam", "sym")], out = "outputs/systematic/mis_is_rgp.tex",
-#     single.row = FALSE, df = FALSE, no.space = TRUE
-#   )
-# }
-
 
 
 # Mispecification - RGPs:
@@ -715,19 +691,7 @@ if (FALSE) {
 # Mispecification - metrics:
 sys_mis_met <- list()
 
-# sys_mis$metrics_sim <- lm(
-#   rmse ~ model * (avg_sim + acf_sim + sd_sim) - 1,
-#   sys_data |> clump_dgps()
-# ) |> print_summary()
-
-# if (FALSE) {
-#   results$format_reg_matrix(
-#     sys_mis$metrics_sim, out = "outputs/systematic/mis_metrics_sim.tex",
-#     dimnames = list(Model = c("SET", "ST", "MS"), Metric = c("Avg", "ACF", "SD"))
-#   )
-# }
-
-sys_mis_met$sim_int <- lm(
+sys_mis_met$sim_int <- lm( # Consider - avg_est * acf_est * sd_est
   rmse ~ model * (avg_sim * acf_sim * sd_sim) - 1,
   sys_data |> clump_dgps()
 ) |> print_summary()
@@ -747,20 +711,8 @@ sys_data_est <- sys_data |>
     sd_est = case_when(model == "r1_nors" ~ sd_sim, TRUE ~ sd_est)
   )
 
-# sys_mis$metrics <- lm(
-#   rmse ~ model * (avg_est + acf_est + sd_est) - 1,
-#   sys_data_est |> clump_dgps()
-# ) |> print_summary()
-
-# if (FALSE) {
-#   results$format_reg_matrix(
-#     sys_mis$metrics, out = "outputs/systematic/mis_metrics.tex",
-#     dimnames = list(Model = c("SET", "ST", "MS"), Metric = c("Avg", "ACF", "SD"))
-#   )
-# }
-
-sys_mis_met$est_int <- lm(
-  rmse ~ model * (avg_est * acf_est * sd_est) - 1,
+sys_mis_met$est_int <- lm( # Consider - avg_est * acf_est * sd_est
+  rmse ~ model * (avg_est * acf_est * sd_est),
   sys_data_est
 ) |> print_summary()
 
@@ -771,22 +723,22 @@ if (FALSE) {
   )
 }
 
-# sys_mis_met$est_int <- lm(
-#   rmse ~ model * (avg_est * acf_est * sd_est) - 1 + sgp + rgp,
-#   sys_data_est |> clump_dgps("var", "all")
-# ) |> print_summary()
+sys_mis_met$est_int2 <- lm( # Consider - avg_est * acf_est * sd_est
+  rmse ~ model * (avg_est * acf_est * sd_est) - 1 +
+    model:(avg_est + acf_est + sd_est):sgp -
+    (avg_est + acf_est + sd_est):sgp - model:sgp,
+  sys_data_est |> clump_dgps("all", "fam")
+) |> print_summary()
 
-
-# Misspecification - Appendix:
-#...
+if (FALSE) {
+  results$format_reg_matrix3(
+    sys_mis_met$est_int2, out = "outputs/systematic/mis_metrics_est_strat.tex"
+  )
+}
 
 
 # Identification - base:
 sys_match <- list()
-sys_match$r2 <- lm(rmse ~ r2 - 1, sys_data)
-sys_match$regimes <- lm(rmse ~ regimes_bme + switches_diff + duration_diff - 1, sys_data)
-sys_match$coefs <- lm(rmse ~ mu_diff + rho1_diff + sigma_diff - 1, sys_data)
-sys_match$metrics <- lm(rmse ~ avg_diff + acf_diff + sd_diff - 1, sys_data)
 
 sys_match$base <- lm(rmse ~ r2 + regimes_bme + switches_diff + duration_diff, sys_data)
 sys_match$coefs <- lm(
@@ -794,7 +746,7 @@ sys_match$coefs <- lm(
     mu_diff + rho1_diff + sigma_diff,
   sys_data
 )
-sys_match$coefs <- lm(
+sys_match$metrics <- lm(
   rmse ~ r2 + regimes_bme + switches_diff + duration_diff +
     avg_diff + acf_diff + sd_diff,
   sys_data
@@ -802,7 +754,7 @@ sys_match$coefs <- lm(
 
 if (FALSE) {
   results$format_reg_table(
-    sys_match, out = "outputs/systematic/match.tex",
+    sys_match[c("base", "coefs", "metrics")], out = "outputs/systematic/match.tex",
     single.row = TRUE, df = FALSE
   )
 }
@@ -812,9 +764,14 @@ sys_match$r2_models <- lm(
   data = sys_data
 ) |> print_summary()
 
+sys_match$rbme_models <- lm(
+  rmse ~ model:regimes_bme - 1,
+  data = sys_data
+) |> print_summary()
+
 if (FALSE) {
   results$format_reg_table(
-    sys_match$r2_models, out = "outputs/systematic/match_r2.tex",
+    sys_match[c("r2_models", "rbme_models")], out = "outputs/systematic/match_r2.tex",
     single.row = TRUE, df = FALSE
   )
 }
@@ -827,6 +784,6 @@ sys_match$metrics_models <- lm(
 if (FALSE) {
   results$format_reg_matrix(
     sys_match$metrics_models, out = "outputs/systematic/match_metrics.tex",
-    rows = 1:9
+    rows = 1:9, dimnames = list(Model = c("SET", "ST", "MS"), Metric = c("Avg", "ACF", "SD"))
   )
 }

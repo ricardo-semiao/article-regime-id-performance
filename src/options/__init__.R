@@ -44,8 +44,8 @@ dicts_reg <- c(
   #
   models$dict$gt %>% set_names(paste0("model", names(.))),
   regimes_bme = "$BME(r)$",
-  switches_diff = "$\\Delta \\text{switches}$",
-  duration_diff = "$\\Delta \\text{duration}$",
+  switches_diff = "$\\Delta \\text{Switches}$",
+  duration_diff = "$\\Delta \\text{Duration}$",
   r2 = "$R^2$",
   mu_diff = "$\\Delta \\mu$",
   rho1_diff = "$\\Delta \\rho_1$",
@@ -56,21 +56,30 @@ dicts_reg <- c(
   #
   is_mis = "Baseline",
   models$dict$gt %>% {set_names(
-    paste0(., "model"),
+    paste0("Model: ", .),
     paste0("is_mis:model", names(.))
   )},
   rgps$dict$gt %>% {set_names(
-    paste0(., "rgp"),
+    paste0("RGP: ", .),
    paste0("is_mis:rgp", str_replace(names(.), "(r[0-9]+_[^_]+)_.+", "\\1"))
   )},
   sgps$dict$gt %>% {set_names(
-    .,
+    paste0("RN:", .),
     paste0("is_mis:sgp", str_replace(names(.), "(.+)[0-9]+", "\\1"))
   )},
-  "is_mis:sgp1" = "small RN",
-  "is_mis:sgp2" = "big RN",
-  "is_mis:rgpasymm" = "asymmetric RGP",
-  "is_mis:rgpsymm" = "symmetric RGP"
+  "is_mis:sgp1" = "RN: small",
+  "is_mis:sgp2" = "RN: big",
+  "is_mis:rgpasymm" = "RGP: asym.",
+  "is_mis:rgpsymm" = "RGP: sym.",
+  #
+  models$dict$gt %>% {set_names(
+    paste0("$R^2 ~ \\cdot$ ", .),
+    paste0("model", names(.), ":r2")
+  )},
+  models$dict$gt %>% {set_names(
+    paste0("$BME(r) ~ \\cdot$ ", .),
+    paste0("model", names(.), ":regimes_bme")
+  )}
 )
 
 #' Names' dictionaries for each option

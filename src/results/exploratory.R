@@ -84,7 +84,7 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
     ) |>
     ungroup()
 
-  data_raw |>
+  data <- data_raw |>
     mutate(
       big_rn = c("small", "big")[grepl("2$", sgp) + 1],
       sgp = dicts$sgps$gt[sgp] |> fct(unique(dicts$sgps$gt)),
@@ -92,7 +92,12 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
     ) |>
     pivot_wider(names_from = big_rn, values_from = c(avg, acf, sd)) |>
     relocate(rgp, sgp) |>
-    arrange(rgp, sgp) |>
+    arrange(rgp, sgp)
+
+  data |>
+    mutate(across(everything(), as.character)) |>
+    reduce(c(3, 7), .init = _, ~ add_row(.x, .after = .y)) |>
+    mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) |>
     gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
     tab_stubhead(c("RGP", "RN")) |>
     reduce_spanners(cols, dicts$metrics$disp_gt) |>
@@ -104,16 +109,9 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
       )
     ) |>
     fmt_markdown(c("rgp", "sgp")) |>
-    tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01")) |>
-    tab_style(
-      style = cell_borders(sides = "bottom", color = "black", weight = px(2)),
-      locations = list(
-        cells_stub(rows = seq(3, 6, 3), "rgp"),
-        cells_stub(rows = seq(3, 6, 3), "sgp"),
-        cells_body(rows = seq(3, 6, 3))
-      )
-    )
+    tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01"))
 }
+
 
 
 # Metrics Separation across t ----------------------------------------------------------
@@ -180,7 +178,8 @@ metrics_sep_graphs <- function(data_s, ...) {
       xlim(10, n_t) +
       labs(color = "DGP symmetry", fill = "DGP symmetry", x = "Time", y = "Moment's dispersion") +
       facet_grid2(
-        vars(sgp), vars(stat), labeller = label_parsed # Consider scales = "free_y"
+        vars(sgp), vars(stat), scales = "free_y", independent = "y",
+        labeller = label_parsed
       ) +
       scale_fill_manual(values = unname(pal$main)) +
       scale_color_manual(values = unname(pal$main))
