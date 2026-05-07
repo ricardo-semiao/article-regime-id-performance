@@ -392,3 +392,22 @@ acor <- function(y, p = 1, na.rm = FALSE) {
   sum((y[(p + 1):n] - y_bar) * (y[1:(n - p)] - y_bar)) / sum((y - y_bar)^2)
 }
 fn_env(acor) <- pkg_env("base")
+
+#' @export
+clump_dgps <- function(sys_data, keep_rgp = "fam", keep_sgp = "fam") {
+  pats_rgp <- c(
+    fam = "^(r[0-9]+_[^_]+)_*.*$",
+    var = "^.*_(a?symm)_?.*$",
+    all = "(.+)"
+  )
+  pats_sgp <- c(
+    fam = "^(r[0-9]+_[^_]+_[^_0-9]+)[0-9]+$",
+    var = "^r[0-9]+_[^_]+_[^_0-9]+([0-9]+)$",
+    all = "(.+)"
+  )
+
+  mutate(sys_data,
+    rgp = str_replace(rgp, pats_rgp[keep_rgp], "\\1") |> fct(),
+    sgp = str_replace(sgp, pats_sgp[keep_sgp], "\\1") |> fct()
+  )
+}

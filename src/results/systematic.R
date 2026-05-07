@@ -22,18 +22,24 @@ if (FALSE) {
 
 #' @export
 format_reg_matrix <- function(
-  mod, out, dim = c(3, 3), rows = 8:16, dimnames = NULL, ...
+  mod, out, marginal = TRUE, dim = c(3, 3), rows = 8:16, dimnames = NULL, ...
 ) {
   dict_local <- c("SET", "ST", "MS")
 
   dimnames <- dimnames %||% list(Model = dict_local, RGP = dict_local)
   coefs <- summary(mod)$coefficients[rows, ]
-  controls <- mod$coefficients
 
-  parts <- str_split_fixed(rownames(coefs), ":", 2)
-  coefs_full <- coefs[, 1] + controls[parts[, 1]] + controls[parts[, 2]]
+  if (marginal) {
+    values <- coefs[, 1]
+    sd <- glue(" ({round(coefs[, 2], 3)})")
+  } else {
+    controls <- mod$coefficients
+    parts <- str_split_fixed(rownames(coefs), ":", 2)
+    values <- coefs[, 1] + controls[parts[, 1]] + controls[parts[, 2]]
+    sd <- ""
+  }
 
-  table <- glue("{round(coefs_full, 3)}{add_star(coefs[, 4])} ({round(coefs[, 2], 3)})") |>
+  table <- glue("{round(values, 3)}{add_star(coefs[, 4])}{sd}") |>
     matrix(dim[1], dim[2]) |>
     `colnames<-`(dimnames[[2]]) |>
     as.data.frame() |>
@@ -42,6 +48,52 @@ format_reg_matrix <- function(
     tab_stubhead(names(dimnames)[1]) |>
     tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01")) |>
     tab_spanner(names(dimnames)[2], dimnames[[2]])
+
+  gtsave2(table, out, ...)
+  invisible(table)
+}
+
+
+#' @export
+format_reg_matrix2 <- function(
+  mod, out, marginal = TRUE, dim = c(12, 3), rows = 16:51, dimnames = NULL, ...
+) {
+  ds <- dicts$sgps$gt %>% set_names(str_replace(names(.), "[0-9]+$", ""))
+  dr <- dicts$rgps$gt %>% set_names(str_replace(names(.), "_a?symm_.+", ""))
+
+  controls <- mod$coefficients
+  coefs <- left_join(
+    mod$coefficients %>% tibble(Coef = names(.), Estimate = .),
+    summary(mod)$coefficients %>% {as_tibble(.) |> mutate(Coef = rownames(.))}
+  )
+  main <- coefs[rows, ]
+
+  ints <- main$Coef %>% str_split_fixed(":", max(str_count(., ":") + 1))
+
+  if (marginal) {
+    values <- main$Estimate
+    sd <- glue(" ({round(main[['Std. Error']], 3)})")
+  } else {
+    parts <- apply(ints, 2, \(x) controls[x] %>% ifelse(is.na(.), 0, .))
+    values <- main$Estimate + rowSums(parts)
+    sd <- ""
+  }
+
+  table <- main |>
+    transmute(
+      fmt = glue("{round(values, 3)}{add_star(main[['Pr(>|t|)']])}{sd}"),
+      sgp = ints[, 1], rgp = ints[, 2], model = ints[, 3],
+      sgp = ds[str_replace(sgp, "^sgp", "")],
+      rgp = dr[str_replace(rgp, "^rgp", "")],
+      model = dicts$models$gt[str_replace(model, "^model", "")]
+    ) |>
+    filter(!is.na(values)) |>
+    pivot_wider(names_from = model, values_from = fmt) |>
+    relocate(rgp, sgp) |>
+    gt(rowname_col = c("rgp", "sgp")) |>
+    tab_stubhead(c("RGP", "SGP")) |>
+    cols_label_with(fn = md) |>
+    fmt_markdown(c("rgp", "sgp"))
 
   gtsave2(table, out, ...)
   invisible(table)

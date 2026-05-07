@@ -66,7 +66,7 @@ get_results$stats_lm <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) {
     preds[i + 1] <- sum(mod$coefficients * c(1, data[n_t - i, -1]))
   }
 
-  y <- c(rep(NA, n_b + n_l), mod$fitted.values, preds)
+  y <- c(rep(NA_real_, n_b + n_l), mod$fitted.values, preds)
 
   # Meta information:
   idx_fit <- (n_b + 1):(n_t - n_h)
@@ -111,7 +111,7 @@ get_results$mbreaks_dofix <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par
     preds[i + 1] <- sum(coefs_last_r * c(1, data[n_t - i, -1]))
   }
 
-  y <- c(rep(NA, n_b + n_l), mod$fitted.values, preds)
+  y <- c(rep(NA_real_, n_b + n_l), mod$fitted.values, preds)
 
   # Meta information:
   idx_fit <- (n_b + 1):(n_t - n_h)
@@ -164,7 +164,7 @@ get_results$tsdyn_setar <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par, 
     preds[i + 1] <- sum(coefs[r[n_t - i], ] * c(1, data[n_t - i, -1]))
   }
 
-  y <- c(rep(NA, n_b + n_l + 1), mod$fitted.values, preds)
+  y <- c(rep(NA_real_, n_b + n_l + 1), mod$fitted.values, preds)
 
   # Meta information:
   idx_fit <- (n_b + 1):(n_t - n_h)
@@ -213,7 +213,7 @@ get_results$tsdyn_lstar <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
     )
   }
 
-  y <- c(rep(NA, n_b + n_l + 1), mod$fitted.values, preds)
+  y <- c(rep(NA_real_, n_b + n_l + 1), mod$fitted.values, preds)
   r_cat <- (r <= 0.5) + 1
 
   # Meta information:
@@ -260,7 +260,7 @@ get_results$mswm_msmfit <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
     preds[i + 1] <- sum(coefs %*% c(1, data[n_t - i, -1]) * r[(n_t - i), ])
   }
 
-  y <- c(rep(NA, n_b + n_l), mod@model$fitted.values, preds)
+  y <- c(rep(NA_real_, n_b + n_l), mod@model$fitted.values, preds)
   r_cat <- max.col(r, ties.method = "first")
 
   # Meta information:
@@ -306,9 +306,14 @@ ar <- function(
     as.list(current_env()), results = get_results$stats_lm
   )
 
+  if (n_l != 1) stop("Only n_l = 1 is currently supported for ar().")
+  if (n_r != 1) stop("Only n_r = 1 is supported for ar().")
+
   body <- expr({
     mod <- stats::lm(
       data[(n_b + n_l + 1):(n_t - n_h), 1] ~ data[(n_b + n_l):(n_t - n_h - 1), 1]
+      # TODO: consider data[(n_b + 1 + n_l):(n_t - n_h), 1] ~ data[(n_b + 1):(n_t - n_h - n_l), 1]
+      # and similar in the other models
     )
     results(data, mod, n_b, n_h, n_t, n_r, n_l)
   })

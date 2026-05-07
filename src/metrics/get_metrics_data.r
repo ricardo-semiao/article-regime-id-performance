@@ -98,9 +98,9 @@ get_estimation_metrics <- function(data_e) {
       r2 = metrics$performance_r2(y_est[idx_fit], y_sim[idx_fit]),
       regimes_bme = metrics$performance_bme(r_err[idx_fit]),
       switches_est = metrics$average_switches(y_sim[idx_fit], r_est[idx_fit], n_r = n_r[1]),
-      duration_est = metrics$duration_diff(y_sim[idx_fit], r_est[idx_fit], n_r = n_r[1]),
+      duration_est = metrics$regimes_duration(y_sim[idx_fit], r_est[idx_fit], n_r = n_r[1]) |> disp_mpe(),
       switches_sim = metrics$average_switches(y_sim[idx_fit], r_sim[idx_fit], n_r = n_r[1]),
-      duration_sim = metrics$duration_diff(y_sim[idx_fit], r_sim[idx_fit], n_r = n_r[1]),
+      duration_sim = metrics$regimes_duration(y_sim[idx_fit], r_sim[idx_fit], n_r = n_r[1]) |> disp_mpe(),
       #skewness = metrics$inconditional_skewness(y_sim[idx_fit]),
       #kurtosis = metrics$inconditional_kurtosis(y_sim[idx_fit])
     ) |>

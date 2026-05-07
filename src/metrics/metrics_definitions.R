@@ -236,7 +236,9 @@ fn_env(regimes_instances) <- pkg_env("base")
 #' @export
 regimes_duration <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
-    mean(table(cumsum(abs(c(0, diff(r))))[r == s]), ...)
+    idx <- r == s
+    if (!any(idx)) return(0)
+    mean(table(cumsum(abs(c(0, diff(r))))[idx]), ...)
   })
 }
 fn_env(regimes_duration) <- pkg_env("base")
@@ -269,17 +271,6 @@ average_switches <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   sum(diff(r) != 0) / length(y)
 }
 fn_env(average_switches) <- pkg_env("base")
-
-#' TODO: document
-#' @export
-duration_diff <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
-  durations <- regimes_duration(y, r, n_r, ...)
-  abs(durations[1] - durations[2])
-}
-fn_env(duration_diff) <- new_environment(
-  list(regimes_duration = regimes_duration),
-  pkg_env("base")
-)
 
 
 

@@ -54,7 +54,23 @@ dicts_reg <- c(
   acf_diff = "$\\Delta \\text{acf}(.)$",
   sd_diff = "$\\Delta \\text{sd}(.)$",
   #
-  is_misTRUE = "Is misspecified"
+  is_mis = "Baseline",
+  models$dict$gt %>% {set_names(
+    paste0(., "model"),
+    paste0("is_mis:model", names(.))
+  )},
+  rgps$dict$gt %>% {set_names(
+    paste0(., "rgp"),
+   paste0("is_mis:rgp", str_replace(names(.), "(r[0-9]+_[^_]+)_.+", "\\1"))
+  )},
+  sgps$dict$gt %>% {set_names(
+    .,
+    paste0("is_mis:sgp", str_replace(names(.), "(.+)[0-9]+", "\\1"))
+  )},
+  "is_mis:sgp1" = "small RN",
+  "is_mis:sgp2" = "big RN",
+  "is_mis:rgpasymm" = "asymmetric RGP",
+  "is_mis:rgpsymm" = "symmetric RGP"
 )
 
 #' Names' dictionaries for each option

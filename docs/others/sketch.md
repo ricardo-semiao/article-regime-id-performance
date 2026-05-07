@@ -601,7 +601,6 @@ Some models estimations had issues and were removed from the analysis: [VAL] mod
 ```{=tex}
 \input{../../outputs/diagnostics/estimation_issues.tex}
 ```
-
 Estimation issues
 :::
 
@@ -619,7 +618,6 @@ As a final placebo test, the forecast performance (RMSE) was regressed agains th
 ```{=tex}
 \input{../../outputs/diagnostics/i_independence.tex}
 ```
-
 RMSE and simulation index relationship
 :::
 
@@ -627,7 +625,7 @@ RMSE and simulation index relationship
 
 
 
-# Exploratory analysis {#sec-exp}
+# Regimes separation {#sec-reg-sep}
 
 The goal of this section is to explore how the information of the regime distributions, as captured by the RC metrics, tells us about the DGPs and models. This information will be useful to put the systematic results of the next section into perspective, and also present some theoretical results for the econometrician. The section is organized into two subsections.
 
@@ -654,7 +652,6 @@ The first object of this subsection is the @tbl-metrics_sep_t. It should be read
 ```{=tex}
 \input{../../outputs/exploratory/metrics_sep_t.tex}
 ```
-
 Regimes' metrics separation across DGPs
 :::
 
@@ -675,53 +672,33 @@ The regime-separation graphs should be read as follows.
 ![Regime separation - MS](../../outputs/exploratory/metrics_sep_ms.pdf){#fig-rs-ms height=40%}
 
 
-## Models' performance {#sec-exp-perf}
 
-Estimating an RS model adds a second layer on top of the DGPs: even if the model class matches the RGP, the estimation is imperfect. In the context of this work, it is useful to separate two types of estimation error: (i) Regime identification error: the model assigns the current observation to the wrong regime (or, in smooth-transition contexts, assigns weights that do not align with the latent regime); (ii) Parameter estimation error: conditional on the inferred regimes, the model estimates $\mu$, $\rho_1$, and $\sigma$ with error. The focus here is not on identification per se (i.e., "how often the model is correct"), but on learning and forecasting: how these two types of error relate to the distribution of forecasting errors.
+# Performance analysis {#sec-perf}
 
-The first object of this subsection targets regime identification error. The graphs below compare the distribution of forecasting errors conditional on whether the underlying regime was correctly identified. They should be read as follows:
+## Models' fixed effects {#sec-mod-fe}
 
-- Each panel corresponds to a DGP configuration (grouped by RGP and RN, as indicated in the figure layout).
-- Within each panel, forecast errors are split by an indicator of regime correctness (correct vs. incorrect regime assignment), so the comparison is between two conditional error distributions.
-- Each figure corresponds to one empirical model class (SET/ST/MS), making it possible to compare how the same diagnostic behaves across models.
+The first object is @tbl-fe_base, a simple fixed-effects regression, where forecast RMSE is regressed on model indicators. This summarizes how each model performs on average across the full population of simulated series.
 
-![Regime and series prediction - SET](../../outputs/exploratory/rmse_regimes_r1_nors.pdf){#fig-rp-set height=40%}
-
-![Regime and series prediction - SET](../../outputs/exploratory/rmse_regimes_r2_set_x.pdf){#fig-rp-set height=40%}
-
-![Regime and series prediction - ST](../../outputs/exploratory/rmse_regimes_r2_st.pdf){#fig-rp-st height=40%}
-
-![Regime and series prediction - MS](../../outputs/exploratory/rmse_regimes_r2_ms.pdf){#fig-rp-ms height=40%}
-
-
-
-# Systematic analysis {#sec-sys}
-
-This section summarizes the main patterns of the simulations using standard regression summaries. The goal is to move from the descriptive diagnostics of @sec-exp to a more orthodox set of comparisons, first in terms of the DGP/model labels (RGP, RN, and model class), and then in terms of the regime-conditional metrics that an econometrician can compute from the estimated model.
-
-The section is organized into four subsections. First, @sec-sys-general summarizes the average performance of each model across the full simulated population via simple model fixed effects.
-
-Second, @sec-sys-rgp stratifies that comparison by the true DGP class. The goal is to quantify how model performance varies with the type of mis-specification, i.e., which empirical model is fitted under which RGP and RN. Third, @sec-sys-metrics repeats the same idea, but replaces DGP labels with the RC-metric dispersions defined in @sec-theory-metrics. This reframes the analysis in terms of observable features of the estimated regimes, rather than in terms of the (unknown) true DGP class. This is conceptually more general, but its external validity remains constrained by the limited population of DGPs considered in @sec-impl.
-
-Finally, @sec-sys-id decomposes performance into components related to regime identification and parameter estimation, aligning with the learning motivation of @sec-intro.
-
-The results are simply presented in the current state of this work, not discussed.
-
-
-## Models' fixed effects {#sec-sys-general}
-
-The first object is @tbl-model_fe, a simple fixed-effects regression, where forecast RMSE is regressed on model indicators. This summarizes how each model performs on average across the full population of simulated series.
-
-::: {#tbl-model_fe tbl-pos="!htbp"}
+::: {#tbl-fe_base tbl-pos="!htbp"}
 ```{=tex}
-\input{../../outputs/systematic/model_fe.tex}
+\input{../../outputs/systematic/fe_base.tex}
 ```
-
 Models fixed effects
 :::
 
+@tbl-fe_strat.
 
-## Mis-specification of RGP {#sec-sys-rgp}
+::: {#tbl-fe_strat tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/fe_strat.tex}
+```
+Models fixed effects - across RGPs
+:::
+
+
+## Mis-specification and performance {#sec-mis-perf}
+
+### Overall effect
 
 The second object stratifies the comparison by the true regime generating process.
 
@@ -729,48 +706,45 @@ The next tables are presented as coefficient matrices. Each matrix is a compact 
 
 The first table considers only the symmetric regime frequencies and the "big" version of the regime natures. The second table changes to assymetric regimes, while the third changes to "small" regime natures.
 
-::: {#tbl-mis_is tbl-pos="!htbp"}
-```{=tex}
-\input{../../outputs/systematic/mis_is.tex}
-```
+@tbl-mis_rgp.
 
-RGP mis-specification overall effect
+::: {#tbl-mis_is_rgp tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_is_rgp.tex}
+```
+RGP mis-specification - overall effect and RN interactions
 :::
 
-::: {#tbl-mis_sym tbl-pos="!htbp"}
+<!-- ::: {#tbl-mis_is_sgp tbl-pos="!htbp"}
 ```{=tex}
-\input{../../outputs/systematic/mis_sym.tex}
+\input{../../outputs/systematic/mis_is_sgp.tex}
 ```
+RGP mis-specification - overall effect and RGP interactions
+::: -->
 
-RGP mis-specification - symmetric regimes
+
+### Across RGPs and RNs
+
+@tbl-mis_rgp.
+
+::: {#tbl-mis_rgp tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/mis_rgp.tex}
+```
+RGP mis-specification - across RGPs
 :::
 
-::: {#tbl-mis_asym tbl-pos="!htbp"}
+@tbl-mis_rgp_full.
+
+::: {#tbl-mis_rgp_full tbl-pos="!htbp"}
 ```{=tex}
-\input{../../outputs/systematic/mis_asym.tex}
+\input{../../outputs/systematic/mis_rgp_full.tex}
 ```
-
-RGP mis-specification - asymmetric regimes
-:::
-
-::: {#tbl-mis_rn tbl-pos="!htbp"}
-```{=tex}
-\input{../../outputs/systematic/mis_rn.tex}
-```
-
-RGP mis-specification - big RNs
-:::
-
-::: {#tbl-mis_asym_rn tbl-pos="!htbp"}
-```{=tex}
-\input{../../outputs/systematic/mis_asym_rn.tex}
-```
-
-RGP mis-specification - asymmetric regimes and big RNs
+RGP mis-specification - across RGPs and RNs
 :::
 
 
-## Mis-specification via RC metrics {#sec-sys-metrics}
+### Across RC metrics
 
 The previous subsection uses DGP labels (RGP and RN) to stratify performance. This is informative, but it is not directly usable by an econometrician, as the true DGP class is unknown. The motivation of the RC-metric framework (@sec-theory-metrics) is that, even when the DGP is unknown, the estimated model induces regime distributions, and those distributions can be summarized by metrics that are observable from $(\hat{y}, \hat{r})$.
 
@@ -780,36 +754,19 @@ In this subsection, the same idea of interacting "model" with "DGP" is reformula
 ```{=tex}
 \input{../../outputs/systematic/mis_metrics_sim.tex}
 ```
-
 Mis-specification via true RC metrics
 :::
 
 ::: {#tbl-mis_metrics_sim_int tbl-pos="!htbp"}
 ```{=tex}
-\input{../../outputs/systematic/mis_metrics_sim_int.tex}
+\input{../../outputs/systematic/mis_metrics_est.tex}
 ```
-
 Mis-specification via true RC metrics - with interactions
 :::
 
-::: {#tbl-mis_metrics tbl-pos="!htbp"}
-```{=tex}
-\input{../../outputs/systematic/mis_metrics.tex}
-```
-
-Mis-specification via estimated RC metrics
-:::
-
-::: {#tbl-mis_metrics_int tbl-pos="!htbp"}
-```{=tex}
-\input{../../outputs/systematic/mis_metrics_int.tex}
-```
-
-Mis-specification via estimated RC metrics - with interactions
-:::
 
 
-## Identification of components and performance {#sec-sys-id}
+## Identification and performance {#sec-id-perf}
 
 The final object relates performance to the two estimation-error components highlighted in @sec-exp-perf: regime identification and parameter estimation. The motivation is not to evaluate identification per se, but to connect these errors to forecasting outcomes.
 
@@ -817,7 +774,6 @@ The final object relates performance to the two estimation-error components high
 ```{=tex}
 \input{../../outputs/systematic/match.tex}
 ```
-
 RMSE and identification
 :::
 
@@ -827,8 +783,15 @@ To relate with the RC metrics, we can analyze the effect of matching each metric
 ```{=tex}
 \input{../../outputs/systematic/match_metrics.tex}
 ```
+RMSE and metrics identification across models
+:::
 
-RMSE and metrics identification
+
+::: {#tbl-match_r2.tex tbl-pos="!htbp"}
+```{=tex}
+\input{../../outputs/systematic/match_r2.tex}
+```
+RMSE and $R^2$ across models
 :::
 
 
@@ -1082,7 +1045,6 @@ Each group of lines corresponds to the moments of a DGP. The first two columns r
 ```{=tex}
 \input{../../outputs/diagnostics/coefs_table.tex}
 ```
-
 Estimated coefficients across DGPs
 :::
 
@@ -1090,10 +1052,34 @@ Estimated coefficients across DGPs
 ```{=tex}
 \input{../../outputs/diagnostics/metrics_table.tex}
 ```
-
 Estimated metrics across DGPs
 :::
 
 ```{=tex}
 \end{landscape}
 ```
+
+
+
+<!-- # Mis-specification and performance {#sec-app-mis-perf}
+
+
+
+
+# Identification and performance {#sec-app-id-perf}
+
+Estimating an RS model adds a second layer on top of the DGPs: even if the model class matches the RGP, the estimation is imperfect. In the context of this work, it is useful to separate two types of estimation error: (i) Regime identification error: the model assigns the current observation to the wrong regime (or, in smooth-transition contexts, assigns weights that do not align with the latent regime); (ii) Parameter estimation error: conditional on the inferred regimes, the model estimates $\mu$, $\rho_1$, and $\sigma$ with error. The focus here is not on identification per se (i.e., "how often the model is correct"), but on learning and forecasting: how these two types of error relate to the distribution of forecasting errors.
+
+The first object of this subsection targets regime identification error. The graphs below compare the distribution of forecasting errors conditional on whether the underlying regime was correctly identified. They should be read as follows:
+
+- Each panel corresponds to a DGP configuration (grouped by RGP and RN, as indicated in the figure layout).
+- Within each panel, forecast errors are split by an indicator of regime correctness (correct vs. incorrect regime assignment), so the comparison is between two conditional error distributions.
+- Each figure corresponds to one empirical model class (SET/ST/MS), making it possible to compare how the same diagnostic behaves across models.
+
+![Regime and series prediction - SET](../../outputs/exploratory/rmse_regimes_r1_nors.pdf){#fig-rp-set height=40%}
+
+![Regime and series prediction - SET](../../outputs/exploratory/rmse_regimes_r2_set_x.pdf){#fig-rp-set height=40%}
+
+![Regime and series prediction - ST](../../outputs/exploratory/rmse_regimes_r2_st.pdf){#fig-rp-st height=40%}
+
+![Regime and series prediction - MS](../../outputs/exploratory/rmse_regimes_r2_ms.pdf){#fig-rp-ms height=40%} -->
