@@ -21,6 +21,7 @@ if (FALSE) {
   meta_e = estimations_meta; data_e = estimations_data
   rmv = diag_obs_remove; n_l = 1
   residuals = FALSE; bins = 50; rmv_out = TRUE
+  lims = c(x = NA, y = NA)
 }
 
 filt_sim <- function(sim) {

@@ -283,15 +283,14 @@ map_parallel <- function(
     cli_warn("{.code x} is a dataframe, {.code pmap}-like behavior may occour")
   }
 
-  setup_expr <- call2(
-    `{`,
-    !!!imap(setup_packages, ~ expr(library(!!.x, character.only = TRUE)))
-  )
-
   f_safe <- if (safe) safely_modify(f) else f
 
   if (parallel) {
     on.exit(mirai$daemons(0), add = TRUE)
+
+    setup_expr <- call2(`{`,
+      !!!imap(setup_packages, ~ expr(library(!!.x, character.only = TRUE)))
+    )
 
     mirai$daemons(workers, cleanup = cleanup) # * No worker cleanup between tasks
     do.call(mirai$everywhere, c(.expr = setup_expr, setup_data[]))
@@ -303,7 +302,8 @@ map_parallel <- function(
       if (inherits_any(x, "try-error")) list(result = NULL, error = x) else x
     }) # Connection resets happen before safely can catch them
   } else {
-    results <- lapply(x, f_safe)
+    fn_env(f_safe) <- new_environment(setup_data, fn_env(f_safe))
+    results <- lapply(x, f_safe) # TODO: add profress
   }
 
   results

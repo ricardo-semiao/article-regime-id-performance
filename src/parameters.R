@@ -65,6 +65,8 @@ menu$ests <- expand_grid(
     #"r2_set_diff",
     "r2_st",
     "r2_ms",
+    "r2_km",
+    "r1_rf",
     NULL
   )
 ) |>

@@ -1,16 +1,24 @@
-\begin{tabular}{@{\extracolsep{\fill}}l|l|rrr}
-\toprule
-\multicolumn{2}{l}{} & \multicolumn{3}{c}{{Model}} \\ 
-\cmidrule(lr){3-5}
-Metric & SGP & SET & ST & MS \\ 
+\begin{tabular}{@{\extracolsep{\fill}}l|l|rrrr}
+\toprule\toprule
+\multicolumn{2}{l}{} & \multicolumn{4}{c}{{Model}} \\ 
+\cmidrule(lr){3-6}
+Metric & SGP & MS & SET & ST & KM \\ 
 \midrule\addlinespace[2.5pt]
-{\(d(\hat{\mu}(.))\)} & \(\rho_{1}\) & -0.033** (0.013) & 0.013 (0.024) & 0.004 (0.016) \\ 
- & {\(\sigma\)} & {0.044*** (0.013)} & {0.016 (0.023)} & {0.041*** (0.013)} \\ 
- &  &  &  &  \\ 
-{\(d(\hat{\rho}_1(.))\)} & {\(\rho_{1}\)} & {0.005 (0.015)} & {0.005 (0.018)} & {-0.004 (0.019)} \\ 
- & \(\sigma\) & 0.12*** (0.015) & 0.055*** (0.02) & 0.022 (0.019) \\ 
- &  &  &  &  \\ 
-\(d(\hat{\sigma}(.))\) & \(\rho_{1}\) & -0.001 (0.015) & 0.031 (0.025) & -0.099*** (0.009) \\ 
- & \(\sigma\) & 0.003 (0.015) & 0.022 (0.024) & -0.052*** (0.009) \\ 
-\bottomrule
+\(d(\hat{\mu}(.))\) & \(\rho_{1}\) & 0.025* (0.013) & -0.039*** (0.012) & 0.107*** (0.023) & 0.011 (0.009) \\ 
+ & \(\sigma\) & 0.053*** (0.011) & 0.025** (0.012) & 0.113*** (0.023) & 0.05*** (0.009) \\ 
+ &  &  &  &  &  \\ 
+\(d(\hat{\rho}_1(.))\) & \(\rho_{1}\) & -0.005 (0.008) & -0.01 (0.006) & -0.014* (0.007) & 0.004 (0.015) \\ 
+ & \(\sigma\) & 0.004 (0.008) & 0.05*** (0.006) & 0.013 (0.008) & 0.119*** (0.016) \\ 
+ &  &  &  &  &  \\ 
+\(d(\hat{\sigma}(.))\) & \(\rho_{1}\) & -0.036*** (0.006) & 0.053*** (0.011) & 0.007 (0.015) & -0.006 (0.014) \\ 
+ & \(\sigma\) & -0.017*** (0.006) & 0.061*** (0.01) & 0.012 (0.014) & 0.015 (0.013) \\ 
+\midrule\addlinespace[2.5pt]
+\multicolumn{3}{l|}{Observations} & \multicolumn{1}{l}{88126} \\
+\multicolumn{3}{l|}{$R^2$,$~$ Adjusted $R^2$} & \multicolumn{1}{l}{0.737,$~~~$0.737} \\
+\multicolumn{3}{l|}{Resid. SE,$~$ F stat. p-value} & \multicolumn{1}{l}{1.012,$~~~$<0.001} \\
+\bottomrule\bottomrule
 \end{tabular}
+\begin{minipage}{\linewidth}\centering
+\vspace{.05em}
+\emph{Note:}  \(^{*}\)p\textless{}0.1; \(^{**}\)p\textless{}0.05; \(^{***}\)p\textless{}0.01\\
+\end{minipage}

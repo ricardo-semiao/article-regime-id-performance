@@ -16,6 +16,13 @@ regimes_order <- function(coefs, rn_par, dims) {
 }
 fn_env(regimes_order) <- pkg_env("base")
 
+bare_sd <- function(x, ...) {
+  xna <- x[!is.na(x)]
+  n <- length(xna)
+
+  sqrt(sum((xna - sum(xna) / n)^2) / (n - 1))
+}
+
 
 # Temporary example:
 if (FALSE) {
@@ -23,6 +30,7 @@ if (FALSE) {
   n_l <- 1; n_r <- 2
   min_r_size <- 0.1; tol <- 1e-5; max_iter <- 10
   g <- \(x) x; gamma <- NULL; rn_par = "rho1"
+  w_size = 5
   data <- data.frame(y = c(rnorm(50, 2), rnorm(30, 0), rnorm(n_t - 80, 1))) |>
     data_lags(n_l = 1)
 }
@@ -58,7 +66,7 @@ get_results$stats_lm <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) {
 
   # Regimes:
   r <- rep(1L, n_t)
-  r[1:n_b] <- NA_integer_
+  r[1:n_b] <- NA_integer_ # TODO optimize as is in RF
 
   # Series:
   preds <- double(n_h)
@@ -277,10 +285,91 @@ get_results$mswm_msmfit <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par) 
 }
 
 
+#' Get results from stats::kmeans
+get_results$stats_km <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par, w_size) {
+  n_l <- 1 # TODO: reimplement for n_l > 1
+  dims <- list(
+    rows = paste0("R", 1:n_r),
+    cols = c("mu", paste0("rho", 1:n_l), "sigma")
+  )
+
+  # Regimes:
+  r_pred <- integer(n_h)
+  for (i in (n_h - 1):0) {
+    w_idx <- n_t - i
+    w_data <- data[(w_idx - w_size):(w_idx - 1), "y_l1"]
+
+    data[, "avg"][w_idx] <- mean(w_data)
+    data[, "acf"][w_idx] <- acor(w_data)
+    data[, "sd"][w_idx] <- bare_sd(w_data)
+
+    r_pred[i + 1] <- which.min(apply(mod$centers, 1, \(c) sum((c - data[w_idx, ])^2)))
+  }
+  r <- c(
+    rep(NA_integer_, n_b),
+    mod$cluster,
+    r_pred
+  )
+
+  # Series:
+  idx_fit <- (n_b + 1):(n_t - n_h)
+  ar <- stats::lm(
+    y ~ 0 + r + y_l1:r - 1,
+    data = cbind(data[idx_fit, ], r = factor(r[idx_fit]))
+  )
+
+  y <- c(
+    rep(NA_real_, n_b),
+    stats::fitted(ar),
+    stats::predict(ar, data.frame(r = factor(r_pred), y_l1 = data[(n_t - n_h + 1):n_t, "y_l1"]))
+  ) # TODO: reimplement natively
+
+  # Meta information:
+  coefs <- c(
+    ar$coefficients,
+    series_sd(data[idx_fit, "y"] - y[idx_fit], r[idx_fit], n_r)
+  ) |>
+    matrix(n_r, 3)
+  ord <- regimes_order(coefs, rn_par, dims)
+
+  meta <- list(
+    coefs = `dimnames<-`(coefs[ord, ], dims),
+    switches = mod$centers
+  )
+
+  list(y = unname(y), r = ord[r], meta = meta)
+}
+
+
+# Add to get_results:
+get_results$stats_rf <- function(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par, w_size) {
+  dims <- list(
+    rows = "R1",
+    cols = c("mu", paste0("rho", 1:n_l), "sigma")
+  )
+
+  idx_fit <- (n_b + 1):(n_t - n_h)
+  preds_oos <- stats::predict(mod, newdata = as.data.frame(data[(n_t - n_h + 1):n_t, , drop = FALSE]))
+  fitted_in <- stats::predict(mod, newdata = as.data.frame(data[idx_fit, , drop = FALSE]))
+
+  y <- c(rep(NA_real_, n_b), fitted_in, preds_oos)
+  r <- c(rep(NA_integer_, n_b), rep(1, n_t - n_b))
+  meta <- list(
+    coefs = `dimnames`(matrix(NA_real_, 1, 2 + n_l), dims)#,
+    #importance = randomForest::importance(mod)
+  )
+
+  list(y = unname(y), r = r, meta = meta)
+}
+
+
 # Sanitizing enclosing environments
 for (model_name in names(get_results)) {
   fn_env(get_results[[model_name]]) <- new_environment(
-    list(series_sd = series_sd, regimes_order = regimes_order),
+    list(
+      series_sd = series_sd, regimes_order = regimes_order,
+      acor = acor, bare_sd = bare_sd
+    ), # TODO customize for each
     pkg_env("base")
   )
 }
@@ -314,6 +403,7 @@ ar <- function(
       data[(n_b + n_l + 1):(n_t - n_h), 1] ~ data[(n_b + n_l):(n_t - n_h - 1), 1]
       # TODO: consider data[(n_b + 1 + n_l):(n_t - n_h), 1] ~ data[(n_b + 1):(n_t - n_h - n_l), 1]
       # and similar in the other models
+      # Use names of data
     )
     results(data, mod, n_b, n_h, n_t, n_r, n_l)
   })
@@ -479,6 +569,93 @@ markov <- function(
       sw = c(rep(TRUE, n_l + 1), FALSE)
     )
     results(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par)
+  })
+
+  new_function(
+    args = exprs(data = , n_t = , n_h = , n_b = , rn_par = ),
+    body = body,
+    env = new_environment(defaults, pkg_env("base"))
+  )
+}
+
+
+#' Model: K-means
+#' @export
+km <- function(
+  n_r, n_l = 1, w_size = 5
+) {
+  defaults <- c(
+    as.list(current_env()), results = get_results$stats_km,
+    acor = acor, bare_sd = bare_sd
+  )
+
+  body <- expr({
+    data <- cbind(data, avg = NA_real_, acf = NA_real_, sd = NA_real_)
+    idx_fit <- (n_b + 1):(n_t - n_h)
+
+    for (t in 1:(length(idx_fit) - w_size - 1)) {
+      w_idx <- t + w_size + 1
+      w_data <- data[(t + 1):(w_idx), "y_l1"]
+
+      data[idx_fit, "avg"][w_idx] <- mean(w_data)
+      data[idx_fit, "acf"][w_idx] <- acor(w_data)
+      data[idx_fit, "sd"][w_idx] <- bare_sd(w_data)
+    }
+    data[idx_fit, "avg"][1:w_size] <- mean(data[(n_b + w_size + 1):(n_t - n_h), "avg"])
+    data[idx_fit, "acf"][1:w_size] <- mean(data[(n_b + w_size + 1):(n_t - n_h), "acf"])
+    data[idx_fit, "sd"][1:w_size] <- mean(data[(n_b + w_size + 1):(n_t - n_h), "sd"])
+    data[is.na(data)] <- 0
+
+    mod <- stats::kmeans(data[idx_fit, ], n_r) # TODO: shuold not include y_t?
+    results(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par, w_size)
+  })
+
+  new_function(
+    args = exprs(data = , n_t = , n_h = , n_b = , rn_par = ),
+    body = body,
+    env = new_environment(defaults, pkg_env("base"))
+  )
+}
+
+
+# Creator: random forest
+#' @export
+rf <- function(n_r = 1, n_l = 1, w_size = 5, ntree = 50, mtry = NULL) {
+  defaults <- c(
+    as.list(current_env()), results = get_results$stats_rf,
+    acor = acor, bare_sd = bare_sd
+  )
+
+  body <- expr({
+    model.frame <- stats::model.frame
+
+    data <- cbind(data, avg = NA_real_, acf = NA_real_, sd = NA_real_)
+    idx_fit <- (n_b + 1):(n_t - n_h)
+
+    for (t in 1:(length(idx_fit) - w_size - 1)) {
+      w_idx <- t + w_size + 1
+      w_data <- data[(t + 1):(w_idx), "y_l1"]
+      data[idx_fit, "avg"][w_idx] <- mean(w_data)
+      data[idx_fit, "acf"][w_idx] <- acor(w_data)
+      data[idx_fit, "sd"][w_idx] <- bare_sd(w_data)
+    }
+    data[idx_fit, "avg"][1:w_size] <- mean(data[(n_b + w_size + 1):(n_t - n_h), "avg"])
+    data[idx_fit, "acf"][1:w_size] <- mean(data[(n_b + w_size + 1):(n_t - n_h), "acf"])
+    data[idx_fit, "sd"][1:w_size] <- mean(data[(n_b + w_size + 1):(n_t - n_h), "sd"])
+    data[is.na(data)] <- 0
+
+    # Build training data: response + predictors (exclude 'y' from predictors when needed by other code)
+    predictors <- setdiff(colnames(data), "y")
+    train_df <- as.data.frame(cbind(y = data[idx_fit, "y"], data[idx_fit, predictors, drop = FALSE]))
+    mod <- randomForest::randomForest(
+      y ~ ., data = train_df, ntree = ntree,
+      mtry = max(1, floor((ncol(train_df) - 1) / 4)),
+      nodesize = 7, maxnodes = 100#,
+      #importance = FALSE
+    )
+
+    # Ensure predict rows have same predictor columns
+    results(data, mod, n_b, n_h, n_t, n_r, n_l, rn_par, w_size)
   })
 
   new_function(

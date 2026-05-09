@@ -5,10 +5,7 @@
 box::use(
   src/utils[...],
   metrics = ./metrics_definitions,
-  src/parameters[n_t, n_h, n_b]
-)
-
-box::use(
+  src/parameters[n_t, n_h, n_b],
   dtplyr[lazy_dt]
 )
 

@@ -50,9 +50,9 @@ dicts_reg <- c(
   mu_diff = "$\\Delta \\mu$",
   rho1_diff = "$\\Delta \\rho_1$",
   sigma_diff = "$\\Delta \\sigma$",
-  avg_diff = "$\\Delta \\text{avg}(.)$",
-  acf_diff = "$\\Delta \\text{acf}(.)$",
-  sd_diff = "$\\Delta \\text{sd}(.)$",
+  avg_diff = "$\\Delta d(\\hat{\\mu}(.))$",
+  acf_diff = "$\\Delta d(\\hat{\\rho}_1(.))$",
+  sd_diff = "$\\Delta d(\\hat{\\sigma}(.))$",
   #
   is_mis = "Baseline",
   models$dict$gt %>% {set_names(
@@ -64,7 +64,7 @@ dicts_reg <- c(
    paste0("is_mis:rgp", str_replace(names(.), "(r[0-9]+_[^_]+)_.+", "\\1"))
   )},
   sgps$dict$gt %>% {set_names(
-    paste0("RN:", .),
+    paste0("RN: ", .),
     paste0("is_mis:sgp", str_replace(names(.), "(.+)[0-9]+", "\\1"))
   )},
   "is_mis:sgp1" = "RN: small",
@@ -79,7 +79,23 @@ dicts_reg <- c(
   models$dict$gt %>% {set_names(
     paste0("$BME(r) ~ \\cdot$ ", .),
     paste0("model", names(.), ":regimes_bme")
-  )}
+  )},
+  #
+  "model_r != dgp_rTRUE" = "$\\hat{S} \\neq S$",
+  "model_r > dgp_rTRUE" = "$\\hat{S} > S$",
+  "model_r < dgp_rTRUE" = "$\\hat{S} < S$",
+  "model_r > dgp_rTRUE:avg_sim" = "$\\hat{S} > S$ : $d(\\hat{\\mu}(.))$",
+  "model_r > dgp_rTRUE:acf_sim" = "$\\hat{S} > S$ : $d(\\hat{\\rho}_1(.))$",
+  "model_r > dgp_rTRUE:sd_sim" = "$\\hat{S} > S$ : $d(\\hat{\\sigma}(.))$",
+  "model_r < dgp_rTRUE:avg_sim" = "$\\hat{S} < S$ : $d(\\hat{\\mu}(.))$",
+  "model_r < dgp_rTRUE:acf_sim" = "$\\hat{S} < S$ : $d(\\hat{\\rho}_1(.))$",
+  "model_r < dgp_rTRUE:sd_sim" = "$\\hat{S} < S$ : $d(\\hat{\\sigma}(.))$",
+  #
+  "as.integer(model_r > dgp_r):modelr1_nors" = "$\\hat{S} > S$ : No RS",
+  "as.integer(model_r > dgp_r):modelr2_ms" = "$\\hat{S} > S$ : MS",
+  "as.integer(model_r > dgp_r):modelr2_set_x" = "$\\hat{S} > S$ : SET",
+  "as.integer(model_r > dgp_r):modelr2_st" = "$\\hat{S} > S$ : ST",
+  "as.integer(model_r > dgp_r):modelr2_km" = "$\\hat{S} > S$ : KM"
 )
 
 #' Names' dictionaries for each option

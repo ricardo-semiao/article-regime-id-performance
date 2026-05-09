@@ -5,16 +5,23 @@ box::use(
   src/utils[...],
   src/options[dicts],
   stargazer[stargazer],
-  gt[...]
+  gt[...],
+  broom[glance]
 )
 
 
 # Temporary example:
 if (FALSE) {
-  mods = lm(rmse ~ poly(sim, 9) - 1, sys_data)
-  args = list()
-  dim = c(3, 3); rows = 1:9; dimnames = NULL
+  mods = mod = lm(rmse ~ poly(sim, 9) - 1, sys_data)
+  args = list(); out = "test.tex";
+  dim = c(3, 3); rows = 1:9; dimnames = NULL; marginal = TRUE
 }
+
+dict_stats <- c(
+  nobs = "Observations",
+  r = "$R^2$,$~$ Adjusted $R^2$",
+  test = "Resid. SE,$~$ F stat. p-value"
+)
 
 
 
@@ -47,9 +54,33 @@ format_reg_matrix <- function(
     gt(rowname_col = "rgp") |>
     tab_stubhead(names(dimnames)[1]) |>
     tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01")) |>
-    tab_spanner(names(dimnames)[2], dimnames[[2]])
+    tab_spanner(names(dimnames)[2], unname(dimnames[[2]])) |>
+    cols_label_with(fn = md)
 
   gtsave2(table, out, ...)
+  table <- readLines(out)
+
+  stats <- glance(mod) %>%
+    {list(
+      nobs = .$nobs,
+      r = c(.$r.squared, .$adj.r.squared) |> round(3) |>
+        paste(collapse = ",$~~~$"),
+      test = c(round(.$sigma, 3), round(.$p.value, 3) %>% {if (. == "0") "<0.001" else .}) |>
+        paste(collapse = ",$~~~$")
+    )} |>
+    _[names(dict_stats)] |>
+    imap_chr(\(x, nm) {
+      nm <- dict_stats[nm]
+      glue("\\multicolumn{{2}}{{l|}}{{{nm}}} & \\multicolumn{{{dim[2] - 1}}}{{l}}{{{x}}} \\\\")
+    }) |>
+    c("\\midrule\\addlinespace[2.5pt]", .x = _) |>
+    unname()
+
+  table <- append(table, stats, grep("^\\\\bottomrule", table) - 1)
+  table[grep("^\\\\toprule", table)] <- "\\toprule\\toprule"
+  table[grep("^\\\\bottomrule", table)] <- "\\bottomrule\\bottomrule"
+
+  writeLines(table, out)
   invisible(table)
 }
 
@@ -83,32 +114,48 @@ format_reg_matrix2 <- function(
     transmute(
       fmt = glue("{round(values, 3)}{add_star(main[['Pr(>|t|)']])}{sd}"),
       sgp = ints[, 1], rgp = ints[, 2], model = ints[, 3],
-      sgp = ds[str_replace(sgp, "^sgp", "")],
-      rgp = dr[str_replace(rgp, "^rgp", "")],
-      model = dicts$models$gt[str_replace(model, "^model", "")]
+      sgp = ds[str_replace(sgp, "^sgp", "")] |> fct(unique(ds)),
+      rgp = dr[str_replace(rgp, "^rgp", "")] |> fct(unique(dr)),
+      model = dicts$models$gt[str_replace(model, "^model", "")] |>
+        fct(unique(dicts$models$gt))
     ) |>
+    arrange(rgp, sgp, model) |>
     filter(!is.na(values)) |>
     pivot_wider(names_from = model, values_from = fmt) |>
-    relocate(rgp, sgp) |>
-    arrange(rgp, sgp) |>
     mutate(across(everything(), as.character)) |>
     reduce(c(3, 7, 11), .init = _, ~ add_row(.x, .after = .y)) |>
     mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) |>
     gt(rowname_col = c("rgp", "sgp")) |>
     tab_stubhead(c("RGP", "SGP")) |>
-    tab_spanner("Model", c("SET", "ST", "MS")) |>
+    tab_spanner("Model", -c(rgp, sgp)) |>
     cols_label_with(fn = md) |>
     fmt_markdown(c("rgp", "sgp")) |>
-    tab_style(
-      style = cell_borders(sides = "bottom", color = "black", weight = px(1)),
-      locations = list(
-        cells_stub(rows = seq(3, 9, 3), "rgp"),
-        cells_stub(rows = seq(3, 9, 3), "sgp"),
-        cells_body(rows = seq(3, 9, 3))
-      )
-    )
+    tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01"))
 
   gtsave2(table, out, ...)
+  table <- readLines(out)
+
+  stats <- glance(mod) %>%
+    {list(
+      nobs = .$nobs,
+      r = c(.$r.squared, .$adj.r.squared) |> round(3) |>
+        paste(collapse = ",$~~~$"),
+      test = c(round(.$sigma, 3), round(.$p.value, 3) %>% {if (. == "0") "<0.001" else .}) |>
+        paste(collapse = ",$~~~$")
+    )} |>
+    _[names(dict_stats)] |>
+    imap_chr(\(x, nm) {
+      nm <- dict_stats[nm]
+      glue("\\multicolumn{{3}}{{l|}}{{{nm}}} & \\multicolumn{{{dim[2] - 2}}}{{l}}{{{x}}} \\\\")
+    }) |>
+    c("\\midrule\\addlinespace[2.5pt]", .x = _) |>
+    unname()
+
+  table <- append(table, stats, grep("^\\\\bottomrule", table) - 1)
+  table[grep("^\\\\toprule", table)] <- "\\toprule\\toprule"
+  table[grep("^\\\\bottomrule", table)] <- "\\bottomrule\\bottomrule"
+
+  writeLines(table, out)
   invisible(table)
 }
 
@@ -140,32 +187,51 @@ format_reg_matrix3 <- function(
     transmute(
       fmt = glue("{round(values, 3)}{add_star(main[['Pr(>|t|)']])}{sd}"),
       sgp = ints[, 3], metric = ints[, 2], model = ints[, 1],
-      sgp = ds[str_replace(sgp, "^sgp", "")],
-      metric = dicts$metrics$disp_gt[str_replace(metric, "_est", "")],
-      model = dicts$models$gt[str_replace(model, "^model", "")]
+      sgp = ds[str_replace(sgp, "^sgp", "")] |> fct(unique(ds)),
+      metric = dicts$metrics$disp_gt[str_replace(metric, "_est|_diff|_sim", "")] |>
+        fct(unique(dicts$metrics$disp_gt)),
+      model = dicts$models$gt[str_replace(model, "^model", "")] |>
+        fct(unique(dicts$models$gt))
     ) |>
     filter(!is.na(values)) |>
-    pivot_wider(names_from = model, values_from = fmt) |>
+    filter(model != "No RS") |>
     relocate(metric, sgp) |>
-    arrange(metric, sgp) |>
+    arrange(metric, sgp, model) |>
+    pivot_wider(names_from = model, values_from = fmt) |>
     mutate(across(everything(), as.character)) |>
     reduce(c(2, 5), .init = _, ~ add_row(.x, .after = .y)) |>
     mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) |>
     gt(rowname_col = c("metric", "sgp")) |>
     tab_stubhead(c("Metric", "SGP")) |>
-    tab_spanner("Model", c("SET", "ST", "MS")) |>
+    tab_spanner("Model", -c(metric, sgp)) |>
     cols_label_with(fn = md) |>
     fmt_markdown(c("metric", "sgp")) |>
-    tab_style(
-      style = cell_borders(sides = "bottom", color = "black", weight = px(2)),
-      locations = list(
-        cells_stub(rows = seq(2, 4, 2), "metric"),
-        cells_stub(rows = seq(2, 4, 2), "sgp"),
-        cells_body(rows = seq(2, 4, 2))
-      )
-    )
+    tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01"))
 
   gtsave2(table, out, ...)
+  table <- readLines(out)
+
+  stats <- glance(mod) %>%
+    {list(
+      nobs = .$nobs,
+      r = c(.$r.squared, .$adj.r.squared) |> round(3) |>
+        paste(collapse = ",$~~~$"),
+      test = c(round(.$sigma, 3), round(.$p.value, 3) %>% {if (. == "0") "<0.001" else .}) |>
+        paste(collapse = ",$~~~$")
+    )} |>
+    _[names(dict_stats)] |>
+    imap_chr(\(x, nm) {
+      nm <- dict_stats[nm]
+      glue("\\multicolumn{{3}}{{l|}}{{{nm}}} & \\multicolumn{{{dim[2] - 2}}}{{l}}{{{x}}} \\\\")
+    }) |>
+    c("\\midrule\\addlinespace[2.5pt]", .x = _) |>
+    unname()
+
+  table <- append(table, stats, grep("^\\\\bottomrule", table) - 1)
+  table[grep("^\\\\toprule", table)] <- "\\toprule\\toprule"
+  table[grep("^\\\\bottomrule", table)] <- "\\bottomrule\\bottomrule"
+
+  writeLines(table, out)
   invisible(table)
 }
 
@@ -187,7 +253,8 @@ format_reg_table <- function(mods, out, ...) {
 
   labs <- reduce(mods, .init = character(0), ~ union(.x, names(.y$coefficients))) %>%
     dicts$reg[.] %>%
-    .[names(.) != "(Intercept)"]
+    .[names(.) != "(Intercept)"] |>
+    na.omit() # ! Fix keep and omit arguments to stargazer
 
   label <- str_split_1(out, "/") %>% .[length(.)] %>% str_remove("\\.tex$")
 

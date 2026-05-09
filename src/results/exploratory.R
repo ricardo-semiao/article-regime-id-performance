@@ -194,8 +194,10 @@ metrics_sep_graphs <- function(data_s, ...) {
 regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
   filters <- enquos(...)
 
-  data_formatted <- data_e |>
-    filter(!!!filters, t > n_t - n_h) |>
+  data_raw <- data_e |>
+    filter(!!!filters, t > n_t - n_h)
+
+  data_formatted <- data_raw |>
     left_join(
       data_s, by = c("sgp", "rgp", "sim", "t"),
       suffix = c("_est", "_sim")
@@ -212,7 +214,7 @@ regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
     ) |>
     ungroup()
 
-  map(set_names(unique(data_e$model)), \(mod_name) {
+  map(set_names(unique(data_raw$model)), \(mod_name) {
     ggplot(filter(data_formatted, model == mod_name), aes(x = y_err)) +
       geom_density(aes(color = correct_r)) +
       facet_grid2(
@@ -222,4 +224,29 @@ regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
       labs(y = "Density", x = "Forecasting error", color = "Regime ID") +
       scale_color_manual(values = unname(pal$main))
   })
+}
+
+
+
+# Metrics diff ----------------------------------------------------------
+#' @export
+metrics_diff_graph <- function(data_m) {
+  data_m |>
+    #clump_dgps() |>
+    filter(rgp != "r1_nors", ! model %in% c("r1_nors", "r1_rf")) |>
+    pivot_longer(c(avg_diff, acf_diff, sd_diff)) |>
+    mutate(
+      rgp = dicts$rgps$gg[rgp] |> fct(unique(dicts$rgps$gg)),
+      sgp = dicts$sgps$gg[sgp] |> fct(unique(dicts$sgps$gg)),
+      model = dicts$models$gg[model] |> fct(unique(dicts$models$gg)),
+      name = dicts$metrics$disp_gg[str_replace(name, "_diff", "")],
+    ) |>
+    group_by(name) |>
+    filter(value < quantile(value, 0.99, na.rm = TRUE)) |>
+    mutate(value = value / mad(value, na.rm = TRUE)) |>
+    ggplot(aes(value, after_stat(count / sum(count)), fill = model)) +
+    geom_histogram(bins = 50, position = "stack") +
+    facet_grid(vars(sgp), vars(name), labeller = label_parsed) +
+    scale_fill_manual(values = unname(pal$main)) +
+    labs(x = "Metrics' absolute difference", y = "Frequency", fill = "Model")
 }

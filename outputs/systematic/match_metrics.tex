@@ -1,13 +1,17 @@
 \begin{tabular}{@{\extracolsep{\fill}}l|rrr}
-\toprule
+\toprule\toprule
  & \multicolumn{3}{c}{{Metric}} \\ 
 \cmidrule(lr){2-4}
-Model & Avg & ACF & SD \\ 
+Model & \(d(\hat{\mu}(.))\) & \(d(\hat{\rho}_1(.))\) & \(d(\hat{\sigma}(.))\) \\ 
 \midrule\addlinespace[2.5pt]
-MS & -1.136*** (0.021) & 0.544*** (0.007) & 0.575*** (0.014) \\ 
-SET & 0.416*** (0.008) & -0.724*** (0.014) & 0.547*** (0.017) \\ 
-ST & 0.271*** (0.005) & 0.404*** (0.016) & -0.051*** (0.015) \\ 
-\bottomrule
+SET & 0.737*** (0.02) & 0.445*** (0.006) & 0.359*** (0.008) \\ 
+ST & 0.36*** (0.007) & 0.14*** (0.003) & 0.421*** (0.007) \\ 
+MS & 0.228*** (0.005) & 0.091*** (0.008) & 0.428*** (0.008) \\ 
+\midrule\addlinespace[2.5pt]
+\multicolumn{2}{l|}{Observations} & \multicolumn{2}{l}{89065} \\
+\multicolumn{2}{l|}{$R^2$,$~$ Adjusted $R^2$} & \multicolumn{2}{l}{0.441,$~~~$0.441} \\
+\multicolumn{2}{l|}{Resid. SE,$~$ F stat. p-value} & \multicolumn{2}{l}{1.529,$~~~$<0.001} \\
+\bottomrule\bottomrule
 \end{tabular}
 \begin{minipage}{\linewidth}\centering
 \vspace{.05em}
