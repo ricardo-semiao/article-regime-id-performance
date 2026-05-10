@@ -9,13 +9,9 @@ author:
         - name: Mestrando em Economia pela FGV-EESP
 date: today
 abstract: |
-    This thesis investigates how regime switching models learn and forecast when the data-generating process is mis-specified, and whether observable regime characteristics can help explain and predict model performance. I introduce a unified framework separating the _series generating process_ and the _regime generating process_, and formalize _regime-conditional metrics_ (RC) that summarize regime distributions.
+    This thesis investigates how regime switching (RS) models learn and forecast across varying data generating processes, and whether the distribution of each regime can help explain and predict model performance. I introduce a framework separating the _series generating process_ (SGP) versus _regime generating process_ (RGP), and formalize _regime-conditional metrics_ (RC), that summarize the difference between regime distributions. A Monte Carlo setup generates series, models, and RC metrics. The framework is expandable, but I focus on: stationary $AR(1)$ series; two-regime Markov Switching (MS), Self-Exciting Threshold (SET), and Smooth Transition (ST) mechanisms; MS, SET, and ST models, plus K-Means (KM) and Random Forest (RF); RC metrics are the average, SD, and lag-1 ACF. Results show that RGPs and SGPs interact in non-obvious ways, but the RC metrics can sometimes characterize this behavior. KM and RF models are the best performers, followed by SET and ST, while MS is more flexible and performs better in asymmetric regimes; KM and ST are robust across DGPs. Mis-specifying the RGP increases the RMSE by $0.52$, ST does poorly with no-RS series, but other model-RGP interactions are generally insignificant. Matching the regime is important for performance, but not for the KM model. SET and ST are best on series with high average separation, ST does worse with high ACF separation, and KM fares well with different SDs. Under-specifying the number of regimes is less harmful when regime distributions are minimally separated, and over-estimation is less harmful in the opposite case.
 
-    A Monte Carlo setup is defined to simulate series, estimate models, and calculate RC metrics. The framework and implementation is general and expandable, but I focus on stationary $AR(1)$ series, with two regimes governed by Markov Switching (MS), Self-Exciting Threshold (SET), or Smooth Transition (ST) mechanisms, and utilize the 1st, 2nd moments, and lag-1 autocorrelation for RC metrics.
-
-    The results show that RC metrics meaningfully characterize regime separation, with MS RGPs there is a clear map from the metrics values and which parameter is changing, but not for SET and ST. SET and ST generally yield better fixed‑effect forecasting performance, while MS is more flexible and performs better in asymmetric regimes cases. Model mis-specification raises RMSE (baseline increase of 0.547, larger with volatility changes), but RGP interactions are insignificant. Given RC metrics, SET/ST perform best when average separation is high, MS suffers with high ACF separation. Correct regime identification typically narrows RMSE tails (though not uniformly).
-
-    The study’s main limitation is external validity: findings are conditional on a restricted pool of DGPs. Expanding to richer DGPs, more regimes, different error distributions, and including more RC metrics is the natural next step. Nevertheless, the RC‑metric approach offers a promising diagnostic and model‑selection tool for applied econometricians working with regime switching time series.
+    **Keywords**: Time series, Regime Switching.
 keywords:
   - Time series
   - Regime Switching
@@ -93,13 +89,13 @@ format:
 
 Regime switching (RS) models describe time series that exhibit different behavior -- different parameters -- across different regimes. They are useful to capture non-linearities in time series, having been widely used in economics and finance, for instance, to model business cycles and market volatility. There are several types of regime switching modeling, some with stochastic switching, such as Markov-switching models, and some with deterministic switching, such as threshold models.
 
-As with any forecasting model, it is important to understand the factors that influence their performance, and how econometricians can use this knowledge to improve their models. In this work, I focus on: (i) the ability of these models to learn and generate performant forecasts under the presence of mis-specification; and (ii) how that ability relates to the characteristics of the regimes.
+As with any forecasting model, it is important to understand the factors that influence their performance, and how econometricians can use this knowledge to improve their models. In this work, I focus on: (i) the ability of these models to learn and generate accurate forecasts in the presence of mis-specification; and (ii) how that ability relates to the characteristics of the regimes.
 
 The first focus is common in forecasting econometrics: exactly identifying the data generating process (DGP) is the exception, not the rule, so the modeling goal is actually to find a robust approximator. It is important to document how each RS model behaves under different mis-specifications, explore possible universal approximators, and understand how each element of the DGP affects the learning problem of the models.
 
 The second focus is less orthodox and specific to RS models. These models are special in the sense that they not only identify the series in question but also its states -- its regimes -- thus allowing the econometrician to describe the distribution of each regime and how different they are from each other. This characterization of regimes' distributions might be informative for the model's performance: for example, if the DGP implies different intercepts across regimes, a model whose identified regimes have the same conditional average is probably not capturing that dynamic well; or some class of model can be good at capturing that dynamic but bad at capturing changes in persistence. These examples might seem obvious, but I will show that there is much useful information to be taken from this kind of analysis.
 
-The nature of this project is explorative. I will simulate a diverse set of DGPs and try to find stylized facts about how each RS model adjusts to them, and how the characteristics of the estimated regimes relate to this adjustment. To make things more concrete, in the remainder of this section I synthesize the methodology, describe the patterns I hope to find, and present some of the actual findings.
+The nature of this project is exploratory. I will simulate a diverse set of DGPs and try to find stylized facts about how each RS model adjusts to them, and how the characteristics of the estimated regimes relate to this adjustment. To make things more concrete, in the remainder of this section I synthesize the methodology, describe the patterns I hope to find, and present some of the actual findings.
 
 
 ## Basic methodology and hypothesis {#sec-intro-method}
@@ -108,17 +104,17 @@ The methodology follows a common setup. The first step is to establish a theoret
 
 Creating a general framework was a goal in itself, but for this work, I considered only a specific set of DGPs, models, and metrics, answering only some of the questions it allows to be asked.
 
-I focus on stationary $AR(1)$ processes, with regime switching via Markov Switching, Self-Exciting Threshold, and Smooth Transition, with symmetric and asymmetric variations. There, the regimes can differ in one of the three parameters of the $AR(1)$, and the change can be 'big' or 'small'. A no-RS model is included as a baseline.
+I focus on stationary $AR(1)$ processes, with regime switching via Markov Switching (MS), Self-Exciting Threshold (SET), and Smooth Transition (ST), with symmetric and asymmetric variations. There, the regimes can differ in one of the three parameters of the $AR(1)$, and the change can be 'big' or 'small'. A no-RS DGP is included as a baseline. Each RGP is accompanied by its related model, with the addition of a unsupervised RS K-Means (KM) model, and a Random Forest (RF) for benchmarks.
 
-For the analysis, the first step is exploratory, to understand how the regimes' distributions differ across these DGPs.  Do the metrics correctly identify the differences between the distributions? Can they help us get stylized facts to better understand how these models work?
+For the analysis, the first step is exploratory, to understand how the regimes' distributions differ across these DGPs. Do the metrics correctly identify the differences between the distributions? Can they help us get stylized facts to better understand how these models work?
 
-Then, the focus is to understand if the distribution of regimes informs something about the models' performance. That is, do the models fare better when faced with a specific profile of regimes' distributions? Or does matching the distributions improve models' performance in the sense of the metrics?
+Then, the focus is to understand if the distribution of regimes informs something about the models' performance. That is, do the models fare better when faced with a specific profile of regimes' distributions? Or does matching the distributions improve models' performance in the sense of the metrics? Does under-specifying the number of regimes matter less if the regimes' distributions were similar, and vice versa?
 
 For the more orthodox objectives, we first explore the general performance of the considered models in this specific pool of DGPs. Which one performs better? How do the models' components relate to that performance, and how does it vary across DGP scenarios (e.g. asymmetric DGPs)? Does mis-specifying the DGP impact performance, and how? Which model component (fit, regimes, parameters, etc.) is more important to match, in terms of performance?
 
-The goal of this work is to answer these questions, generating stylized facts about the DGPs, and practical recommendations for modeling regime switching time series. Results are conditional in the population of DGPs considered, but are still useful. Notably: the interaction between RGPs and RNs is paramout to the behaviour of the series, with MS RGPs it can be profiled by the dispersion of the RC metrics, but not with SET and ST; MS models are more flexible and deal better with scenarios such as asymmetric RGPs, but SET and ST are otherwise overall better; Mis-specifying the RGP increases the RMSE by $0.547$, and more with changes in volatility, but RGPs interactions are insignificant.
+The goal of this work is to answer these questions, generating stylized facts about the DGPs, and practical recommendations for modeling regime switching time series. Results are conditional in the population of DGPs considered, but are still useful. The inclusion of more DGPs and metrics would help with some of this work's limitations. Notable findings include: the interaction between RGPs and RNs is paramount to the behavior of the series; such behavior can be profiled by the dispersion of the RC metrics, but only with MS RGPs, SET and ST possibly requiring more metrics; MS models are more flexible and deal better with scenarios such as asymmetric RGPs, but SET and ST are otherwise overall better, while KM and RF are clearly on top; Mis-specifying the RGP increases the RMSE by $0.52$, but RGPs interactions are insignificant.
 
-An initial analysis of how a model fares for each profile of RC metrics is done, with potential for powerful practical utility for model selection, e.g. SET and ST are best on series with high average separation, MS does worse with high ACF separation, while the opposite is true for ST. But, this analysis has issues of external validity and variance across non-observable DGP factors, and requires further investigation.
+An initial analysis of how a model fares for each profile of RC metrics is done, with potential for powerful practical utility for model selection, e.g. SET and ST are best on series with high average separation, ST does worse with high ACF separation, and KM fares well with different volatility. But, this analysis has issues with the estimated metrics and varies across non-observable DGP factors, and requires further investigation. Under-specifying the number of regimes is attenuated in minimally separated regimes' distributions, and over-estimation is attenuated in the opposite case.
 
 The rest of this work is divided as follows: @sec-lit presents the literature review. The general framework is presented in @sec-theory and @sec-sim, while the specific implementation chosen is presented in @sec-impl. The results are split into a more exploratory section ([-@sec-sep]) and a systematic one ([-@sec-perf]). Finally, @sec-conc concludes.
 
@@ -130,7 +126,7 @@ The regime switching literature is vast and contains many model variations. It i
 
 The first is the state-space (SS) literature, with its quintessential implementation by @Kalman1960. While RS and SS models have developed as somewhat independent fields, RS can be viewed as a subset of SS, where the state (regime) variable and the observed series variable are modeled separately. This separation is central to the framework used in this paper. Bridges between the literatures include Switching State-Space Models and the seminal work by @Kim1994, which extends Hamilton's Markov-switching model to general state-space models.
 
-The second is the structural break (SB) literature, the most relevant starting point being @Chow1960. Much of it is devoted to diagnosing breaks, which are indeed present in RS settings, with the non-constant parameters. However, SB models typically treat breaks as exogenous and non-recurring. Bridging the gap, @Bai1998 allows for multiple unknown breaks, which can be relevant for RS contexts, while @Chib1998 demonstrates that SBs can be formulated as Markov-switching processes that have only positive probability for staying in the initial regime and switching to the next, not for switching back. Ultimately, I found that SB models were not comparable with RS models for the analysis done in this work.
+The second is the structural break (SB) literature, the most relevant starting point being @Chow1960. Much of it is devoted to diagnosing breaks, which are indeed present in RS settings, with the non-constant parameters. However, SB models typically treat breaks as exogenous and non-recurring. Bridging the gap, @Bai1998 allows for multiple unknown breaks, which can be relevant for RS contexts, while @Chib1998 demonstrates that SBs can be formulated as Markov-switching processes that have only positive probability for staying in the initial regime and switching to the next, not for switching back. Ultimately, I found that SB models were not comparable with RS models for the analysis done in this work, but future works could explore these connections.
 
 
 ## Regime switching models
@@ -274,7 +270,7 @@ Notably, the number of estimated regimes $\hat{S}$ is a parameter in $\Theta_m$,
 
 ## Regime conditional metrics {#sec-theory-metrics}
 
-A regime-conditional (RC) metric $\met$ is function that receives a vector of series and a vector of regimes, and returns a sequence with one value for each regime. They are used to characterize the distribution of $y_t$ or $(y_t, y_{t-j})$ within each regime.
+A regime-conditional (RC) metric $\met$ is a function that receives a vector of series and a vector of regimes, and returns a sequence with one value for each regime. They are used to characterize the distribution of $y_t$ or $(y_t, y_{t-j})$ within each regime.
 
 \begin{equation}
     \met: (y, r) \mapsto \mathbb{R}^{S}
@@ -284,7 +280,7 @@ An example is the function that returns, for each regime $s$, the mean of the se
 
 [^regime_obs_set]: $R_s \coloneqq \{ y_t ~:~ r^s_t = \max\{r_t\} \}$.
 
-For the joint distribution $(y_t, y_{t-j})$, the metrics are more complex, as they must consider only the windows $(y_t, \dots, y_{t-j})$ fully contained in the same regime instance. This is further described in [Apendix -@sec-app-metrics].
+For the joint distribution $(y_t, y_{t-j})$, the metrics are more complex, as they must consider only the windows $(y_t, \dots, y_{t-j})$ fully contained in the same regime instance. This is further described in [Appendix -@sec-app-metrics].
 
 In any case, RC metrics may lump together observations from different time windows. For them to describe a well-defined regime distribution, it is required that the series be stationary within each regime. This will impose restrictions on the DGPs that this work will consider.
 
@@ -336,7 +332,7 @@ Second, which series to use: the true or estimated ones. One can use the true va
 
 [^order]: This is only possible if $S = \hat{S}$ and there is an unambiguous way to match the estimated and true regimes.
 
-Less generally, sometimes there are other possible estimators for the same population RC metric, instead of simply using $(\hat{y}, \hat{r})$. A special case is when the metric is a moment of the (joint) distribution, and the SGP is simple: one can simply plug the estimated parameters into the analytical formula for the moment, and generally have a better estimator. This is further discussed in [Apendix -@sec-app-metrics].
+Less generally, sometimes there are other possible estimators for the same population RC metric, instead of simply using $(\hat{y}, \hat{r})$. A special case is when the metric is a moment of the (joint) distribution, and the SGP is simple: one can simply plug the estimated parameters into the analytical formula for the moment, and generally have a better estimator. This is further discussed in [Appendix -@sec-app-metrics].
 
 This framework allows for mixing and matching these options, each being useful to answer different questions. In this work, I use the estimated ones computed from $(y, \hat{r})$, as these are the values available to the econometrician in practice, while the true metrics are calculated analytically. Additionally, I ignore the metrics separated by regime, and condense their information by considering only their dispersion, as this is a simpler measure and more comparable across DGPs and models.
 
@@ -436,9 +432,9 @@ Then, for each model, the dispersion of the RC metrics are calculated and stored
 \vspace{-0.5em}
 ```
 
-Recall the discussion in @sec-theory-metrics about the two different aspects of RC metrics usage. With different options, the function $C_c$ can use different inputs ($Y, R$, $Y, \hat{R}$, or $\hat{Y}, \hat{R}$), which is represented by all four objects being passed to it. Additionally, the function could return the whole sequence of RC metrics, not a single value, then, each row would be identified by $(p, i, m, s)$. While the metrics recieve the full dataset, estimation is only done with $(B + 1):(T - H)$.
+Recall the discussion in @sec-theory-metrics about the two different aspects of RC metrics usage. With different options, the function $C_c$ can use different inputs ($Y, R$, $Y, \hat{R}$, or $\hat{Y}, \hat{R}$), which is represented by all four objects being passed to it. Additionally, the function could return the whole sequence of RC metrics, not a single value, then, each row would be identified by $(p, i, m, s)$. While the metrics receive the full dataset, estimation is only done with $(B + 1):(T - H)$.
 
-The dataset $D$ is already in a friendly format for analyzing the relationship between the performance of each observation and the characteristics of the regimes, as well of considering stratifications by DGP and model.
+The dataset $D$ is already in a friendly format for analyzing the relationship between the performance of each observation and the characteristics of the regimes, as well as considering stratifications by DGP and model.
 
 
 
@@ -484,7 +480,7 @@ The next 'ingredient' is the RGP. I will consider the options Self-Exciting Thre
 
 Each of these RGPs has empirical model counterparts, which are also considered.
 
-The formal definition of each RGP/model is presented in [Apendix -@sec-app-cons], first the RGP hypothesis, then the empirical model's estimation strategy.
+The formal definition of each RGP/model is presented in [Appendix -@sec-app-cons], first the RGP hypothesis, then the empirical model's estimation strategy.
 
 For all RGPs, an option with equally likely regimes and an asymmetric variation is considered.
 
@@ -499,8 +495,6 @@ For all RGPs, an option with equally likely regimes and an asymmetric variation 
 - **Markov Switching:**
     - Symmetric matrix, high persistence ($P(s | s) = 0.9$).
     - Asymmetric matrix, high persistence ($P(1 | 1) = 0.9$, $P(1 | 2) = 0.3$).
-
-<!-- * UPDATE -->
 
 A Structural breaks model was considered, and all analisies pointed to an overall imcomparable behavior with the other models, as it does not have reocurring regimes, as expected. Thus, it was dropped from the final set of models.
 
@@ -547,13 +541,11 @@ The goal with RC metrics is to capture the change in the series characteristics 
 
 In this work, I focus on the moments of the distribution of $y_t$ and $(y_t, y_{t-j})$. Specifically, the RC metrics considered are the RC mean, RC standard deviation, and RC autocorrelation of lag 1. Higher lags could be considered, but in the simple $AR(1)$ context this would bring little additional information.
 
-As stated before, the RC mean and RC SD are simply the mean and SD of each set $R_s$. The autocorrelation is similar, but must be calculated separately for each concurrent set of observations in $R_s$. The formal definitions are stated in the [Apendix -@sec-app-metrics].
+As stated before, the RC mean and RC SD are simply the mean and SD of each set $R_s$. The autocorrelation is similar, but must be calculated separately for each concurrent set of observations in $R_s$. The formal definitions are stated in the [Appendix -@sec-app-metrics].
 
 As the focus is on the dispersion of RC metrics, two important measures to consider are the standard deviation and the average pairwise absolute difference. For only two regimes, they are very similar and the absolute difference is more intuitive. All the metrics are composed such that all $\disp \circ \met \in C$ return a single real value, and $\disp(x) = |x_1 - x_2|$.
 
-There are some possible expansions on this work's metrics calculation. One is to use non-standard weights for the empirical moments, giving more importance to observations near the edges of regimes' instances. Another is to use a cluster separation measure, such as the silhouette score, instead of a simple absolute distance between the RC metrics. Finally, one can use distribution distance metrics, such as the Earth Mover's Distance, on the empirical distribution of each regime. These are not currently considered.
-
-No regime-unconditional metrics are considered. The list of considered metrics is as below:
+There are some possible expansions on this work's metrics calculation. One is to use non-standard weights for the empirical moments, giving more importance to observations near the edges of regimes' instances. Another is to use a cluster separation measure, such as the silhouette score, instead of a simple absolute distance between the RC metrics. Finally, one can use distribution distance metrics. These are not currently considered. No regime-unconditional metrics are considered. The list of considered metrics is as below:
 
 - First moment: RC mean $\hat{\mu}(y | S)$.
 - Second moment: RC standard deviation $\hat{\sigma}(y | S)$.
@@ -583,17 +575,17 @@ Following @sec-sim-hyper, the chosen hyperparameters are as below. Some values a
 
 The error sequences were generated in parallel, using [`rTRNG::rnorm_trng`](https://github.com/cran/rTRNG). The models were estimated with [`stats::lm`](https://github.com/SurajGupta/r-source/tree/master/src/library/stats), [`mbreaks::dofix`](https://github.com/cran/mbreaks), [`tsDyn::setar`](https://github.com/cran/tsDyn), [`tsDyn::lstar`](https://github.com/cran/tsDyn), [`MSwM::msmFit`](https://github.com/cran/MSwM), and [`randomforest::randomForest`](https://github.com/cran/randomforest).
 
-On top of visualizing the series and guaranteeing no missing values, some diagnostics on the simulation, model estimation, and metrics calculation are performed. All of the diagnostics are presented in [Apendix -@sec-app-diag].
+On top of visualizing the series and guaranteeing no missing values, some diagnostics on the simulation, model estimation, and metrics calculation are performed. All of the diagnostics are presented in [Appendix -@sec-app-diag].
 
 The errors should be i.i.d. Gaussian with mean $0$ and should not present any pattern, especially across the parallelization structure. This is guaranteed by the TRNG library, but it is also checked.
 
 Some observations had to be removed. @tbl-estimation_issues lists the reasons and the amounts, some observations have multiple issues thus the difference between the '% Bad' and '% Removed' columns. Some models did not converge and produced no output. Others couldn't estimate some parameters. The need to remove those is straightforward.
 
-Some models' predictions were dominated by one regime and produced zero or only one observation of the other. While this is not a failed estimation, calculating the dispersion of regimes distributions is impossible in these cases, and they would be removed from most analysis anyway. [Apendix -@sec-app-diag-r] plots the distribution of regimes' proportion, and notably, K-Means has the most balanced regimes.
+Some models' predictions were dominated by one regime and produced zero or only one observation of the other. While this is not a failed estimation, calculating the dispersion of regimes distributions is impossible in these cases, and they would be removed from most analysis anyway. [Appendix -@sec-app-diag-r] plots the distribution of regimes' proportion, and notably, K-Means has the most balanced regimes.
 
 The last removal is less straightforward. Some models generated unreasonably large errors, and parameters unreasonably outside the normal range, so they would commonly be disregarded. This is more subjective and prone to cherry-picking; thus I was parsimonious in this removal. Only RMSEs higher than 50, means higher than the 90th quantile of the whole dataset, and $\rho_1$s higher than 10 standard deviations of all the $\rho_1$ estimates were removed.
 
-[Apendix -@sec-app-diag-error] shows the distribution of fits and RMSEs, notably, the RF has signs of overfitting, which is because the chosen 'generic' hyperparametrization is overkill for the simple SGPs considered. [Apendix -@sec-app-diag-params] shows the distribution of the estimated $AR$ parameters, notably, ST has distributions with more variance. [Apendix -@sec-app-diag-params] shows distribution of other paramters of the models on models. The RF importance ranks the first two lags then the rolling average as the most important, while the ACF and SD have much lower importance.
+[Appendix -@sec-app-diag-error] shows the distribution of fits and RMSEs. Notably, the RF shows signs of overfitting, because the chosen generic hyperparameterization is overkill for the simple SGPs considered. [Appendix -@sec-app-diag-params] shows the distribution of the estimated $AR$ parameters; ST has distributions with more variance. It also shows distributions of other model parameters. The RF feature importance ranks the first two lags and the rolling average as most important, while the ACF and SD have much lower importance.
 
 ::: {#tbl-estimation_issues tbl-pos="!htbp"}
 ```{=tex}
@@ -602,9 +594,9 @@ The last removal is less straightforward. Some models generated unreasonably lar
 Estimation issues
 :::
 
-The average coefficient generated by the models is presented in [Apendix -@sec-app-diag-params]. Only the matched model-RGP pairs are included, and a test of difference agains the true parameter is performed. Many tests don't pass, but that is expected, as all parameters are allowed to change across regimes. It is important to note that they generally do (except for $\sigma$).
+The average coefficient generated by the models is presented in [Appendix -@sec-app-diag-params]. Only the matched model-RGP pairs are included, and a test of difference against the true parameter is performed. Many tests don't pass, but that is expected, as all parameters are allowed to change across regimes. It is important to note that they generally do (except for $\sigma$).
 
-To consider the metrics estimation, the regime-conditional and unconditional moments are estimated using and tested against their true values in [Apendix -@sec-app-diag-metrics]. The estimations use $(y, r)$, while the true values are calculated via the analytical formula (the unconditional true values are not calculated). Again, the tests are not generally expected to pass, specially given their high power.
+To consider the metrics estimation, the regime-conditional and unconditional moments are estimated using and tested against their true values in [Appendix -@sec-app-diag-metrics]. The estimations use $(y, r)$, while the true values are calculated via the analytical formula (the unconditional true values are not calculated). Again, the tests are not generally expected to pass, especially given their high power.
 
 As a final placebo test, the forecast performance (RMSE) was regressed against the index $i$ of the simulation. The @tbl-i_independence shows generally no relation, as expected.
 
@@ -654,7 +646,7 @@ The figures [-@fig-rs-ms], [-@fig-rs-set], and [-@fig-rs-st] present the results
 
 We have two main results. The first is the effect of asymmetry. The average values across asymmetric and symmetric cases are very similar, but the standard deviation is not. This is because the standard deviation is constrained by the small amount of observations in the less frequent regime, and this number grows very slowly across time.
 
-The second result is that the values and their standard deviations seem to be more or less stabilized around $T = 60$, which means that for a series of this size, between 60 and 100, which is the observation size of this work, we possibly would have similar results on the usefulness of these metrics. But for series smaller than that, the metrics would be significantly less informative.
+The second result is that the values and their standard deviations seem to be more or less stabilized around $T = 60$, which means that for a series of this size (60 to 100 observations) we would likely see similar usefulness of these metrics. For smaller series, the metrics are significantly less informative.
 
 ![Regime separation - MS](../../outputs/exploratory/metrics_sep_ms.pdf){#fig-rs-ms height=40%}
 
@@ -665,15 +657,15 @@ The second result is that the values and their standard deviations seem to be mo
 
 ## Models and regimes {#sec-sep-models}
 
-To study how the models estimation relate to the regime separation, one could compare the estimated metrics with the true ones. This is done in @fig-metrics_diff, where the absolute difference between the true and estimated RC metric's dispersion. Each panel (row) is a parameter change, and (column) a metric. The estimated metrics are calculated with $(y, \hat{r})$, while the true metrics via the analytical formula, thus, there is the composition of the metric estimator error and the $\hat{r}$ error. The metrics were scaled by their MAD for comparability.
+To study how the models estimation relate to the regime separation, one could compare the estimated metrics with the true ones. This is done in @fig-metrics_diff, which shows the absolute difference between the true and estimated RC metrics' dispersion. Each panel (row) is a parameter change, and (column) a metric. The estimated metrics are calculated with $(y, \hat{r})$, while the true metrics via the analytical formula, thus, there is the composition of the metric estimator error and the $\hat{r}$ error. The metrics were scaled by their MAD for comparability.
 
 ![Metrics difference](../../outputs/exploratory/metrics_diff.pdf){#fig-metrics_diff fig-pos="!htbp" height=40%}
 
-We can see that KM and ST do well with average when $\mu$ is changing, but not otherwise, while SET has a more balanced result, and MS being the clear last. KM overall shines with $\mu$ changes, possibly for having 4 lags of the (level of) the series in its composition. More importantly, the distribution for any given metric varies widely across RNs, this means that no model makes a 'fixed' error for each metric, depending on the unobservable RN, the correctness of the estimated metrics will vary. In opposition, a graph stratified by RGP would show that each metric error is somewhat invariant across RGPs. This will be relevant in @sec-perf-mis. The breaks in the distributions comes from the fact that the true metrics are set values for each DGP.
+We can see that KM and ST do well with average when $\mu$ is changing, but not otherwise, while SET has a more balanced result, and MS performs worst. KM overall shines with $\mu$ changes, possibly for having 4 lags of the (level of) the series in its composition. More importantly, the distribution for any given metric varies widely across RNs. This means that no model makes a 'fixed' error for each metric; depending on the unobservable RN, the correctness of the estimated metrics will vary. In contrast, a graph stratified by RGP would show that each metric error is somewhat invariant across RGPs. This will be relevant in @sec-perf-mis. The breaks in the distributions come from the fact that the true metrics are set values for each DGP.
 
-Another usefull analysis comes from relating the model output (estimated fit, $r$, parameters) to the performance of the models. The fit and parameters, continuous variables, are studied in @sec-perf-id. The binarized regime assignment has special importance, as it is directly related to regime separation, and can be used to split the forecasting errors into "correctly identified" and "incorrectly identified" observations. The figures [-@fig-rp-nors]-[-@fig-rp-st] compare the distribution of individual forecasting errors, conditional on whether the underlying regime was correctly identified. Each panel corresponds to a DGP configuration, and presents the distribution of forecasting stratified by regime correctness; Each figure corresponds to one model. The graphs are done with big RNs, symmetric RGPs, and 100 simulation indexes.
+Another useful analysis comes from relating the model output (estimated fit, $r$, parameters) to the performance of the models. The fit and parameters, continuous variables, are studied in @sec-perf-id. The binarized regime assignment has special importance, as it is directly related to regime separation, and can be used to split the forecasting errors into "correctly identified" and "incorrectly identified" observations. The figures [-@fig-rp-nors]-[-@fig-rp-st] compare the distribution of individual forecasting errors, conditional on whether the underlying regime was correctly identified. Each panel corresponds to a DGP configuration, and presents the distribution of forecasting stratified by regime correctness; each figure corresponds to one model. The graphs are done with big RNs, symmetric RGPs, and 100 simulation indexes.
 
-In general terms, the 'correct' distributions have slimmer tails, as would be in line with the literature. But it is important to note it is not always the case, especially for the MS model, a result that will be discussed in @sec-perf-fe. For the ST model with no-RS RGP, we have overall high errors with bi-modal distributions, which will be discussed in @sec-perf-mis.
+In general terms, the 'correct' distributions have slimmer tails, as would be in line with the literature. But it is important to note that it is not always the case, especially for the MS model, a result that will be discussed in @sec-perf-fe. For the ST model with no-RS RGP, we have overall high errors with bimodal distributions, which will be discussed in @sec-perf-mis.
 
 ![Regime and series prediction - no-RS](../../outputs/exploratory/rmse_regimes_r1_nors.pdf){#fig-rp-nors height=40%}
 
@@ -691,11 +683,11 @@ In general terms, the 'correct' distributions have slimmer tails, as would be in
 
 In this section, the goal is to obtain systematic results on the performance of models, and how the regimes' distributions might affect and inform performance.  First, I analyze the overall performance of each model through their fixed effects. I (i) add controls to understand which component of the models is most related to their performance; and (ii) stratify the DGPs to understand how performance changes across scenarios.
 
-I continue studying the models' performance by further analyzing their interaction with the DGPs. I (i) analyze the effect of model-RGP mismach, and interact it with the DGP options, to see if the mismatch effect change across scenarios; (ii) analyze specific model-DGP pairs; and (iii) consider a different way to describe the DGPs, in terms of the RC metrics that they generate, and check how each model fares against each profile of series. I consider if any results induce a practical recommendation for the econometrician.
+I continue studying the models' performance by further analyzing their interaction with the DGPs. I (i) analyze the effect of model-RGP mismatch, and interact it with the DGP options, to see if the mismatch effect changes across scenarios; (ii) analyze specific model-DGP pairs; and (iii) consider a different way to describe the DGPs, in terms of the RC metrics that they generate, and check how each model fares against each profile of series. I consider if any results induce a practical recommendation for the econometrician.
 
-Then, in the topic of mis-specification, I test the hypothesis that underestimating the number of regimes is less harmful when the regmes' distributions are less separated, and if the opposite is true for overestimation.
+Then, in the topic of mis-specification, I test the hypothesis that underestimating the number of regimes is less harmful when the regimes' distributions are less separated, and if the opposite is true for overestimation.
 
-Finally, I analyzed which model component (estimated fit, $r$, parameters, or metrics) is more associated with each models' performance. For each model, there are different points of interest for the econometrician.
+Finally, I analyze which model component (estimated fit, $r$, parameters, or metrics) is more associated with each model's performance. For each model, there are different points of interest for the econometrician.
 
 All the regressions have RMSE as the dependent variable, so higher coefficient values imply a worse performance associated with the given variable. The metrics and parameters are normalized $|x - \text{median}(x)| / \text{mad}(x)$, except for the RMSE. Some metrics are not available for all observations, such as the ACF that requires at least one length-2 instance of each regime in the series, thus the number of observations in each regression can vary. A $\Delta$ symbol means the absolute difference between the estimated value (often with $y, \hat{r}$) and the analytical true value.
 
@@ -739,7 +731,7 @@ Models fixed effects - across stratifications
 
 ### Mis-specification of RGP family
 
-To study the effect of mis-specification, @tbl-mis_is defines mis-specification as "the family of the model being different than the family of the RGP". Only the MS, SET, and ST models are kept. The baseline effect of miss-specification is an RMSE increase of $0.515$. To further understand how this effect changes across stratifications, consider the columns (2-6). (2): MS models suffer more, in line with previous results, while ST models suffer less. (3): Mis-estimating a RS model in a non-RS RGP is disastrous, and in light of that, mis-specification across RS RGPs is not so relevant. This will be further explored in the next subsection.
+To study the effect of mis-specification, @tbl-mis_is defines mis-specification as "the family of the model being different than the family of the RGP". Only the MS, SET, and ST models are kept. The baseline effect of miss-specification is an RMSE increase of $0.52$. To further understand how this effect changes across stratifications, consider the columns (2-6). (2): MS models suffer more, in line with previous results, while ST models suffer less. (3): Mis-estimating a RS model in a non-RS RGP is disastrous, and in light of that, mis-specification across RS RGPs is not so relevant. This will be further explored in the next subsection.
 
 In (4), asymmetric regimes are harder to estimate, so that sometimes mis-specification helps. (5) Similar to before, $\sigma$ changes make forecasting harder, and this effect is compounded by mis-specification; for the other two parameters the effect is similar. Finally, (6) shows that in small RNs, estimating the wrong regime generates a smaller error, so mis-specifying the RGP is not too problematic.
 
@@ -865,11 +857,9 @@ There are other match-able characteristics of the models, such as the $\tau$ for
 
 This section analyzes how the models perform when the assumed number of regimes $\hat{S}$ is different than the true one $S$. In this analysis, underestimating the number of regimes means estimating a simple $AR(1)$ with one of the two-regime RGPs, while superestimating means estimating some of the two-regime models with a series generator from a simple AR(1). The results should be interpreted as such.
 
-In @tbl-regimes, the overall effect of an underestimation shows even a slight improvement, but, as I will show, this is carried by the fact that KM does super well when we have a no RS series.[^km-nors] With the superestimation, we have a positive result of $0.7$.[^controls-nr]
+In @tbl-regimes, the overall effect of an underestimation shows even an improvement.[^km-nors] With the superestimation, we have a positive result of $0.7$.[^controls-nr] Column (2) has all of the metrics' interactions are negative. This means that when we superestimate, if the regimes were highly different in terms of the metrics, we have an attenuation of the bad effect of the misspecification. That is, it is very useful to be able to match these big differences, even if we need to use more regimes than could be needed.
 
 [^controls-nr]: Controls include metrics FEs, and interactions of the $S$ comparison with models, plus metrics with models, RGP family, and RN parameter.
-
-Column (2) has all of the metrics' interactions are negative. This means that when we superestimate, if the regimes were highly different in terms of the metrics, we have an attenuation of the bad effect of the misspecification. That is, it is very useful to be able to match these big differences, even if we need to use more regimes than could be needed.
 
 When we consider the opposite scenario in (3), the interactions are still negative. But again, this is carried by the KM, as if we remove it from the sample, we get positive results throughout all the metrics. Column (4) shows that with underestimation, but similar regimes, we have an attenuation of the misspecification effect.
 
@@ -889,29 +879,59 @@ To stratify the effects by model, consider @tbl-regimes_models. As noted before,
 Mis specification of the number of regimes
 :::
 
+This analysis can be expanded to a more general notion of over- and under-specification, by generating series with several $S > 1$ and estimating them with models with several $\hat{S} > 1$.
+
 
 
 # Conclusion {#sec-conc}
 
 This work studied regime switching models and DGPs from a learning perspective, showing how the regimes' distributions can be used to analyze them, and generate stilyzed facts relevant to forecast performance.
 
-The general and expandable framework plus implementation is a contribution in itself. I represent any RS DGP as a combination of a regime generating process (RGP) and a series generating process (SGP), and I formalize regime-conditional (RC) metrics as functions that characterize the regime distributions. This makes it possible to discuss model behavior both in terms of labels (RGP and regime nature) and in terms of observable regime characteristics computed from $(\hat{y},~\hat{r})$.
+The general and expandable framework plus implementation is a contribution in itself. I represent any RS DGP as a combination of a regime generating process and a series generating process, and I formalize regime-conditional metrics as functions that characterize the regime distributions. This makes it possible to discuss model behavior both in terms of labels (RGP and regime nature) and in terms of observable regime characteristics computed from $(\hat{y},~\hat{r})$.
 
 The framework was implemented with a constrained subset of its full capacity. I restrict attention to stationary Gaussian $AR(1)$ SGPs, two regimes, a MS, SET and ST of RGPs, and a minimal set of RC metrics (the first two moments and the lag-1 autocorrelation), summarized via distance across regimes.
 
-Some facts about the DGPs' regime separation were presented. For the MS RGP, the metrics define a clear-cut profile: in $\mu$ changes only the average separates the regimes, in $\rho_1$ changes it is both the ACF and SD, and in $\sigma$ changes, only the SD. For SET and ST, the interaction between the RGP and the RN creates more complex profiles, where all metrics are different across regimes, and more metrics would be required to fully identify the DGP. The assymetric RGPs have a similar separation, but require larger sample size to estabilish it. With approximately 60 observations, the separation of these stationary $AR(1)$ series with $\sigma = 1$ converged. The RMSE distributions of observations with correctly identified regimes have slimmer tails, but not always, especially for the MS model.
+Some facts about the DGPs' regimes' distributions were presented. For the MS RGP, the metrics define a clear-cut profile: for $\mu$ changes, only the average separates the regimes; for $\rho_1$ changes, both the ACF and SD separate the regimes; and for $\sigma$ changes, only the SD separates the regimes. For SET and ST, the interaction between the RGP and the RN creates more complex profiles, where all metrics are different across regimes, and more metrics would be required to fully identify the DGP. The asymmetric RGPs have a similar separation, but require larger sample size to establish it. With approximately 60 observations, the separation of these stationary $AR(1)$ series with $\sigma = 1$ converged. The estimated metrics do not perfectly match the true ones, and the errors' distribution vary across which parameter is changing. The RMSE distributions of observations with correctly identified regimes have slimmer tails, but not always, especially for the MS model.
 
-On the performance of the models, the MS model has a worse overall fixed effect, but its flexibility allows it to commit fewer egregious errors overall, performing better in asymmetric regimes and showing the smallest relationship between $R^2$ and RMSE. The SET and ST models have better fixed effects and fare better for intercept changes. ST is more robust to small parameter changes, but commits huge errors when estimated on a no-RS RGP.
+On the performance of the models, the MS model has a worse overall fixed effect ($1.78$), but its flexibility allows it to commit fewer egregious errors overall, performing better in asymmetric regimes and showing the smallest relationship between $R^2$ and RMSE. The SET ($1.69$) and ST ($1.63$) models have better fixed effects and fare better for intercept changes. ST is more robust to small parameter changes. All of them have a worse result than the KM ($1.30$), which has a surprisingly good efficiency. The RF ($1.59$) is second to it, but partially because of its 'generic' hyperparametrization, exemplifying the risk of overfitting in complex models. The KM changes the least across stratifications, attesting to its strong approximator qualities; ST follows, given its relation to Neural Networks.
 
-The baseline effect of mis-specification is an RMSE increase of $0.547$. The $\sigma$ changes make forecasting harder, and this effect is compounded by mis-specification. In small RNs, mis-specifying the RGP is not too problematic. Mis-specification across RS RGPs is not so relevant, and no specific model-RGP pair has a different fixed effect than the correctly specified pair.
+The baseline effect of mis-specifying the RGP is an RMSE increase of $0.515$. The $\sigma$ changes make forecasting harder, and this effect is compounded by mis-specification. In small RNs, mis-specifying the RGP is not too problematic. MS models suffer more, while ST suffers less. Misestimating an RS model in a non-RS DGP is disastrous, increasing RMSE by $3.53$, especially for ST.
 
-Interactions of model-RGP-RN are similarly insignificant, but the RC metrics are another way to characterize the DGP. SET and ST have a negative effect when estimated on series with high average separation. For MS, we have an improvement given average, but a worsening given ACF separation. The opposite is true for ST, but without statistical significance. Finally, high SD has insignificant effects, but negative for ST and MS. With the estimated metrics, the results are mostly the same. On top of the universal limitations, these general results are not invariant to non-observable DGP characteristics.
+Mis-specification across RS RGPs is not so relevant, and no specific model-RGP pair has a different fixed effect than the correctly specified pair. Interactions of model-RGP-RN are similarly insignificant, but the RC metrics are another way to characterize the DGP. SET, ST and KM do well with high average separation; ST seems to suffer with high ACF separation, and KM benefits from SD differentiation. MS does not show significant results.
 
-Several analyses can be done to expand the results. A main one is to understand how the effect of mis-specifying the number of regimes relates to the regime separation. Series with lower regime separation can often be estimated with fewer regimes without a large performance loss, generating a recommendation for this hyperparameter selection. Another is to include less-parametric models in the analysis, such as a Random Forest benchmark and a Clustering-based RS model.
+Unfortunately, these results change when we switch to estimated metrics, in line with the study on metrics estimation errors. As said before, these errors also depend on which parameter is changed, e.g., a big ACF difference is a bad scenario for ST when the $\sigma$ parameter causes that perceived correlation change. Still, this analysis could eventually be used as practical recommendations for the econometrician, and possible improvements to it are discussed in @sec-conc-limit.
 
-The main limitation of the current implementation is external validity. Even when the analysis is phrased in terms of RC metrics, it remains conditional on a narrow population of DGPs and on a limited set of regime descriptors. A more robust assessment of the usefulness of RC metrics for the econometrician requires expanding both sides: richer DGPs (more SGP functional forms, more regimes, additional regime mechanisms, non-Gaussian errors, and possibly non-stationary settings) and richer metrics (higher moments, silhouette-like differences, distribution-distance or separation criteria). This is the natural next step to turn the RC-metric approach into a more general model-selection and diagnostic tool.
+Matching each component of the DGPs has different relationships with the RMSE. Regime errors are positively related for the ST/SET/MS models, as shown in the literature, but not for the no-RS and KM models, given their disregard for a proper regime structure. The fit is not a good indicator of performance, and higher fits are often related to higher errors.
 
-Some results are expected, but interesting light has been shed on (i) the relationship between RGPs and RNs, especially via the metrics separation discussion; (ii) the differences between MS and SET/ST; and (iii) the effects of mis-specification. The performance of models given regimes characteristics could be of high practical use for the econometrician, but must be taken with caution and requires further investigation.
+MS has a massive improvement when matching the average and decent on volatility. SET is similar but overall matching matters less. For ST, matching the average matters less, but it is more important for ACF and volatility. KM is overall the most balanced, with a decent relationship with all metrics.
+
+Finally, the effect of estimating one of the RS models in a no-RS DGP increases the RMSE by $0.7$, but when the series are highly different across the RC metrics, this effect is attenuated, as the added power to explain the highly different regimes has its benefits. Estimating a simple $AR(1)$ with a RS DGP is often beneficial, but when the regimes are highly different, it starts to be harmful.
+
+
+## Limitations and further research {#sec-conc-limit}
+
+### DGPs and models
+
+The most general limitation of this work is external validity. While the metrics somewhat abstract from the DGPs, the results are still conditional on the specific population of DGPs considered here. Expanding the set of RGPs would be the first improvement. This could be done while maintaining a balanced relationship between threshold-based and Markov-based processes, and discrete transitions versus smooth transition processes. E.g. including MS-ST DGPs, and the mixed models by @Chang2017 and @Wu2007. At the same time, variations on the models would be interesting, for example Markov with non-geometric distributions and thresholds with $|y_{t-1}|$ and $|\Delta y_{t-1}|$ as transition variables.
+
+In another front, one can focus on the importance of the SGP, considering more complex models than the simple AR(1), introducing non-stationarity. More complex RNs can include changes in the family of the errors' distribution or changing more than one parameter at a time. Models that match the new RGPs should follow, but also other general-purpose models, such as Neural Networks, given their relationship to ST models. The properties of ensemble RS models could also be assessed.
+
+### Metrics
+
+Different strategies for metric calculation can help with a better identification between the estimated and the true values, e.g. adding stronger weights to observations close to the regime switches, and different dispersion measures, such as silhouette-like measures or squared distances.
+
+Additionally, it was seen that the set of three metrics considered was not enough to fully characterize all the DGPs, which led to unobservable factors being relevant in the model-DGP analysis. A fuller set of metrics could help with that, including, for example, third and fourth moments, more lags of the autocorrelation, and more general distribution distances.
+
+
+### Additional analyses
+
+Finally, there were many other questions that the framework can handle left unexplored. All the information of the regimes' distributions were collapsed on the difference between them, on measures on the dispersion of the RC metrics. But the individual information of each regime can be useful, e.g. to analyzi if the models perform better in the regime of the high or the low parameter value.
+
+One can test if common approaches to selecting the models' hyperparameters, such as choosing the number of regimes via AIC or BIC, works overall, and in which scenarios it doesn't.
+
+More agnostic approaches to estimate what metrics change across regimes can help with the practical recommendations. The dispersion of the rolling series of the metrics is an option.
+
+A last interesting option is to include complex but no-RS models, such as models with frequent 'outliers' or non linearities, and understand how well do RS models are to capture these dynamics, similar to the work of @Chib1998.
 
 
 
@@ -1018,9 +1038,9 @@ Similarly defined by @Terasvirta1994. Review of other options by @Dijk2002
 Similarly defined by @Hamilton1989. Review of other options by @Song2021.
 
 
-### Unsupervisioned clustering (UC)
+### Unsupervised clustering (UC)
 
-**Hypothesis:** there is RS, but no hypothesis is mabe about the RGP.
+**Hypothesis:** there is RS, but no hypothesis is made about the RGP.
 
 **Model:** Unsupervised clustering techniques, such as K-Means, can be used to estimate the regimes based on $y_t$, its lags, and rolling moments. Given the regimes, $\mu$ and $\rho_1$ are estimated via OLS. This hybrid approach yields non-standard asymptotic properties. Other clustering techniques could be used, but I focus on the general K-Means clustering problem is as below:
 
@@ -1070,9 +1090,9 @@ Note the absence of bias correction. While it could be present, it can generate 
 
 For binary regimes, this is equivalent to calculating the unweighted autocorrelation of every concurrent window of regime $s$.
 
-In this work, I am currently using the binary version of the RC metrics, calculated after binaryzing $r$.
+In this work, I am currently using the binary version of the RC metrics, calculated after binarizing $r$.
 
-Recall that a RC metric returns a sequence with entries for each regime, so when describing the e.g. RC mean $\mu(y, r)$, I am refering to:
+Recall that a RC metric returns a sequence with entries for each regime, so when describing, e.g., the RC mean $\mu(y, r)$, I am referring to:
 
 \begin{align}
     &\mu(y, r) \coloneqq \mu(y, r | S) = \left(\mu(y, r | s)\right)_{s \in 1:S}
