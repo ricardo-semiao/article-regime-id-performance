@@ -6,39 +6,6 @@ box::use(
   src/utils[...]
 )
 
-# Bare versions of stats functions. Assumes numerical vectors of same size and
-# na.rm = TRUE.
-bare_cov <- function(x, y, ...) {
-  not_na <- !is.na(x) & !is.na(y)
-  yna <- y[not_na]
-  xna <- x[not_na]
-  n <- length(xna)
-
-  sum((xna - sum(xna) / n) * (yna - sum(yna) / n)) / (n - 1)
-}
-fn_env(bare_cov) <- pkg_env("base")
-
-bare_sd <- function(x, ...) {
-  xna <- x[!is.na(x)]
-  n <- length(xna)
-
-  sqrt(sum((xna - sum(xna) / n)^2) / (n - 1))
-}
-fn_env(bare_sd) <- pkg_env("base")
-
-bare_cor <- function(x, y, ...) {
-  not_na <- !is.na(x) & !is.na(y)
-  yna <- y[not_na]
-  xna <- x[not_na]
-  n <- length(yna)
-
-  mx <- sum(xna) / n
-  my <- sum(yna) / n
-
-  sum((xna - mx) * (yna - my)) / sqrt(sum((xna - mx)^2) * sum((yna - my)^2))
-}
-fn_env(bare_cor) <- pkg_env("base")
-
 bare_stats <- new_environment(
   list(cov = bare_cov, cor = bare_cor, sd = bare_sd, lag = lag, acor = acor),
   pkg_env("base")
@@ -263,7 +230,7 @@ regimes_transmat <- function(y, r, n_r = max(r, na.rm = TRUE), prop = TRUE, ...)
 
   if (prop) counts / rowSums(counts) else counts
 }
-fn_env(regimes_transmat) <- pkg_env("base")
+#fn_env(regimes_transmat) <- pkg_env("base")
 
 #' TODO: document
 #' @export

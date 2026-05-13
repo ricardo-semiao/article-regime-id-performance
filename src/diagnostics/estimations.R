@@ -1,7 +1,7 @@
 
 box::use(
   src/utils[...],
-  src/metrics[series_sd],
+  src/creators/metrics[series_sd],
   src/options[dicts],
   src/parameters[...],
   ggplot2[...],
@@ -9,12 +9,7 @@ box::use(
   gt[...]
 )
 
-# - NAs in y and r: should be the same, and exactly as many as the model requires (n_b + n_l + possibly more)
-# - NAs in coefs: should only exist on sigma with 1 regime or 2 regimes but only one observation in one of them. There are other cases breaking this rule that should be investigated, but are currently removed
-# - Distribution of R: number of unique R's and distribution of less frequent regime. Should remove cases with 1 regime or 2 but only one observation in one of them
-# - Distribution of errors: of residuals and forecasting errors. Should look good
-# - Distribution of coefs: should look good
-# - Distribution of other metadata: currently ignored
+
 
 # Temporary example:
 if (FALSE) {
@@ -24,20 +19,16 @@ if (FALSE) {
   lims = c(x = NA, y = NA)
 }
 
-filt_sim <- function(sim) {
-  sim %in% global_env()$filter_sim_i2
-}
 
 
-
-# NAs ----------------------------------------------------------
+# NAs --------------------------------------------------------------------------
 
 #' @export
 nas_on_fit <- function(data_e) {
   data <- data_e |>
     group_by(sgp, rgp, sim, model) |>
     summarise(
-      na_y = sum(is.na(r_est)),
+      na_y = sum(is.na(y_est)),
       na_r = sum(is.na(r_est)),
     )
 
@@ -76,49 +67,9 @@ nas_on_coefs <- function(meta_e, data_e) {
   invisible(coefs)
 }
 
-# Unexported for now, as sigma NAs are being investigated and are currently removed
-study_sigma <- function(coefs, data_e) {
-  fab <- function(ik) {
-    obs <- with(ik, paste0(sgp, rgp, sim, model, sep = "-"))
-    data_e |>
-      filter(paste0(sgp, rgp, sim, model, sep = "-") %in% obs) |>
-      group_by(sgp, rgp, sim, model) |>
-      reframe(
-        sd = series_sd(y_err, r_est, n_r = 2, na.rm = TRUE),
-        r = 1:2
-      ) |>
-      pivot_wider(names_from = r, values_from = sd, names_prefix = "sd_r")
-  }
-
-  rs <- data_e |>
-    group_by(sgp, rgp, sim, model) |>
-    summarise(
-      r_unique = length(unique(na.omit(r_est))),
-      r_prop = min(tabulate(r_est)) # ! Incorrect
-    ) |>
-    ungroup()
-
-  data <- left_join(
-    coefs, rs, by = c("sgp", "rgp", "sim", "model"),
-    na_matches = "never", unmatched = "error", relationship = "one-to-one"
-  )
-
-  i1 <- ab |> filter(r_unique == 2 & r_prop == 1 & na_sigma)
-  i2 <- ab |> filter(r_unique == 2 & r_prop == 1 & !na_sigma)
-  i3 <- ab |> filter(r_unique == 2 & r_prop == 2 & na_sigma)
-  i4 <- ab |> filter(r_unique == 2 & r_prop == 2 & !na_sigma)
-  i5 <- ab |> filter(r_unique == 2 & r_prop == 3 & na_sigma)
-
-  fab(i1) |> complete.cases() |> table() |> print() # ok
-  fab(i2) |> complete.cases() |> table() |> print() # these should have had na_sigma = TRUE
-  fab(i3) |> complete.cases() |> table() |> print() # these should have had na_sigma = FALSE
-  fab(i4) |> complete.cases() |> table() |> print() # these should have had na_sigma = FALSE and all the same
-  fab(i5) |> complete.cases() |> table() |> print() # these should have had na_sigma = FALSE
-}
 
 
-
-# Distributions ---------------------------------------------------------
+# Distributions ----------------------------------------------------------------
 
 #' Errors distribution
 #' @export
@@ -188,7 +139,6 @@ regimes_proportions_est <- function(data_e, n_l, bins = 50) {
     print()
 
   g <- diag_regime_data |>
-    filter(filt_sim(sim)) |>
     mutate(model = dicts$models$gg[model] |> fct(dicts$models$gg)) |>
     ggplot(aes(n_rare_prop)) +
     geom_histogram(bins = 50) +
@@ -205,7 +155,7 @@ regimes_proportions_est <- function(data_e, n_l, bins = 50) {
 
 
 
-# Metadata Distribution ------------------------------------------------------
+# Metadata Distribution --------------------------------------------------------
 
 #' @export
 parameters_distribution <- function(meta_e, data_e, q = 0.95, k = 20, rmv_out = FALSE, bins = 50) {
@@ -252,8 +202,7 @@ parameters_distribution <- function(meta_e, data_e, q = 0.95, k = 20, rmv_out = 
     with(table(model, param)) |>
     print()
 
-  g <- diag_param_data_filt |>
-    filter(filt_sim(sim)) %>%
+  g <- diag_param_data_filt %>%
     {if (rmv_out) filter(., !out) else .} |>
     mutate(
       model = dicts$models$gg[model] |> fct(dicts$models$gg),
@@ -285,7 +234,7 @@ meta_distribution <- function(meta_e) {
     labs(x = "Gamma")
 
   data_tau <- meta_e |>
-    filter(model %in% c("r2_set_x", "r2_st")) |>
+    filter(model %in% c("r2_set", "r2_st")) |>
     mutate(
       tau = map_dbl(meta_est, ~ .x$switches %||% NA),
       model = dicts$models$gg[model] |> fct(dicts$models$gg)
@@ -320,8 +269,66 @@ meta_distribution <- function(meta_e) {
 # TODO: Pannelize
 
 
+format_gt_coefs <- function(meta_e, rows = c(3, 7)) {
+  cols <- list(
+    mu = c("r1_mu", "r2_mu"),
+    rho1 = c("r1_rho1", "r2_rho1"),
+    sigma = c("r1_sigma", "r2_sigma")
+  )
 
-# Save Errors ----------------------------------------------------------
+  meta_e |>
+    relocate(rgp, sgp) |>
+    arrange(rgp, sgp) |>
+    mutate(across(everything(), as.character)) |>
+    add_emtpy_rows(rows) |>
+    gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
+    cols_label_with(fn = \(x) {
+      md(str_replace_all(x, c(
+        "r([0-9]+)_.+" = "$s = \\1$"
+      )))
+    }) |>
+    tab_stubhead(c("RGP", "RN")) |>
+    reduce_spanners(cols, dicts$params$gt_s) |>
+    fmt_markdown(c("rgp", "sgp")) |>
+    cols_align(align = "left", columns = list_c(cols)) |>
+    fmt(columns = list_c(cols), fns = \(x) gsub("0(\\.[0-9]|$)", "\\1", x)) |>
+    add_footnote()
+}
+
+#' @export
+coefs_table <- function(meta_e, ..., test = TRUE) {
+  filters <- enquos(...)
+
+  meta_e <- meta_e |>
+    filter(!!!filters) |>
+    mutate(
+      rgp = dicts$rgps$gt_param[rgp] |> fct(dicts$rgps$gt_param),
+      sgp = dicts$sgps$gt_param[sgp] |> fct(dicts$sgps$gt_param)
+    ) |>
+    relocate(rgp, sgp) |>
+    mutate(
+      map_dfr(meta_est, ~ matrix_to_vec(.x$coefs, suf = "_est")),
+      map_dfr(meta_sim, ~ matrix_to_vec(.x$coefs, suf = "_sim"))
+    ) |>
+    group_by(rgp, sgp) |>
+    summarise(
+      r1_mu = glue_t_test(mu_R1_est, unique(mu_R1_sim), test = test),
+      r2_mu = glue_t_test(mu_R2_est, unique(mu_R2_sim), test = test),
+      r1_rho1 = glue_t_test(rho1_R1_est, unique(rho1_R1_sim), test = test),
+      r2_rho1 = glue_t_test(rho1_R2_est, unique(rho1_R2_sim), test = test),
+      r1_sigma = glue_t_test(sigma_R1_est, unique(sigma_R1_sim), test = test),
+      r2_sigma = glue_t_test(sigma_R2_est, unique(sigma_R2_sim), test = test)
+    ) |>
+    ungroup() |>
+    arrange(rgp, sgp)
+
+
+  format_gt_coefs(meta_e)
+}
+
+
+
+# Save Errors ------------------------------------------------------------------
 
 #' @export
 save_obs_removed <- function(rmv) {
@@ -382,21 +389,46 @@ save_obs_removed <- function(rmv) {
     )
 }
 
-# Currently not used:
-save_errors <- function(errors, out) {
-  total <- 0
 
-  imap(errors, \(items, error) {
-    n <- length(items)
-    total <<- total + n
 
-    paste0(
-      "Error: ", error, "\n",
-      "- Occurences: ", n, "\n",
-      "- Items: ", str_c(items, collapse = ", ")
-    )
-  }) |>
-    str_c(collapse = "\n\n") |>
-    str_c("Total:", total, "\n\n", .x = _) |>
-    writeLines(out)
+# Unused -----------------------------------------------------------------------
+
+# Unexported for now, as sigma NAs are being investigated and are currently removed
+study_sigma <- function(coefs, data_e) {
+  fab <- function(ik) {
+    obs <- with(ik, paste0(sgp, rgp, sim, model, sep = "-"))
+    data_e |>
+      filter(paste0(sgp, rgp, sim, model, sep = "-") %in% obs) |>
+      group_by(sgp, rgp, sim, model) |>
+      reframe(
+        sd = series_sd(y_err, r_est, n_r = 2, na.rm = TRUE),
+        r = 1:2
+      ) |>
+      pivot_wider(names_from = r, values_from = sd, names_prefix = "sd_r")
+  }
+
+  rs <- data_e |>
+    group_by(sgp, rgp, sim, model) |>
+    summarise(
+      r_unique = length(unique(na.omit(r_est))),
+      r_prop = min(tabulate(r_est)) # ! Incorrect
+    ) |>
+    ungroup()
+
+  data <- left_join(
+    coefs, rs, by = c("sgp", "rgp", "sim", "model"),
+    na_matches = "never", unmatched = "error", relationship = "one-to-one"
+  )
+
+  i1 <- ab |> filter(r_unique == 2 & r_prop == 1 & na_sigma)
+  i2 <- ab |> filter(r_unique == 2 & r_prop == 1 & !na_sigma)
+  i3 <- ab |> filter(r_unique == 2 & r_prop == 2 & na_sigma)
+  i4 <- ab |> filter(r_unique == 2 & r_prop == 2 & !na_sigma)
+  i5 <- ab |> filter(r_unique == 2 & r_prop == 3 & na_sigma)
+
+  fab(i1) |> complete.cases() |> table() |> print() # ok
+  fab(i2) |> complete.cases() |> table() |> print() # these should have had na_sigma = TRUE
+  fab(i3) |> complete.cases() |> table() |> print() # these should have had na_sigma = FALSE
+  fab(i4) |> complete.cases() |> table() |> print() # these should have had na_sigma = FALSE and all the same
+  fab(i5) |> complete.cases() |> table() |> print() # these should have had na_sigma = FALSE
 }

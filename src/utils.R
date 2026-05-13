@@ -241,7 +241,7 @@ print_summary <- function(x, ...) {
 
 
 
-# Parallel Execution ----------------------------------------------------------
+# Parallel Execution -----------------------------------------------------------
 
 #' Helper: updates a function body to be safely
 #'
@@ -311,7 +311,7 @@ map_parallel <- function(
 
 
 
-# Specific Helpers -------------------------------------------------------------
+# Calculations Helpers ---------------------------------------------------------
 
 #' Helper: Compute lagged values
 #'
@@ -337,14 +337,6 @@ data_lags <- function(data, n_l = 1) {
 fn_env(data_lags) <- new_environment(list(lag = lag), pkg_env("base"))
 # TODO: couldnt it just use lag(., n)?
 
-#' Helper: Add significance stars to p-values
-#' @export
-add_star <- function(x, escape = FALSE) {
-  levels <- c("***", "**", "*", "")
-  if (escape) levels <- str_replace_all(levels, "\\*", "\\\\*")
-  cut(x, c(-Inf, 0.01, 0.05, 0.1, Inf), levels) |> as.character()
-}
-
 #' @export
 get_varying_param <- function(dgp_names) {
   dgp_names |>
@@ -354,27 +346,44 @@ get_varying_param <- function(dgp_names) {
 }
 
 #' @export
-trimmed_sd <- function(x, trim = 0.01, na.rm = TRUE) {
-  idx <- x >= quantile(x, trim, na.rm = na.rm) &
-    x <= quantile(x, 1 - trim, na.rm = na.rm)
-  sd(x[idx], na.rm = na.rm)
+regimes_order <- function(coefs, rn_par, dims) {
+  order(coefs[, which(rn_par == dims$cols)], decreasing = FALSE)
 }
+fn_env(regimes_order) <- pkg_env("base")
+
+# Bare versions of stats functions. Assumes numerical vectors of same size and
+# na.rm = TRUE.
+#' @export
+bare_cov <- function(x, y, ...) {
+  not_na <- !is.na(x) & !is.na(y)
+  yna <- y[not_na]
+  xna <- x[not_na]
+  n <- length(xna)
+
+  sum((xna - sum(xna) / n) * (yna - sum(yna) / n)) / (n - 1)
+}
+fn_env(bare_cov) <- pkg_env("base")
 
 #' @export
-reduce_spanners <- function(table, cols, dict) {
-  reduce(names(cols), .init = table, \(table, label) {
-    tab_spanner(table, label = md(dict[label]), columns = cols[[label]])
-  })
+bare_cor <- function(x, y, ...) {
+  not_na <- !is.na(x) & !is.na(y)
+  yna <- y[not_na]
+  xna <- x[not_na]
+  n <- length(yna)
+
+  mx <- sum(xna) / n
+  my <- sum(yna) / n
+
+  sum((xna - mx) * (yna - my)) / sqrt(sum((xna - mx)^2) * sum((yna - my)^2))
 }
+fn_env(bare_cor) <- pkg_env("base")
 
 #' @export
-fmt_decimal <- function(x, n = 2, lead_0 = FALSE, trail_0 = FALSE) {
-  x <- round(x, n) |> as.character()
+bare_sd <- function(x, na.rm = FALSE, ...) {
+  if (na.rm) x <- x[!is.na(x)]
+  n <- length(x)
 
-  if (!lead_0) x <- gsub("^0\\.", ".", x)
-  if (trail_0) x <- ifelse((nchar(x) == n + 1) & grepl("\\.", x), x, paste0(x, "0"))
-
-  x
+  sqrt(sum((x - sum(x) / n)^2) / (n - 1))
 }
 
 #' @export
@@ -410,4 +419,64 @@ clump_dgps <- function(sys_data, keep_rgp = "fam", keep_sgp = "fam") {
     rgp = str_replace(rgp, pats_rgp[keep_rgp], "\\1") |> fct(),
     sgp = str_replace(sgp, pats_sgp[keep_sgp], "\\1") |> fct()
   )
+}
+
+#' @export
+glue_t_test <- function(x, h0, n = 2, test = TRUE) {
+  m <- mean(x, na.rm = TRUE)
+  s <- sd(x, na.rm = TRUE)
+  ndf <- sum(!is.na(x))
+
+  stars <- if (test) {
+    # t <- sqrt(ndf) * (m - h0) / s
+    # p <- 2 * pt(-abs(t), df = ndf - 1)
+    add_star(t.test(x, mu = h0, conf.level = 0.95)$p.value)
+  } else {
+    ""
+  }
+
+  glue("{round(m, n)}{stars} ({round(s / sqrt(ndf), n + 1)})")
+}
+
+
+
+# Formatting Helpers -----------------------------------------------------------
+
+#' Helper: Add significance stars to p-values
+#' @export
+add_star <- function(x, escape = FALSE) {
+  levels <- c("***", "**", "*", "")
+  if (escape) levels <- str_replace_all(levels, "\\*", "\\\\*")
+  cut(x, c(-Inf, 0.01, 0.05, 0.1, Inf), levels) |> as.character()
+}
+
+#' @export
+reduce_spanners <- function(table, cols, dict) {
+  reduce(names(cols), .init = table, \(table, label) {
+    tab_spanner(table, label = md(dict[label]), columns = cols[[label]])
+  })
+}
+
+#' @export
+fmt_decimal <- function(x, n = 2, lead_0 = FALSE, trail_0 = FALSE) {
+  x <- round(x, n) |> as.character()
+
+  if (!lead_0) x <- gsub("^0\\.", ".", x)
+  if (trail_0) x <- ifelse((nchar(x) == n + 1) & grepl("\\.", x), x, paste0(x, "0"))
+
+  x
+}
+
+add_footnote <- function(table, cuts = c(0.1, 0.05, 0.01)) {
+  text <- map2_chr(cuts, seq_along(cuts), ~ glue("$^{{{strrep('*', .y)}}}$p<{.x}")) |>
+    str_c(collapse = "; ") |>
+    str_c("_Note:_ ", .x = _)
+  tab_footnote(table, md(text))
+}
+
+#' @export
+add_emtpy_rows <- function(data, rows = NULL) {
+  data |>
+    reduce(rows, .init = _, ~ add_row(.x, .after = .y)) |>
+    mutate(across(everything(), ~ ifelse(is.na(.x), "", .x)))
 }

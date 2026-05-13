@@ -60,7 +60,7 @@ menu$ests <- expand_grid(
   model = c(
     "r1_nors",
     #"r2_sbreak",
-    "r2_set_x",
+    "r2_set",
     #"r2_set_abs",
     #"r2_set_diff",
     "r2_st",

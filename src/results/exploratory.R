@@ -1,10 +1,10 @@
 
-# Setup ----------------------------------------------------------
+# Setup ------------------------------------------------------------------------
 
 box::use(
   src/utils[...],
   src/options[dicts],
-  src/metrics,
+  src/creators/metrics,
   src/parameters[n_t, n_h],
   ggplot2[...],
   gt[...],
@@ -54,7 +54,7 @@ glue_test <- function(x, r, formula, n = 2, test = TRUE) {
 
 
 #' @export
-metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
+metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE, rows = c(3, 7)) {
   filters <- enquos(...)
 
   cols <- list(
@@ -96,8 +96,7 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
 
   data |>
     mutate(across(everything(), as.character)) |>
-    reduce(c(3, 7), .init = _, ~ add_row(.x, .after = .y)) |>
-    mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) |>
+    add_emtpy_rows(rows) |>
     gt(rowname_col = c("rgp", "sgp"), groupname_col = NULL) |>
     tab_stubhead(c("RGP", "RN")) |>
     reduce_spanners(cols, dicts$metrics$disp_gt) |>
@@ -109,12 +108,12 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE) {
       )
     ) |>
     fmt_markdown(c("rgp", "sgp")) |>
-    tab_footnote(md("_Note:_  $^{*}$p<0.1; $^{**}$p<0.05; $^{***}$p<0.01"))
+    add_footnote()
 }
 
 
 
-# Metrics Separation across t ----------------------------------------------------------
+# Metrics Separation across t --------------------------------------------------
 
 #' @export
 metrics_sep_graphs <- function(data_s, ...) {
@@ -188,7 +187,7 @@ metrics_sep_graphs <- function(data_s, ...) {
 
 
 
-# Forecasting errors and regime prediction ----------------------------------------------------------
+# Forecasting errors and regime prediction -------------------------------------
 
 #' @export
 regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
@@ -228,7 +227,7 @@ regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
 
 
 
-# Metrics diff ----------------------------------------------------------
+# Metrics diff -----------------------------------------------------------------
 #' @export
 metrics_diff_graph <- function(data_m) {
   data_m |>

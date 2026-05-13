@@ -4,24 +4,11 @@ box::use(
   ./models,
   ./rgps,
   ./sgps,
+  ./metrics,
   gt[md],
   latex2exp[TeX]
 )
 
-
-dict_metrics <- list3(
-  cond_gt = c(
-    avg = r"($\hat{\mu}(. | s)$)",
-    acf = r"($\hat{\rho}_1(. | s)$)",
-    sd = r"($\hat{\sigma}(. | s)$)"
-  ),
-  disp_gt = c(
-    avg = r"($d(\hat{\mu}(.))$)",
-    acf = r"($d(\hat{\rho}_1(.))$)",
-    sd = r"($d(\hat{\sigma}(.))$)"
-  ),
-  disp_gg = map_chr(disp_gt, \(x) attr(TeX(x), "plotmath"))
-)
 
 dict_params <- list3(
   gt_s = c(
@@ -93,7 +80,7 @@ dicts_reg <- c(
   #
   "as.integer(model_r > dgp_r):modelr1_nors" = "$\\hat{S} > S$ : No RS",
   "as.integer(model_r > dgp_r):modelr2_ms" = "$\\hat{S} > S$ : MS",
-  "as.integer(model_r > dgp_r):modelr2_set_x" = "$\\hat{S} > S$ : SET",
+  "as.integer(model_r > dgp_r):modelr2_set" = "$\\hat{S} > S$ : SET",
   "as.integer(model_r > dgp_r):modelr2_st" = "$\\hat{S} > S$ : ST",
   "as.integer(model_r > dgp_r):modelr2_km" = "$\\hat{S} > S$ : KM"
 )
@@ -104,7 +91,7 @@ dicts <- list(
   models = models$dict,
   rgps = rgps$dict,
   sgps = sgps$dict,
-  metrics = dict_metrics,
+  metrics = metrics$dict,
   params = dict_params,
   reg = dicts_reg
 )
@@ -122,7 +109,8 @@ params <- list(
 options <- list(
   models = models$options,
   rgps = rgps$options,
-  sgps = sgps$options
+  sgps = sgps$options,
+  metrics = metrics$get_metrics_data
 )
 
 #' Groups of options
