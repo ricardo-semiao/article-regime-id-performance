@@ -12,11 +12,16 @@ box::use(
 
 # Creator ----------------------------------------------------------------------
 
-#' Model: Markov switching
+#' Creator - Model: Markov switching
 #'
-#' Comments on parameters:
-#' - All coefficients switch between regimes, but not sigma
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param n_l [`integer(1)`] Number of lags.
+#' @param gamma [`matrix()`] Transition probabilities.
+#' @param min_r_size [`double(1)`] Minimum regime size as a proportion.
+#' @param tol [`double(1)`] Convergence tolerance.
+#' @param max_iter [`integer(1)`] Maximum number of iterations.
 #'
+#' @returns [`function(data, n_t, n_b, n_h, rn_par)`] Function to fit the model.
 #' @export
 ms <- function(
   n_r = 2, n_l = 1, gamma = NULL,

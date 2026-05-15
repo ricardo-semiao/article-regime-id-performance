@@ -35,6 +35,15 @@ if (FALSE) {
 
 # Metrics Separation at T ------------------------------------------------------
 
+#' Results - exploratory: Glue test
+#'
+#' @param x [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param formula [`formula()`] Formula for the test.
+#' @param n [`integer(1)`] Number of decimal places.
+#' @param test [`logical(1)`] Whether to perform the test.
+#'
+#' @returns [`character(1)`] Formatted string with test results.
 glue_test <- function(x, r, formula, n = 2, test = TRUE) {
   m <- metrics$series_avg(x, r, na.rm = TRUE) |> metrics$disp_mpe()
   s <- metrics$series_sd(x, r, na.rm = TRUE) |> metrics$disp_mpe()
@@ -52,7 +61,15 @@ glue_test <- function(x, r, formula, n = 2, test = TRUE) {
   glue("{fmt_decimal(m, n)}{stars} ({fmt_decimal(s, n)})")
 }
 
-
+#' Results - exploratory: Metrics separation table
+#'
+#' @param data_s [`data.frame()`] Simulations data.
+#' @param ... Filters for the data.
+#' @param n [`integer(1)`] Number of decimal places.
+#' @param test [`logical(1)`] Whether to perform the test.
+#' @param rows [`integer()`] Rows to add empty rows.
+#'
+#' @returns [`<gt_tbl>`] A formatted table with metrics separation.
 #' @export
 metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE, rows = c(3, 7)) {
   filters <- enquos(...)
@@ -64,7 +81,7 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE, rows = c(3, 7)) {
   )
 
   data_raw <- data_s |>
-    filter(!!! filters) |>
+    filter(!!!filters) |>
     group_by(sgp, rgp, sim) |>
     reframe(
       avg = metrics$series_avg(y, r, na.rm = TRUE),
@@ -115,6 +132,12 @@ metrics_sep_table <- function(data_s, ..., n = 2, test = TRUE, rows = c(3, 7)) {
 
 # Metrics Separation across t --------------------------------------------------
 
+#' Results - exploratory: Metrics separation graphs
+#'
+#' @param data_s [`data.frame()`] Simulations data.
+#' @param ... Filters for the data.
+#'
+#' @returns [`list[<ggplot>]`] A list of ggplot objects for metrics separation.
 #' @export
 metrics_sep_graphs <- function(data_s, ...) {
   filters <- enquos(...)
@@ -189,6 +212,14 @@ metrics_sep_graphs <- function(data_s, ...) {
 
 # Forecasting errors and regime prediction -------------------------------------
 
+#' Results - exploratory: Regimes RMSE graphs
+#'
+#' @param data_e [`data.frame()`] Estimation data.
+#' @param data_s [`data.frame()`] Simulations data.
+#' @param ... Filters for the data.
+#' @param trim [`double(1)`] Trim proportion for outliers.
+#'
+#' @returns [`list[<ggplot>]`] A list of ggplot objects for RMSE graphs.
 #' @export
 regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
   filters <- enquos(...)
@@ -228,6 +259,12 @@ regimes_rmse_graphs <- function(data_e, data_s, ..., trim = 0.0005) {
 
 
 # Metrics diff -----------------------------------------------------------------
+
+#' Results - exploratory: Metrics difference graph
+#'
+#' @param data_m [`data.frame()`] Metrics data.
+#'
+#' @returns [`<ggplot>`] A ggplot object for metrics difference.
 #' @export
 metrics_diff_graph <- function(data_m) {
   data_m |>

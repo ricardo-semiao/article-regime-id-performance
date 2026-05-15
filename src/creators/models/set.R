@@ -12,16 +12,19 @@ box::use(
 
 # Creator ----------------------------------------------------------------------
 
-#' Model: Threshold
+#' Creator - Model: Threshold
 #'
-#' Comments on parameters:
 #' - m, ML, MM, MH given by mL etc.; th missing (will be estimated)
 #' - mTh, thDelay missing, given by thVar
-#' - Model in levels and with constants; no threshold restrictions
 #'
-#' @param g [`function(y){}`] Transition function. Must be a closure (i.e.
-#'  non-primitive), and will have its environment sanitized to base env.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param n_l [`integer(1)`] Number of lags.
+#' @param g [`function(y)`] Transition function. Must be a closure (non-primitive).
+#' @param min_r_size [`double(1)`] Minimum regime size as a proportion.
+#' @param tol [`double(1)`] Convergence tolerance.
+#' @param max_iter [`integer(1)`] Maximum number of iterations.
 #'
+#' @returns [`function(data, n_t, n_b, n_h, rn_par)`] Function to fit the model.
 #' @export
 set <- function(
   n_r, n_l = 1, g = \(y) y,

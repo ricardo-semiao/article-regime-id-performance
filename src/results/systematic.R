@@ -39,7 +39,21 @@ lm_clumped <- function(
 }
 
 
+
 # Regression Tables ------------------------------------------------------------
+
+#' Results - systematic: Format regression matrix
+#'
+#' @param mod [`lm`] Linear model object.
+#' @param out [`character(1)`] Output file path.
+#' @param keep [`character(1)`] Pattern to keep coefficients.
+#' @param parts [`character()`] Parts of the coefficients.
+#' @param order [`integer()`] Order of parts.
+#' @param marginal [`logical(1)`] Whether to compute marginal effects.
+#' @param rows [`integer()`] Rows to add empty rows after.
+#' @param ... Additional arguments passed to [gt::gtsave()].
+#'
+#' @returns [`character()`] Saves and returns a formatted regression matrix.
 #' @export
 format_reg_matrix <- function(
   mod, out,
@@ -109,7 +123,13 @@ format_reg_matrix <- function(
   invisible(table)
 }
 
-
+#' Results - systematic: Format regression table
+#'
+#' @param mods [`list[lm]`] List of linear model objects.
+#' @param out [`character(1)`] Output file path.
+#' @param ... Additional arguments passed to [stargazer()].
+#'
+#' @returns [`character()`] Saves and returns a formatted regression table.
 #' @export
 format_reg_table <- function(mods, out, ...) {
   lmp <- function(mod) {

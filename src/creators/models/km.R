@@ -12,7 +12,15 @@ box::use(
 
 # Creator ----------------------------------------------------------------------
 
-#' Model: K-means
+#' Creator - Model: K-means
+#'
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param n_l [`integer(1)`] Number of lags. Currently only `1` is supported.
+#' @param n_l_r [`integer(1)`] Number of lagged regimes.
+#' @param w_size [`integer(1)`] Window size for metrics.
+#' @param w_metrics [`list()`] List of window metrics.
+#'
+#' @returns [`function(data, n_t, n_b, n_h, rn_par)`] Function to fit the model.
 #' @export
 km <- function(
   n_r, n_l = 1, n_l_r = 1, w_size = 5, w_metrics = NULL

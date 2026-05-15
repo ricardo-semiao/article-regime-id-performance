@@ -3,7 +3,7 @@
 
 # Modules to be available in all scripts:
 
-#' Modules: General
+# Modules: General
 #' @export
 box::use(
   r/core[...],
@@ -12,7 +12,7 @@ box::use(
   ggplot2[last_plot]
 )
 
-#' Modules: Tidyverse
+# Modules: Tidyverse
 #' @export
 box::use(
   dplyr[...], tidyr[...],
@@ -66,12 +66,12 @@ theme_set(
 
 # Infrastructure Helpers -------------------------------------------------------
 
-#' Helper: Abort via multiple conditions
+#' Util - infra: abort via multiple conditions
 #'
 #' @param ... [`logical(1)`] Conditions to test.
 #' @param call [`environment()`] Passed to [cli::cli_abort()].
 #'
-#' @returns  [`NULL`] Aborts if conditions are not met.
+#' @returns [`invisible(NULL)`] Aborts if conditions are not met.
 #' @export
 test_conditions <- function(..., call = caller_env()) {
   conditions <- c(...)
@@ -96,9 +96,17 @@ test_conditions <- function(..., call = caller_env()) {
       call = call
     )
   }
+
+  invisible(NULL)
 }
 
-#' Helper: Custom [cli::cli_alert()]
+#' Util - infra: alert failed items
+#'
+#' @param failed_items [`list()`] Items mapped to error objects.
+#' @param out [`character(1)` | `NULL`] Optional file path for a text report.
+#' @param flatten [`logical(1)`] Whether to flatten nested lists first.
+#'
+#' @returns [`invisible(list())`]
 #' @export
 cli_alert_items <- function(failed_items, out = NULL, flatten = FALSE) {
   if (flatten) failed_items <- list_flatten(failed_items)
@@ -144,7 +152,7 @@ cli_alert_items <- function(failed_items, out = NULL, flatten = FALSE) {
   invisible(items_per_error)
 }
 
-#' Helper: list2 with tibble-like self referencing
+#' Util - infra: self-referencing list
 #'
 #' @param ... Arguments to collect in a list. These dots are dynamic.
 #'
@@ -169,14 +177,15 @@ list3 <- function(...) {
   result
 }
 
-#' Helper: ggsave wrapper with default units
+#' Util - infra: save plot
 #'
 #' @param filename [`character(1)`] Output file path.
-#' @param width, height [`numeric(1)`] Plot dimensions.
-#' @param ratio [`numeric(1)`] Aspect ratio (height/width).
-#' @param ... Additional arguments passed to [ggplot::ggsave()].
+#' @param width [`double(1)`] Plot width.
+#' @param ratio [`double(1)`] Height-to-width ratio.
+#' @param scale [`double(1)`] Output scale factor.
+#' @param ... Additional arguments passed to [ggplot2::ggsave()].
 #'
-#' @returns [`invisible(NULL)`].
+#' @returns [`invisible(NULL)`]
 #' @export
 ggsave2 <- function(filename, width = NA, ratio = 1, scale = 1, ...) {
   env <- caller_env()
@@ -187,6 +196,13 @@ ggsave2 <- function(filename, width = NA, ratio = 1, scale = 1, ...) {
   cli$cli_alert_success("File saved: {.file {filename}}")
 }
 
+#' Util - infra: save gt table
+#'
+#' @param data [`<gt_tbl>`] Table to save.
+#' @param filename [`character(1)`] Output file path.
+#' @param ... Additional arguments passed to [gt::tab_options()].
+#'
+#' @returns [`invisible(NULL)`]
 #' @export
 gtsave2 <- function(data, filename, ...) {
   args <- list2(...)
@@ -217,65 +233,108 @@ gtsave2 <- function(data, filename, ...) {
   cli$cli_alert_success("File saved: {.file {filename}}")
 }
 
-
-
-#' Helper: write_rds wrapper with success message
+#' Util - infra: save RDS
 #'
-#' @param x An R object to be saved to file.
-#' @param file [`character(1)`] Path to the file where the object will be
-#'   saved.
+#' @param x [`any`] R object to save.
+#' @param file [`character(1)`] Output file path.
 #' @param ... Additional arguments passed to [readr::write_rds()].
 #'
-#' @returns [`invisible(NULL)`].
+#' @returns [`invisible(NULL)`]
 #' @export
 write_rds2 <- function(x, file, ...) {
   write_rds(x, file, ...)
   cli$cli_alert_success("File saved: {.file {file}}")
 }
 
+#' Util - infra: print summary
+#'
+#' @param x [`any`] Object to summarize.
+#' @param ... Additional arguments passed to [summary()].
+#'
+#' @returns [`invisible(x)`]
 #' @export
 print_summary <- function(x, ...) {
   print(summary(x, ...))
   invisible(x)
 }
 
+#' Util - calculation: Count lines in files
+#'
+#' @param dir [`character(1)`] Directory to scan for files.
+#' @param ignore [`character(1)`] Pattern to ignore certain files or directories.
+#'
+#' @returns [`data.frame()`] A data frame with the count of lines for each file
+#'   and directory, including a total count.
+#' @export
+count_lines <- function(dir = "src/", ignore = "src/others") {
+  src_items <- list.files(dir, full.names = TRUE) |>
+    grep(ignore, x = _, value = TRUE, invert = TRUE)
+
+  entries <- vector("list", length(src_items))
+  names(entries) <- src_items
+
+  for (item in src_items) {
+    entries[[item]] <- if (file.info(item)$isdir) {
+      files <- list.files(item, recursive = TRUE, full.names = TRUE)
+      list(
+        item = item, type = "Directory",
+        lines = sum(sapply(files, function(f) length(readLines(f))))
+      )
+    } else {
+      list(
+        item = item, type = "File",
+        lines = length(readLines(item))
+      )
+    }
+  }
+
+  entries[["Total"]] <- list(
+    item = "Total", type = "Total",
+    lines = sum(sapply(entries, function(e) e$lines))
+  )
+
+  bind_rows(entries) |>
+    arrange(fct(type, c("Directory", "File", "Total")), item) |>
+    select(-type)
+}
+# count_lines()
+
 
 
 # Parallel Execution -----------------------------------------------------------
 
-#' Helper: updates a function body to be safely
-#'
-#' Useful to avoid loading purrr in parallel processing.
+#' Util - parallel: wrap body safely
 #'
 #' @param .f [`function(){}`] Function to modify.
 #'
 #' @returns [`function(){}`] The same function with a tryCatch'ed body.
 #' @export
-safely_modify <- function(.f) {
-  fn_body(.f) <- expr({
+safely_modify <- function(f) {
+  fn_body(f) <- expr({
     tryCatch(
-      expr = list(result = {!!!fn_body(.f)}, error = NULL),
+      expr = list(result = {!!!fn_body(f)}, error = NULL),
       error = \(e) list(result = NULL, error = e)
     )
   })
 
-  .f
+  f
 }
 
-#' Helper: Map with parallelism and/or safety
+#' Util - parallel: map with mirai
 #'
-#' `...` is passed to `f`'s environment, as mirai respects it.
+#' @param x [`vector()`] Input data to process.
+#' @param f [`function(){}`] Function to apply to each element of `x`.
+#' @param parallel [`logical(1)`] Whether to use parallel processing.
+#' @param safe [`logical(1)`] Whether to wrap `f` with `tryCatch()`.
+#' @param workers [`integer(1)`] Number of mirai workers to start.
+#' @param cleanup [`logical(1)`] Whether to clean workers on exit.
+#' @param setup_packages [`character()`] Packages to load on each worker.
+#' @param setup_data [`list()`] Extra data to inject into worker environments.
 #'
-#' @param x [`list()`-like] Input data to process.
-#' @param f [`function()`] Function to apply to each element of `x`.
-#' @param ... Additional arguments passed to `f`.
-#' @param parallel, safe [`logical(1)`] Whether to use parallel processing
-#'  and/or `safely()`.
-#'
-#' @returns [`list()`] Results of applying `f` to `x`.
+#' @returns [`list()`] Results of applying `f` to each of `x`'s elements.
 #' @export
 map_parallel <- function(
-  x, f, ...,
+  x, f,
   parallel, safe, workers = 7, cleanup = FALSE,
   setup_packages = NULL, setup_data = list()
 ) {
@@ -313,30 +372,40 @@ map_parallel <- function(
 
 # Calculations Helpers ---------------------------------------------------------
 
-#' Helper: Compute lagged values
+#' Util - calculation: lag vector
 #'
 #' @param x [`vector()`] Input vector.
+#' @param n [`integer(1)`] Number of positions to lag.
+#' @param default [`=x`] Fill value for the leading lagged entries.
 #'
+#' @returns [`=x`] Lagged vector
 #' @export
 lag <- function(x, n = 1L, default = NA) {
   c(rep(default, n), x[-(length(x) - seq_len(n) + 1)])
 }
 fn_env(lag) <- pkg_env("base")
 
-#' Helper: Add lagged values to a data frame
+#' Util - calculation: add lagged columns
+#'
+#' @param data [`data.frame()`] Data to augment. Must have a `y` column.
+#' @param n_l [`integer(1)`] Number of lag columns to create.
+#'
+#' @returns [`data.frame()`] `data` with added lag columns named `y_l1`, etc.
 #' @export
 data_lags <- function(data, n_l = 1) {
-  data$y_l1 <- lag(data$y)
-
-  for (n in seq_len(n_l - 1)) {
-    data[[paste0("y_l", n + 1)]] <- lag(data[[paste0("y_l", n)]])
+  for (n in seq_len(n_l)) {
+    data[[paste0("y_l", n)]] <- lag(data$y, n = n)
   }
 
   data
 }
 fn_env(data_lags) <- new_environment(list(lag = lag), pkg_env("base"))
-# TODO: couldnt it just use lag(., n)?
 
+#' Util - calculation: extract varying parameter
+#'
+#' @param dgp_names [`character()`] DGP names to parse.
+#'
+#' @returns [`character()`]
 #' @export
 get_varying_param <- function(dgp_names) {
   dgp_names |>
@@ -345,14 +414,26 @@ get_varying_param <- function(dgp_names) {
     {if_else(. == "rho", "rho1", .)} # sgp names have 'rho' refering to 'rho1'
 }
 
+#' Util - calculation: order regimes
+#'
+#' @param coefs [`matrix(double())`] Coefficient matrix.
+#' @param rn_par [`character()`] Column name of the parameter that changes.
+#' @param dims [`list()`] Dimnames, with a `cols` field.
+#'
+#' @returns [`integer()`] The order of regimes increasing in `rn_par`.
 #' @export
 regimes_order <- function(coefs, rn_par, dims) {
   order(coefs[, which(rn_par == dims$cols)], decreasing = FALSE)
 }
 fn_env(regimes_order) <- pkg_env("base")
 
-# Bare versions of stats functions. Assumes numerical vectors of same size and
-# na.rm = TRUE.
+#' Util - calculation: covariance without checks
+#'
+#' @param x [`double()`] First vector.
+#' @param y [`=x`] Second vector.
+#' @param ... Additional arguments ignored.
+#'
+#' @returns [`double(1)`] The covariance. Assumes `na.rm = TRUE`.
 #' @export
 bare_cov <- function(x, y, ...) {
   not_na <- !is.na(x) & !is.na(y)
@@ -364,6 +445,13 @@ bare_cov <- function(x, y, ...) {
 }
 fn_env(bare_cov) <- pkg_env("base")
 
+#' Util - calculation: correlation without checks
+#'
+#' @param x [`double()`] First vector.
+#' @param y [`double()`] Second vector.
+#' @param ... Additional arguments ignored.
+#'
+#' @returns [`double(1)`] The correlation. Assumes `na.rm = TRUE`.
 #' @export
 bare_cor <- function(x, y, ...) {
   not_na <- !is.na(x) & !is.na(y)
@@ -378,6 +466,13 @@ bare_cor <- function(x, y, ...) {
 }
 fn_env(bare_cor) <- pkg_env("base")
 
+#' Util - calculation: standard deviation without checks
+#'
+#' @param x [`double()`] Input vector.
+#' @param na.rm [`logical(1)`] Whether to drop missing values.
+#' @param ... Additional arguments ignored.
+#'
+#' @returns [`double(1)`] The SD.
 #' @export
 bare_sd <- function(x, na.rm = FALSE, ...) {
   if (na.rm) x <- x[!is.na(x)]
@@ -386,6 +481,13 @@ bare_sd <- function(x, na.rm = FALSE, ...) {
   sqrt(sum((x - sum(x) / n)^2) / (n - 1))
 }
 
+#' Util - calculation: autocorrelation
+#'
+#' @param y [`double()`] Input series.
+#' @param p [`integer(1)`] Lag order.
+#' @param na.rm [`logical(1)`] Whether to remove missing values.
+#'
+#' @returns [`double(1)`] The autocorrelation.
 #' @export
 acor <- function(y, p = 1, na.rm = FALSE) {
   idx <- which(is.na(y))
@@ -402,8 +504,15 @@ acor <- function(y, p = 1, na.rm = FALSE) {
 }
 fn_env(acor) <- pkg_env("base")
 
+#' Util - calculation: clump DGP labels
+#'
+#' @param sys_data [`data.frame()`] Data to transform.
+#' @param keep_rgp [`character(1)`] RGP grouping rule.
+#' @param keep_sgp [`character(1)`] SGP grouping rule.
+#'
+#' @returns [`data.frame()`]
 #' @export
-clump_dgps <- function(sys_data, keep_rgp = "fam", keep_sgp = "fam") {
+clump_dgps <- function(data, keep_rgp = "fam", keep_sgp = "fam") {
   pats_rgp <- c(
     fam = "^(r[0-9]+_[^_]+)_*.*$",
     var = "^.*_(a?symm)_?.*$",
@@ -415,12 +524,20 @@ clump_dgps <- function(sys_data, keep_rgp = "fam", keep_sgp = "fam") {
     all = "(.+)"
   )
 
-  mutate(sys_data,
+  mutate(data,
     rgp = str_replace(rgp, pats_rgp[keep_rgp], "\\1") |> fct(),
     sgp = str_replace(sgp, pats_sgp[keep_sgp], "\\1") |> fct()
   )
 }
 
+#' Util - calculation: formatted t test
+#'
+#' @param x [`double()`] Input sample.
+#' @param h0 [`double(1)`] Null hypothesis mean.
+#' @param n [`integer(1)`] Number of decimals.
+#' @param test [`logical(1)`] Whether to compute a t-test.
+#'
+#' @returns [`character(1)`] String like "M*** (SE)".
 #' @export
 glue_t_test <- function(x, h0, n = 2, test = TRUE) {
   m <- mean(x, na.rm = TRUE)
@@ -442,7 +559,12 @@ glue_t_test <- function(x, h0, n = 2, test = TRUE) {
 
 # Formatting Helpers -----------------------------------------------------------
 
-#' Helper: Add significance stars to p-values
+#' Util - formatting: significance stars
+#'
+#' @param x [`double()`] P-values.
+#' @param escape [`logical(1)`] Whether to escape the asterisks.
+#'
+#' @returns [`character()`] Significance stars
 #' @export
 add_star <- function(x, escape = FALSE) {
   levels <- c("***", "**", "*", "")
@@ -450,6 +572,13 @@ add_star <- function(x, escape = FALSE) {
   cut(x, c(-Inf, 0.01, 0.05, 0.1, Inf), levels) |> as.character()
 }
 
+#' Util - formatting: reduce spanners
+#'
+#' @param table [`<gt_tbl>`] Table to update.
+#' @param cols [`list()`] Column selections by spanner label.
+#' @param dict [`character()`] Label translation dictionary.
+#'
+#' @returns [`<gt_tbl>`]
 #' @export
 reduce_spanners <- function(table, cols, dict) {
   reduce(names(cols), .init = table, \(table, label) {
@@ -457,6 +586,14 @@ reduce_spanners <- function(table, cols, dict) {
   })
 }
 
+#' Util - formatting: decimal string
+#'
+#' @param x [`double()`] Values to format.
+#' @param n [`integer(1)`] Number of decimals.
+#' @param lead_0 [`logical(1)`] Whether to keep a leading zero.
+#' @param trail_0 [`logical(1)`] Whether to keep trailing zeros.
+#'
+#' @returns [`character()`]
 #' @export
 fmt_decimal <- function(x, n = 2, lead_0 = FALSE, trail_0 = FALSE) {
   x <- round(x, n) |> as.character()
@@ -467,6 +604,13 @@ fmt_decimal <- function(x, n = 2, lead_0 = FALSE, trail_0 = FALSE) {
   x
 }
 
+#' Util - formatting: add significance footnote
+#'
+#' @param table [`<gt_tbl>`] Table to update.
+#' @param cuts [`double()`] P-value cutoffs.
+#'
+#' @returns [`<gt_tbl>`]
+#' @export
 add_footnote <- function(table, cuts = c(0.1, 0.05, 0.01)) {
   text <- map2_chr(cuts, seq_along(cuts), ~ glue("$^{{{strrep('*', .y)}}}$p<{.x}")) |>
     str_c(collapse = "; ") |>
@@ -474,6 +618,12 @@ add_footnote <- function(table, cuts = c(0.1, 0.05, 0.01)) {
   tab_footnote(table, md(text))
 }
 
+#' Util - formatting: insert empty rows
+#'
+#' @param data [`data.frame()`] Data to update.
+#' @param rows [`integer()` | `NULL`] Row positions to insert after.
+#'
+#' @returns [`data.frame()`]
 #' @export
 add_emtpy_rows <- function(data, rows = NULL) {
   data |>

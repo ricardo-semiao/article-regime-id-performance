@@ -24,6 +24,7 @@ if (FALSE) {
 
 # Dictionary -------------------------------------------------------------------
 
+#' Metrics' names dictionary
 #' @export
 dict <- list3(
   cond_gt = c(
@@ -43,7 +44,12 @@ dict <- list3(
 
 # Getting Metrics Data ---------------------------------------------------------
 
-#' TODO: document
+#' Options - Metrics: Get metrics data
+#'
+#' @param data_e [`data.frame()`] Estimation data.
+#' @param meta_e [`data.frame()`] Metadata for estimations.
+#'
+#' @returns [`data.frame()`] A data frame with metrics data.
 #' @export
 get_metrics_data <- function(data_e, meta_e) {
   cat("Getting model metrics...\n")
@@ -69,7 +75,11 @@ get_metrics_data <- function(data_e, meta_e) {
     )
 }
 
-#' TODO: document
+#' Options - Metrics: Get meta metrics
+#'
+#' @param meta_e [`data.frame()`] Metadata for estimations.
+#'
+#' @returns [`data.frame()`] A data frame with meta metrics.
 get_meta_metrics <- function(meta_e) {
   col <- \(x, col) x[, col] # Direct access bug in dtplyr
 
@@ -90,7 +100,11 @@ get_meta_metrics <- function(meta_e) {
     as_tibble()
 }
 
-#' TODO: document
+#' Options - Metrics: Get estimation metrics
+#'
+#' @param data_e [`data.frame()`] Estimation data.
+#'
+#' @returns [`data.frame()`] A data frame with estimation metrics.
 get_estimation_metrics <- function(data_e) {
   lazy_dt(data_e) |>
     mutate(

@@ -12,7 +12,7 @@ box::use(
 
 # All return an expression
 
-#' SGP: AR
+#' Creator - SGP: AR
 #'
 #' @param mu [`double(1)`] Mean parameter.
 #' @param ... [`double(1)` each] AR coefficients.

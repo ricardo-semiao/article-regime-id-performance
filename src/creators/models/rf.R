@@ -13,7 +13,20 @@ box::use(
 
 # Creator ----------------------------------------------------------------------
 
-# Creator: random forest
+#' Creator - Model: Random forest
+#'
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param n_l [`integer(1)`] Number of lags.
+#' @param n_l_r [`integer(1)`] Number of lagged regimes.
+#' @param w_size [`integer(1)`] Window size for metrics.
+#' @param w_metrics [`list()`] List of window metrics.
+#' @param mtry [`integer(1)`] Number of variables randomly sampled as candidates.
+#' @param nodesize [`integer(1)`] Minimum size of terminal nodes.
+#' @param maxnodes [`integer(1)`] Maximum number of terminal nodes.
+#' @param sampsize [`integer(1)`] Size of sample for training.
+#' @param ntree [`integer(1)`] Number of trees to grow.
+#'
+#' @returns [`function(data, n_t, n_b, n_h, rn_par)`] Function to fit the model.
 #' @export
 rf <- function(
   n_r = 1, n_l = 1, n_l_r = 1, w_size = 5, w_metrics = NULL,

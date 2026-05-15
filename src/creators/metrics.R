@@ -1,4 +1,3 @@
-
 # Setup ------------------------------------------------------------------------
 
 # Loading dependencies:
@@ -27,9 +26,11 @@ if (FALSE) {
 # All receive a vector of metrics x
 
 #' Metrics - dispersion: Mean pairwise distance
-#' @param x [`numeric()`]
-#' @param ... Additional arguments passed to [`base::dist()`].
-#' @returns [`double(1)`]
+#'
+#' @param x [`double()`] Input vector.
+#' @param ... Additional arguments passed to [base::dist()].
+#'
+#' @returns [`double(1)`] Mean pairwise distance.
 #' @export
 disp_mpe <- function(x, k, n = length(x), ...) {
   if (n == 1) {
@@ -40,7 +41,12 @@ disp_mpe <- function(x, k, n = length(x), ...) {
 }
 fn_env(disp_mpe) <- pkg_env("base")
 
-#' TODO: document
+#' Metrics - dispersion: Difference raised to power
+#'
+#' @param x [`double()`] Input vector of length 2.
+#' @param k [`integer(1)`] Power to raise the difference.
+#'
+#' @returns [`double(1)`] Difference raised to the power `k`.
 #' @export
 diff_k_2 <- function(x, k = 1) {
   abs(x[1] - x[2])^k
@@ -57,6 +63,12 @@ fn_env(diff_k_2) <- pkg_env("base")
 # and return a single numeric value
 
 #' Metrics - performance: R squared
+#'
+#' @param y_est [`double()`] Estimated values.
+#' @param y_true [`double()`] True values.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double(1)`] R squared value.
 #' @export
 performance_r2 <- function(y_est, y_true, ...) {
   y_bar <- mean(y_true, ...)
@@ -67,6 +79,11 @@ performance_r2 <- function(y_est, y_true, ...) {
 fn_env(performance_r2) <- pkg_env("base")
 
 #' Metrics - performance: RMSE
+#'
+#' @param y_err [`double()`] Error values.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double(1)`] Root mean squared error.
 #' @export
 performance_rmse <- function(y_err, ...) {
   sqrt(mean(y_err^2, ...))
@@ -74,13 +91,24 @@ performance_rmse <- function(y_err, ...) {
 fn_env(performance_rmse) <- pkg_env("base")
 
 #' Metrics - performance: MAPE
+#'
+#' @param y_err [`double()`] Error values.
+#' @param y_true [`double()`] True values.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double(1)`] Mean absolute percentage error.
 #' @export
 performance_mape <- function(y_err, y_true, ...) {
   mean(abs(y_err) / abs(y_true), ...)
 }
 fn_env(performance_mape) <- pkg_env("base")
 
-#' Metrics - performance: Binary ME (for r)
+#' Metrics - performance: Binary ME
+#'
+#' @param r_err [`double()`] Binary error values.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double(1)`] Binary mean error.
 #' @export
 performance_bme <- function(r_err, ...) {
   mean(r_err, ...)
@@ -95,21 +123,35 @@ fn_env(performance_bme) <- pkg_env("base")
 # vector of length n_r
 
 #' Metrics - series: Conditional average
+#'
+#' @param y [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double()`] Conditional averages for each regime.
 #' @export
 series_avg <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
-  vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
+  vapply(1:n_r, FUN.VALUE = double(1), FUN = \(s) {
     mean(y[r == s], ...)
   })
 }
 fn_env(series_avg) <- pkg_env("base")
 
 #' Metrics - series: Conditional ACF
+#'
+#' @param y [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param n_r [`integer(1)`] Number of regimes.
 #' @param n [`integer(1)`] Lag order.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double()`] Conditional autocorrelations for each regime.
 #' @export
 series_acf <- function(y, r, n_r = max(r, na.rm = TRUE), n = 1, ...) {
   t <- 1:length(y)
 
-  vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
+  vapply(1:n_r, FUN.VALUE = double(1), FUN = \(s) {
     instances <- split(y[r == s], cumsum(c(1, diff(t[r == s]) != 1)))
 
     cors <- vapply(instances, FUN.VALUE = double(1), \(yi) {
@@ -126,19 +168,33 @@ series_acf <- function(y, r, n_r = max(r, na.rm = TRUE), n = 1, ...) {
 }
 fn_env(series_acf) <- bare_stats
 
-#' Metrics - series: Conditional ACF
+#' Metrics - series: Conditional sign proportion
+#'
+#' @param y [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double()`] Proportion of positive differences for each regime.
 #' @export
 series_sign_prop <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
-  vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
+  vapply(1:n_r, FUN.VALUE = double(1), FUN = \(s) {
     mean(diff(y[r == s]) >= 0, ...)
   })
 }
 fn_env(series_sign_prop) <- bare_stats
 
 #' Metrics - series: Conditional SD
+#'
+#' @param y [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param ... Additional arguments passed to [stats::sd()].
+#'
+#' @returns [`double()`] Conditional standard deviations for each regime.
 #' @export
 series_sd <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
-  vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
+  vapply(1:n_r, FUN.VALUE = double(1), FUN = \(s) {
     sd(y[r == s], ...)
   })
 }
@@ -150,7 +206,12 @@ fn_env(series_sd) <- bare_stats
 
 # All receive the model's parameters, n_r, and return a vector of length n_r
 
-#' Metrics - series: Conditional average
+#' Metrics - analytical: Conditional average
+#'
+#' @param coefs [`matrix()`] Model coefficients.
+#' @param n_r [`integer(1)`] Number of regimes.
+#'
+#' @returns [`double()`] Analytical averages for each regime.
 #' @export
 analytical_avg <- function(coefs, n_r = max(r, na.rm = TRUE)) {
   apply(coefs, 1, \(coefs_s) {
@@ -159,8 +220,13 @@ analytical_avg <- function(coefs, n_r = max(r, na.rm = TRUE)) {
 }
 fn_env(analytical_avg) <- pkg_env("base")
 
-#' Metrics - series: Conditional ACF
-#' @param n [`integer(1)`] Lag order.
+#' Metrics - analytical: Conditional ACF
+#'
+#' @param coefs [`matrix()`] Model coefficients.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param lag [`integer(1)`] Lag order.
+#'
+#' @returns [`double()`] Analytical autocorrelations for each regime.
 #' @export
 analytical_acf <- function(coefs, n_r = max(r, na.rm = TRUE), lag = 1) {
   apply(coefs, 1, \(coefs_s) {
@@ -169,7 +235,12 @@ analytical_acf <- function(coefs, n_r = max(r, na.rm = TRUE), lag = 1) {
 }
 fn_env(analytical_acf) <- pkg_env("base")
 
-#' Metrics - series: Conditional SD
+#' Metrics - analytical: Conditional SD
+#'
+#' @param coefs [`matrix()`] Model coefficients.
+#' @param n_r [`integer(1)`] Number of regimes.
+#'
+#' @returns [`double()`] Analytical standard deviations for each regime.
 #' @export
 analytical_sd <- function(coefs, n_r = max(r, na.rm = TRUE)) {
   apply(coefs, 1, \(coefs_s) {
@@ -185,24 +256,37 @@ fn_env(analytical_sd) <- pkg_env("base")
 # All receive y, r, n_r, and additional hyperparameters if needed, and most
 # return a vector of length n_r, unless otherwise specified
 
-#' Metrics - regimes: Number of regimes' instances
-#' For each regime's observations, counts how many had a different previous
-#'  value
+#' Metrics - regimes: Number of instances
+#'
+#' @param y [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param ... Additional arguments passed to [base::sum()].
+#'
+#' @returns [`double()`] Number of instances for each regime.
 #' @export
 regimes_instances <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
-  vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
+  vapply(1:n_r, FUN.VALUE = double(1), FUN = \(s) {
     sum((c(1, diff(r)) != 0)[r == s], ...)
   })
 }
 fn_env(regimes_instances) <- pkg_env("base")
 
-#' Metrics - regimes: Average duration of regimes' instances
+#' Metrics - regimes: Average duration
+#'
 #' The cumulative sum of absolute differences generates a unique id for each
 #'  instance (across all regimes). `r == s` subsets the ones for a specific
 #'  regime, and table counts how many observations each instance had.
+#'
+#' @param y [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double()`] Average duration of instances for each regime.
 #' @export
 regimes_duration <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
-  vapply(1:n_r, FUN.VALUE = numeric(1), FUN = \(s) {
+  vapply(1:n_r, FUN.VALUE = double(1), FUN = \(s) {
     idx <- r == s
     if (!any(idx)) return(0)
     mean(table(cumsum(abs(c(0, diff(r))))[idx]), ...)
@@ -210,11 +294,18 @@ regimes_duration <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
 }
 fn_env(regimes_duration) <- pkg_env("base")
 
-#' Metrics - regimes: Estimated transition counts/probabilities matrix
+#' Metrics - regimes: Transition matrix
+#'
 #' Creates a factor whose levels are all possible combinations of
 #'  "$r_{t-1}$_$r_t$", then tabulates it and reshapes into a matrix.
-#' @param prop [`logical(1)`] Whether to return transition probabilities
-#' @returns [`matrix(, n_r, n_r)`]
+#'
+#' @param y [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param prop [`logical(1)`] Whether to return probabilities.
+#' @param ... Additional arguments passed to [base::table()].
+#'
+#' @returns [`matrix(, n_r, n_r)`] Transition matrix of counts or probabilities.
 #' @export
 regimes_transmat <- function(y, r, n_r = max(r, na.rm = TRUE), prop = TRUE, ...) {
   if (n_r < 2) {
@@ -232,7 +323,14 @@ regimes_transmat <- function(y, r, n_r = max(r, na.rm = TRUE), prop = TRUE, ...)
 }
 #fn_env(regimes_transmat) <- pkg_env("base")
 
-#' TODO: document
+#' Metrics - regimes: Average switches
+#'
+#' @param y [`double()`] Input series.
+#' @param r [`integer()`] Regime identifiers.
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param ... Additional arguments passed to [base::sum()].
+#'
+#' @returns [`double(1)`] Average number of switches per observation.
 #' @export
 average_switches <- function(y, r, n_r = max(r, na.rm = TRUE), ...) {
   sum(diff(r) != 0) / length(y)
@@ -243,7 +341,13 @@ fn_env(average_switches) <- pkg_env("base")
 
 # Inconditional Series Metrics -------------------------------------------------
 
-#' Metrics - series: Conditional skewness
+
+#' Metrics - series: Skewness
+#'
+#' @param y [`double()`] Input series.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double(1)`] Skewness of the series.
 #' @export
 inconditional_skewness <- function(y, ...) {
   sdev <- sd(y, ...)
@@ -252,7 +356,12 @@ inconditional_skewness <- function(y, ...) {
 }
 fn_env(inconditional_skewness) <- bare_stats
 
-#' Metrics - series: Conditional kurtosis
+#' Metrics - series: Kurtosis
+#'
+#' @param y [`double()`] Input series.
+#' @param ... Additional arguments passed to [base::mean()].
+#'
+#' @returns [`double(1)`] Kurtosis of the series.
 #' @export
 inconditional_kurtosis <- function(y, ...) {
   sdev <- sd(y, ...)

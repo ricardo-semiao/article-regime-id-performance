@@ -12,13 +12,17 @@ box::use(
 
 # Creator ----------------------------------------------------------------------
 
-#' Structural breaks
+#' Creator - Model: Structural breaks
 #'
-#' Might only work for n_l = 1.
+#' Might only work for `n_l = 1`. h set by eps1.
 #'
-#' Comments on parameters:
-#' - h set by eps1; model with intercept; no error treatments
+#' @param n_r [`integer(1)`] Number of regimes.
+#' @param n_l [`integer(1)`] Number of lags. Only `1` is supported.
+#' @param min_r_size [`double(1)`] Minimum regime size as a proportion.
+#' @param tol [`double(1)`] Convergence tolerance.
+#' @param max_iter [`integer(1)`] Maximum number of iterations.
 #'
+#' @returns [`function(data, n_t, n_b, n_h, rn_par)`] Function to fit the model.
 #' @export
 sb <- function(
   n_r, n_l = 1,

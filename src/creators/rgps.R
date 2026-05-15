@@ -1,4 +1,3 @@
-
 # Setup ------------------------------------------------------------------------
 
 # Loading dependencies:
@@ -13,9 +12,11 @@ box::use(
 # All return a function with enclosing environment as a child of base, carrying
 # needed objects
 
-#' RGP: No RS
+#' Creator - RGP: No RS
+#'
+#' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
-no_rs <- function() {
+nors <- function() {
   new_function(
     args = pairlist2(y = , r = , t = ),
     body = expr({
@@ -26,14 +27,14 @@ no_rs <- function() {
   )
 }
 
-#' RGP: Structural breaks
+#' Creator - RGP: Structural breaks
 #'
 #' @param breaks [`integer()`] Strictly increasing vector of break points
-#' (>= 1). Breaks are closed on left.
+#'  (>= 1). Breaks are closed on left.
 #'
 #' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
-sbreak <- function(breaks) {
+sb <- function(breaks) {
   walk(list(breaks), force)
 
   test_conditions(
@@ -52,17 +53,17 @@ sbreak <- function(breaks) {
   )
 }
 
-#' SRP: Threshold
+#' Creator - RGP: Threshold
 #'
 #' @param breaks [`numeric()`] Strictly increasing vector of thresholds. Breaks
-#' are closed on left.
+#'  are closed on left.
 #' @param g [`function(y, t){}`] Function for `g(y, t) < breaks`. Must be a
 #'  closure (i.e. non-primitive), and will have its environment sanitized to
 #'  base env.
 #'
 #' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
-threshold <- function(breaks, g = \(y, t) y[t - 1]) {
+set <- function(breaks, g = \(y, t) y[t - 1]) {
   walk(list(breaks, g), force)
   g <- new_function(exprs(y = , t = ), fn_body(g), pkg_env("base"))
 
@@ -80,9 +81,9 @@ threshold <- function(breaks, g = \(y, t) y[t - 1]) {
     env = new_environment(list(g = g), pkg_env("base"))
   )
 }
-# TODO: implement left_closed argument (not really needed)
+# Consider implementing left_closed argument (not really needed)
 
-#' SRP: Smooth Transition
+#' Creator - RGP: Smooth Transition
 #'
 #' Only suitable for 2 regimes.
 #'
@@ -93,7 +94,7 @@ threshold <- function(breaks, g = \(y, t) y[t - 1]) {
 #'
 #' @returns  [`function(){}`] Generator function enclosing a child of base env.
 #' @export
-stransition <- function(breaks, g) {
+st <- function(breaks, g) {
   walk(list(breaks, g), force)
   g <- new_function(exprs(y = , t = , breaks = ), fn_body(g), pkg_env("base"))
 
@@ -114,13 +115,13 @@ stransition <- function(breaks, g) {
   )
 }
 
-#' RGP: Markov
+#' Creator - RGP: Markov
 #'
 #' @param probs [`matrix()`] Transition probability matrix.
 #'
 #' @returns [`function(){}`] Generator function enclosing a child of base env.
 #' @export
-markov <- function(probs) {
+ms <- function(probs) {
   walk(list(probs), force)
 
   test_conditions(

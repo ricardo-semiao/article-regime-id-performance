@@ -14,6 +14,11 @@ n_b <- 4L # Burn-in periods
 n_h <- 10L # Number of periods to predict
 n_t <- 100L + n_b + n_h # Number of time periods
 
+#' Menu of objects considered
+#'
+#' A list with elements 'dgps', 'sims', and 'ests' containing data frames with
+#'   the combinations of parameters for DGPs, simulations, and estimations,
+#'   respectively.
 menu <- list()
 
 
@@ -46,10 +51,12 @@ menu$dgps <- expand_grid(
 ) |>
   mutate(dgp = str_c(sgp, "-", rgp))
 
+n_d <- nrow(menu$dgps) # Number of DGPs
+
 menu$sims <- expand_grid(menu$dgps, sim = 1:n_i) |>
   mutate(dgp_sim = str_c(dgp, "-", sim))
 
-n_s <- nrow(menu$sims)
+n_s <- nrow(menu$sims) # Number of simulations (n_d * n_i)
 
 
 
@@ -72,8 +79,8 @@ menu$ests <- expand_grid(
 ) |>
   mutate(dgp_sim_model = str_c(dgp_sim, "-", model))
 
-n_m <- length(unique(menu$ests$model))
-n_e <- nrow(menu$ests)
+n_m <- length(unique(menu$ests$model)) # Number of models
+n_e <- nrow(menu$ests) # Number of estimations (n_s * n_m)
 
 
 

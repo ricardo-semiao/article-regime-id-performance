@@ -11,16 +11,20 @@ box::use(
 
 # Creator ----------------------------------------------------------------------
 
-#' Model: Smooth transition
+#' Creator - Model: Smooth transition
 #'
-#' TODO: generalize
-#' Only works for 2 regimes. Comments on parameters:
+#' Only works for 2 regimes.
 #' - m, ML, MM, MH given by mL etc.; th missing (will be estimated)
 #' - mTh, thDelay missing, given by thVar
-#' - Model in levels and with constants; no threshold restrictions
-#' - Also consider starting.control
-#' - Old option: `thVar = data$y_l1[(1 + n_l):(n_t - n_h)]`
 #'
+#' @param n_r [`integer(1)`] Number of regimes. Only `2` is supported.
+#' @param n_l [`integer(1)`] Number of lags.
+#' @param gamma [`double()`] Transition smoothness parameter.
+#' @param min_r_size [`double(1)`] Minimum regime size as a proportion.
+#' @param tol [`double(1)`] Convergence tolerance.
+#' @param max_iter [`integer(1)`] Maximum number of iterations.
+#'
+#' @returns [`function(data, n_t, n_b, n_h, rn_par)`] Function to fit the model.
 #' @export
 st <- function(
   n_r = 2, n_l = 1, gamma = NULL,
@@ -36,7 +40,7 @@ st <- function(
       data[(n_b + 1):(n_t - n_h), "y"], mL = n_l, mH = n_l, thDelay = n_l,
       # Hyperparameters:
       gamma = gamma,
-      # Optimization:
+      # Optimization: starting.control
       control = list(maxit = max_iter, abstol = tol),
       # Others:
       d = 1, steps = 1, include = "const", trace = FALSE

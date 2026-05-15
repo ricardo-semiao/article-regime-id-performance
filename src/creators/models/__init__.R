@@ -4,7 +4,7 @@ box::use(
   ./km[km], ./ms[ms], ./nors[nors], ./rf[rf], ./sb[sb], ./set[set], ./st[st]
 )
 
-# Parameters always include n_r and n_p. Often include optimization
+# Parameters always include n_r and n_l. Often include optimization
 # parameters such as min_r_size, tol, and max_iter
 # All return a generator function enclosing a child of base env carrying the
 # hyperparameters, model function, and methods for getting predictions and

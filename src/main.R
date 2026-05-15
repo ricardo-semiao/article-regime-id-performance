@@ -61,7 +61,7 @@ if (FALSE) {
 
 
 
-# Simulation: Series -----------------------------------------------------------
+# Simulation: Simulations ------------------------------------------------------
 
 # Simulation inputs and function:
 sim_inputs <- pmap(menu$sims, \(sgp, rgp, dgp, sim, dgp_sim) {
@@ -100,6 +100,7 @@ simulate_serie <- function(input) {
 # Running simulations:
 safe <- TRUE
 if (FALSE) sim_inputs <- sim_inputs %>% .[str_split_i(names(.), "-", 3) %in% filter_sim_i]
+
 simulations <- map_parallel(
   sim_inputs, simulate_serie,
   parallel = TRUE, safe = safe,
@@ -409,6 +410,17 @@ if (FALSE) {
 }
 
 
+
+# Simulation: Metrics ----------------------------------------------------------
+
+metrics_data <- options$metrics(estimations_data, estimations_meta)
+
+if (FALSE) {
+  #write_rds2(metrics_data, "data/metrics_data.rds")
+  metrics_data <- read_rds("data/metrics_data.rds")
+}
+
+
 # Metrics and true values:
 diags$t_metrics <- diagnostics$metrics_table(
   simulations_data, simulations_meta,
@@ -433,17 +445,6 @@ if (FALSE) {
     diags$i_independence, "outputs/diagnostics/i_independence.tex",
     single.row = TRUE, df = FALSE
   )
-}
-
-
-
-# Simulation: Metrics ----------------------------------------------------------
-
-metrics_data <- options$metrics(estimations_data, estimations_meta)
-
-if (FALSE) {
-  #write_rds2(metrics_data, "data/metrics_data.rds")
-  metrics_data <- read_rds("data/metrics_data.rds")
 }
 
 
