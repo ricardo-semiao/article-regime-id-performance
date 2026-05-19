@@ -8,8 +8,7 @@
 box::use(
   r/core[...],
   cli = cli[cli_abort, cli_warn, cli_inform],
-  glue[glue],
-  ggplot2[last_plot]
+  glue[glue]
 )
 
 # Modules: Tidyverse
@@ -335,7 +334,7 @@ safely_modify <- function(f) {
 #' @export
 map_parallel <- function(
   x, f,
-  parallel, safe, workers = 7, cleanup = FALSE,
+  parallel = TRUE, safe = TRUE, workers = 7, cleanup = FALSE,
   setup_packages = NULL, setup_data = list()
 ) {
   if (inherits_any(x, "data.frame")) {
@@ -347,15 +346,32 @@ map_parallel <- function(
   if (parallel) {
     on.exit(mirai$daemons(0), add = TRUE)
 
+    cat("Setting up infrastructure ...\n")
+    t1 <- Sys.time()
+    #fn_fmls(f_safe) <- c(fn_fmls(f_safe), setup_data[])
     setup_expr <- call2(`{`,
       !!!imap(setup_packages, ~ expr(library(!!.x, character.only = TRUE)))
     )
+    mirai$daemons(workers, cleanup = cleanup)
+    do.call(mirai$everywhere, c(.expr = setup_expr, setup_data))
+    cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = "")
 
-    mirai$daemons(workers, cleanup = cleanup) # * No worker cleanup between tasks
-    do.call(mirai$everywhere, c(.expr = setup_expr, setup_data[]))
+    cat("Defining promises ...\n")
+    t1 <- Sys.time()
+    promise <- lapply(x, \(elem) {
+      mirai$mirai(
+        .expr = f(x),
+        .args = list(f = f_safe, x = elem, .mirai_within_map = TRUE)
+      )
+    }) |>
+      `names<-`(names(x)) |>
+      `class<-`("mirai_map")
+    cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = "")
 
-    promise <- mirai$mirai_map(x, f_safe)
-    results <- mirai$collect_mirai(promise, options = c(".progress"))
+    cat("Collecting map ...\n")
+    t1 <- Sys.time()
+    results <- mirai$collect_mirai(promise, ".progress")
+    on.exit(cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = ""), add = TRUE)
 
     results <- map(results, \(x) {
       if (inherits_any(x, "try-error")) list(result = NULL, error = x) else x
@@ -392,12 +408,13 @@ fn_env(lag) <- pkg_env("base")
 #'
 #' @returns [`data.frame()`] `data` with added lag columns named `y_l1`, etc.
 #' @export
-data_lags <- function(data, n_l = 1) {
-  for (n in seq_len(n_l)) {
-    data[[paste0("y_l", n)]] <- lag(data$y, n = n)
-  }
-
-  data
+data_lags <- function(y, n_l = 1) {
+  n <- length(y)
+  ls <- seq_len(n_l)
+  
+  cbind(y, vapply(ls, \(l) lag(y, l), double(n))) |>
+    as.data.frame() |>
+    `colnames<-`(c("y", paste0("y_l", ls)))
 }
 fn_env(data_lags) <- new_environment(list(lag = lag), pkg_env("base"))
 
@@ -480,6 +497,7 @@ bare_sd <- function(x, na.rm = FALSE, ...) {
 
   sqrt(sum((x - sum(x) / n)^2) / (n - 1))
 }
+fn_env(bare_sd) <- pkg_env("base")
 
 #' Util - calculation: autocorrelation
 #'

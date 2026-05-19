@@ -27,13 +27,26 @@ dict_stats <- c(
 
 # Regression Shortcuts ---------------------------------------------------------
 
+#' Results - systematic: linear model with clumped data
+#'
+#' @param f_rhs [`formula()`] Right-hand side of the formula for the model.
+#' @param data [`data.frame()`] The dataset to use for the model.
+#' @param models [`character()` | `NULL`] Models to exclude from the data.
+#' @param clumps [`character(2)`] Clumping parameters, default is `c("all", "all")`.
+#' @param filters [`exprs()`] Filters to apply after clumping.
+#' @param ... Additional arguments passed to [`stats::lm()`].
+#'
+#' @returns [`lm`] A linear model object created with the specified data and
+#'   formula.
 #' @export
 lm_clumped <- function(
-  f_rhs, data, models = NULL, clumps = c("all", "all"), ...
+  f_rhs, data, models = NULL, clumps = c("all", "all"), filters = TRUE, ...
 ) {
+  filters <- enquos(filters)
+
   data <- data |>
     clump_dgps(clumps[1], clumps[2]) |>
-    filter(! model %in% models)
+    filter(! model %in% models, !!! filters)
 
   lm(new_formula(expr(rmse), enexpr(f_rhs)), data, ...)
 }

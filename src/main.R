@@ -19,7 +19,8 @@ box::use(
 )
 box::use(
   RcppParallel[setThreadOptions],
-  rTRNG[rnorm_trng]
+  rTRNG[rnorm_trng],
+  ggplot2[last_plot]
 )
 
 
@@ -150,6 +151,8 @@ simulations_data <- simulations |>
   relocate(sgp, rgp, sim, t, r, y) |>
   arrange(sgp, rgp, sim, t)
 
+rm(sim_errors, sim_errors_raw, sim_inputs, simulations)
+
 
 
 # Diagnostics: Simulations -----------------------------------------------------
@@ -193,12 +196,11 @@ est_inputs <- map2(
 
 n_l_max <- map_dbl(options$models, ~ max(fn_env(.x)$n_l, fn_env(.x)$n_l_r)) |> max()
 
-estimate_models <- function(input) {
-  data <- data_lags(data.frame(y = input$y), n_l = n_l_max)
+estimate_models <- function(input_name) {
+  input <- est_inputs[[input_name]]
+  data <- data_lags(input$y, n_l = n_l_max)
 
-  results <- vector("list", n_m)
-  names(results) <- names(mods)
-
+  results <- vector("list", n_m) |> `names<-`(names(mods))
   for (mod_name in names(mods)) {
     results[[mod_name]] <- mods[[mod_name]](data, n_t, n_b, n_h, rn_par = input$rn_par)
   }
@@ -214,11 +216,11 @@ if (safe) est_models <- map(est_models, safely_modify)
 if (FALSE) est_inputs <- est_inputs %>% .[str_split_i(names(.), "-", 3) %in% filter_sim_i]
 
 estimations <- map_parallel(
-  est_inputs, estimate_models,
-  parallel = TRUE, safe = FALSE,
+  set_names(names(est_inputs)), estimate_models,
+  parallel = TRUE, safe = FALSE, workers = 8,
   setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
   setup_data = list(
-    mods = est_models, data_lags = data_lags,
+    mods = est_models, data_lags = data_lags, est_inputs = est_inputs,
     n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = n_m
   )
 )
@@ -272,6 +274,8 @@ estimations_data <- estimations_flat |>
   mutate(y_err = y_est - y_sim, r_err = r_sim != r_est) |>
   relocate(sgp, rgp, sim, model, t, r_sim, y_sim, r_est, y_est) |>
   arrange(sgp, rgp, sim, model, t)
+
+rm(est_inputs, est_models, estimations, estimations_flat)
 
 
 
@@ -383,7 +387,6 @@ if (FALSE) {
 
 # Removing issues:
 diags$t_obs_remove <- diagnostics$save_obs_removed(diags$obs_remove)
-diags$t_obs_remove
 
 if (FALSE) {
   gtsave2(diags$t_obs_remove, "outputs/diagnostics/estimation_issues.tex")
@@ -421,7 +424,7 @@ if (FALSE) {
 }
 
 
-# Metrics and true values:
+# Diagnostic of metrics and true values:
 diags$t_metrics <- diagnostics$metrics_table(
   simulations_data, simulations_meta,
   rgp %in% groups$rgp_sym, sgp %in% groups$sgp_big
@@ -609,22 +612,19 @@ res$model_fe_strat$none <- results$lm_clumped(
   model - 1, reg_data, "r1_nors"
 )
 res$model_fe_strat$asym <- results$lm_clumped(
-  model - 1, filter(reg_data, rgp == "asymm"), "r1_nors", c("var", "var")
+  model - 1, reg_data, "r1_nors", c("var", "var"), rgp == "asymm"
 )
 res$model_fe_strat$small <- results$lm_clumped(
-  model - 1, reg_data, filter(reg_data, sgp == "1"), "r1_nors", c("var", "var")
+  model - 1, reg_data, "r1_nors", c("var", "var"), sgp == "1"
 )
 res$model_fe_strat$mu <- results$lm_clumped(
-  model - 1, reg_data, filter(reg_data, sgp == "r2_ar1_mu"),
-  "r1_nors", c("var", "fam")
+  model - 1, reg_data, "r1_nors", c("var", "fam"), sgp == "r2_ar1_mu"
 )
 res$model_fe_strat$rho <- results$lm_clumped(
-  model - 1, reg_data, filter(reg_data, sgp == "r2_ar1_rho"),
-  "r1_nors", c("var", "fam")
+  model - 1, reg_data, "r1_nors", c("var", "fam"), sgp == "r2_ar1_rho"
 )
 res$model_fe_strat$sigma <- results$lm_clumped(
-  model - 1, reg_data, filter(reg_data, sgp == "r2_ar1_sigma"),
-  "r1_nors", c("var", "fam")
+  model - 1, reg_data, "r1_nors", c("var", "fam"), sgp == "r2_ar1_sigma"
 )
 
 if (FALSE) {
@@ -829,7 +829,7 @@ res$match$metrics_models_int <- results$lm_clumped(
 if (FALSE) {
   results$format_reg_matrix(
     res$match$metrics_models_int, out = "outputs/systematic/match_metrics_strat.tex",
-    ".+:model.+:(avg|acf|sd).+:sgp", parts = c(Model = "model", Metric = "metric", SGP = "sgp"),
+    "^model.+:(avg|acf|sd).+:sgp", parts = c(Model = "model", Metric = "metric", SGP = "sgp"),
     order = c(1, 2, 3), rows = c(2, 5)
   )
 }

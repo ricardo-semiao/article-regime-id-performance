@@ -21,6 +21,20 @@ if (FALSE) {
 
 
 
+# Helpers ----------------------------------------------------------------------
+
+matrix_to_vec <- function(x, sep = "_", pref = "", suf = "") {
+  structure(x,
+    dim = NULL,
+    names = pmap_chr(
+      expand_grid(colnames(x), rownames(x)),
+      ~ paste0(pref, .x, sep, .y, suf)
+    )
+  )
+}
+
+
+
 # NAs --------------------------------------------------------------------------
 
 #' @export

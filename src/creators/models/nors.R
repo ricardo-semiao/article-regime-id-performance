@@ -20,7 +20,7 @@ box::use(
 #' @returns [`function(data, n_t, n_b, n_h, rn_par)`] Function to fit the model.
 #' @export
 nors <- function(
-  n_r, n_l = 1
+  n_r = 1, n_l = 1
 ) {
   if (n_l != 1) cli_abort("Only n_l = 1 is currently supported for ar().")
   if (n_r != 1) cli_abort("Only n_r = 1 is supported for ar().")

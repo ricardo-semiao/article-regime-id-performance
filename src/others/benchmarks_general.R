@@ -4,7 +4,9 @@
 # General modules:
 box::use(
   src/utils[...],
-  bench[mark]
+  src/parameters[...],
+  bench[mark], syrup[syrup],
+  ggplot2[...], patchwork[...]
 )
 
 # Models modules:
@@ -15,6 +17,641 @@ box::use(
   star = starvars,
   mstest = MSTest,
   mswm = MSwM
+)
+
+# RNG:
+set.seed(10126271)
+filter_sim_i <- sample(n_i, 20)
+filter_sim_i2 <- sample(n_i, 100)
+
+
+
+# Models 3 ----------------------------------------------------------------
+
+box::use(
+  src/creators/models,
+  mirai, mori
+)
+
+simulations <- read_rds("data/simulations.rds") |> map("result")
+est_inputs <- map2(
+  simulations,
+  get_varying_param(names(simulations)),
+  \(sim, rn_par) list(y = sim$y, rn_par = rn_par)
+)
+
+n_l_max <- 4
+est_models <- list(
+  nors = models$nors(n_r = 1),
+  sb = models$sb(n_r = 2),
+  ms = models$ms(n_r = 2),
+  set= models$set(n_r = 2),
+  st = models$st(n_r = 2),
+  km = models$km(n_r = 2),
+  rf = models$rf()
+)
+
+
+estimate_models <- function(input) {
+  data <- data_lags(input$y, n_l = n_l_max)
+  
+  results <- vector("list", n_m) |> `names<-`(names(mods))
+  for (mod_name in names(mods)) {
+    results[[mod_name]] <- mods[[mod_name]](data, n_t, n_b, n_h, rn_par = input$rn_par)
+  }
+  
+  results
+}
+
+estimate_models2 <- function(i_name) {
+  input <- est_inputs[[i_name]]
+  data <- data_lags(input$y, n_l = n_l_max)
+  
+  results <- vector("list", n_m) |> `names<-`(names(mods))
+  for (mod_name in names(mods)) {
+    results[[mod_name]] <- mods[[mod_name]](data, n_t, n_b, n_h, rn_par = input$rn_par)
+  }
+  
+  results
+}
+
+
+items <- est_inputs %>% .[str_split_i(names(.), "-", 3) %in% filter_sim_i]
+s1 <- syrup(interval = 0.1, {
+  b1 <<- mark(min_iterations = 1, data = {
+    data1 <<- map_parallel(
+      items, estimate_models,
+      parallel = TRUE, safe = TRUE, workers = 7,
+      #setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+      setup_data = list(
+        mods = est_models, data_lags = data_lags,
+        n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = length(est_models)
+      )
+    )
+  })
+})
+
+s2 <- syrup(interval = 0.1, {
+  b2 <<- mark(min_iterations = 1, names = {
+    data2 <<- map_parallel(
+      set_names(names(items)), estimate_models2,
+      parallel = TRUE, safe = TRUE, workers = 7,
+      #setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+      setup_data = list(
+        mods = est_models, data_lags = data_lags, est_inputs = items,
+        n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = length(est_models)
+      )
+    )
+  })
+})
+
+
+s2 |> print(n = Inf)
+bind_rows(b1, b2)
+data <- plot_syrup(data = s1, names = s2, groups = TRUE)$data
+
+data |>
+  group_by(obj) |>
+  #filter(id >= 7) |>
+  summarise(
+    across(c(pct_cpu:vms), ~ paste0(
+      mean(.x, na.rm = TRUE) |> round(2), " (",
+      sd(.x, na.rm = TRUE) |> round(1), ")")
+    )
+  )
+
+
+items <- est_inputs
+s3 <- syrup(interval = 0.1, {
+  b3 <<- mark(max_iterations = 1, names = {
+    data3 <<- map_parallel(
+      set_names(names(items))[1:840], estimate_models2,
+      parallel = TRUE, safe = TRUE, workers = 7,
+      #setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+      setup_data = list(
+        mods = est_models, data_lags = data_lags, est_inputs = items,
+        n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = length(est_models)
+      )
+    )
+  })
+})
+
+
+items2 <- mori::share(est_inputs)
+s4 <- syrup(interval = 0.1, {
+  b4 <<- mark(max_iterations = 1, names_shared = {
+    data4 <<- map_parallel(
+      set_names(names(items2))[1:840], estimate_models2,
+      parallel = TRUE, safe = TRUE, workers = 7,
+      #setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+      setup_data = list(
+        mods = est_models, data_lags = data_lags, est_inputs = items2,
+        n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = length(est_models)
+      )
+    )
+  })
+})
+
+s5 <- syrup(interval = 0.1, {
+  b5 <<- mark(max_iterations = 1, data_shared = {
+    data5 <<- map_parallel(
+      items2, estimate_models,
+      parallel = TRUE, safe = TRUE, workers = 7, cleanup = TRUE,
+      #setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+      setup_data = list(
+        mods = est_models, data_lags = data_lags,
+        n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = length(est_models)
+      )
+    )
+  })
+})
+
+
+s4 |> print(n = Inf)
+bind_rows(b3, b4, b5)
+data <- plot_syrup(names = s3, names_shared = s4, groups = TRUE)$data
+
+
+items <- est_inputs %>% .[str_split_i(names(.), "-", 3) %in% sample(n_i, 20)]
+s6 <- syrup(interval = 0.1, {
+  b6 <<- mark(min_iterations = 1, data2 = {
+    data6 <<- map_parallel3(
+      items, estimate_models,
+      parallel = TRUE, safe = TRUE, workers = 7,
+      #setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+      setup_data = list(
+        mods = est_models, data_lags = data_lags,
+        n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = length(est_models)
+      )
+    )
+  })
+})
+s7 <- syrup(interval = 0.1, {
+  b7 <<- mark(min_iterations = 1, names2 = {
+    data7 <<- map_parallel3(
+      set_names(names(items)), estimate_models2,
+      parallel = TRUE, safe = TRUE, workers = 7,
+      #setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+      setup_data = list(
+        mods = est_models, data_lags = data_lags, est_inputs = items,
+        n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = length(est_models)
+      )
+    )
+  })
+})
+
+s4 |> print(n = Inf)
+bind_rows(b1, b6, b7, b8)
+data <- plot_syrup(names = s7, manual = s8, groups = TRUE)$data
+
+
+s8 <- syrup(interval = 0.1, {
+  b8 <<- mark(min_iterations = 1, names2 = {
+    data8 <<- map_parallel2(
+      set_names(names(items)), estimate_models2,
+      parallel = TRUE, safe = TRUE, workers = 7,
+      #setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+      setup_data = list(
+        mods = est_models, data_lags = data_lags, est_inputs = items,
+        n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = n_l_max, n_m = length(est_models)
+      )
+    )
+  })
+})
+
+f1 <- function(x) {
+  #envs <- c(f_env = rlang::current_env(), rlang::env_parents()[])
+  envs <- list(
+    f_env = rlang::current_env(),
+    global = rlang::env_parent()
+  )
+  lapply(envs, \(e) list(
+    names = names(e) %||% character(0),
+    size = lobstr::obj_size(e) %||% 0
+  ))
+}
+
+items_s <- mori::share(items)
+
+datas <- list(
+  data11 = map_parallel(
+    items[1], f1, setup_data = list(),
+    parallel = TRUE, safe = FALSE, workers = 7,
+  ),
+  data12 = map_parallel(
+    set_names(names(items))[1], f1, setup_data = list(items = items),
+    parallel = TRUE, safe = FALSE, workers = 7,
+  ),
+  data12s = map_parallel(
+    set_names(names(items))[1], f1, setup_data = list(items = items_s),
+    parallel = TRUE, safe = FALSE, workers = 7,
+  ),
+  data22 = map_parallel2(
+    set_names(names(items))[1], f1, setup_data = list(items = items),
+    parallel = TRUE, safe = FALSE, workers = 7,
+  ),
+  data31 = map_parallel3(
+    items[1], f1, setup_data = list(),
+    parallel = TRUE, safe = FALSE, workers = 7,
+  ),
+  data32 = map_parallel3(
+    set_names(names(items))[1], f1, setup_data = list(items = items),
+    parallel = TRUE, safe = FALSE, workers = 7,
+  ),
+  data32s = map_parallel3(
+    set_names(names(items))[1], f1, setup_data = list(items = items_s),
+    parallel = TRUE, safe = FALSE, workers = 7,
+  )
+)
+
+list_flatten(datas)
+
+sumdata <- function(x) {
+  list_transpose(x, simplify = FALSE) |>
+    map(list_transpose) |>
+    map(~ list(
+      names = unique(.x$names),
+      size_m = (mean(.x$size) / 1e+6) |> round(3),
+      size_s = (sum(.x$size) / 1e+6) |> round(3)
+    ))
+}
+
+sumd <- map(datas, sumdata) |> print()
+
+sumd |>
+  iwalk(\(x, opt) {
+    cat(opt, ":\n", sep = "")
+    iwalk(x, \(e, name) {
+      cat(
+        "- ", name, ": ",
+        e$size_m, ", ", e$size_s, " (",
+        paste0(e$names, collapse = ", "), ")\n",
+        sep = ""
+      )
+    })
+  })
+
+datas$data22[1:2]
+
+
+datas$data11[1:10] |>
+  list_transpose() |>
+  map(list_transpose) |>
+  map(~ list(
+    names = unique(.x$names),
+    size_m = (mean(.x$size) / 1024) |> round(1),
+    size_s = (sum(.x$size) / 1024) |> round(1)
+  ))
+
+datas$data12 |>
+  list_transpose() |>
+  _[[1]] |>
+  names()
+
+iwalk(datas, \(x, opt) {
+  cat(opt, ":\n", sep = "")
+  iwalk(x[[1]], \(e, name) {
+    cat(
+      "- ", name, ": ",
+      format(lobstr::obj_size(e)), " (",
+      paste0(names(e), collapse = ", "), ")\n",
+      sep = ""
+    )
+  })
+})
+
+
+iwalk(datas, \(x, opt) {
+  cat(opt, ":\n", sep = "")
+  iwalk(x, \(e, name) {
+    cat(
+      "- ", name, ": ",
+      map_dbl(e, lobstr::obj_size) |> mean() %>% {. / 1024}, " (",
+      paste0(names(e[[1]]), collapse = ", "), ")\n",
+      sep = ""
+    )
+  })
+})
+
+datas$data11[[1]] |> map()
+
+plot_syrup <- function(..., wpid = ps::ps_pid(), groups = FALSE, plot = TRUE) {
+  objs <- list2(...)
+  
+  cat("Current process ID:", wpid)
+  
+  cat("\n\nProcesses by name, parent ID, and ID (of first object):\n")
+  with(objs[[1]], {
+    tab <- table(ppid, pid, name)
+    apply(tab, 3, \(x) x[rowSums(x) != 0, colSums(x) != 0, drop = FALSE]) |>
+      print()
+  })
+  
+  data <- imap_dfr(objs, ~ mutate(.x, obj = .y)) |>
+    filter(ppid == wpid) |>
+    mutate(
+      id = as.integer(id),
+      group = if (groups) {
+        (diff(is.na(c(0, pct_cpu))) == 1) |>
+          cumsum() %>%
+          ifelse(. == 0, 1, .)
+      } else {
+        1
+      },
+      across(c(vms, rss), ~ as.double(.x) / 1000000)
+    ) |>
+    group_by(obj, group) |>
+    filter(n() > 10) |> #sum(apply(pick(pct_cpu:vms), 1, \(x) sum(!is.na(x)))) > 10
+    mutate(id2 = id - min(id) + 1)
+    
+  
+  graph <- data |>
+    pivot_longer(c(pct_cpu, vms, rss), names_to = "stat") |>
+    ggplot(aes(id2, value, group = as.factor(pid))) +
+    geom_line() +
+    facet_grid(vars(stat), vars(obj, group), scales = "free_y") +
+    scale_x_continuous(breaks = scales::breaks_pretty())
+  
+  if (plot) plot(graph)
+  list(data = data, graph = graph)
+}
+
+
+
+map_parallel2 <- function(
+    x, f,
+    parallel, safe, workers = 7, cleanup = FALSE,
+    setup_packages = NULL, setup_data = list(), setup_divide = NULL
+) {
+  if (inherits_any(x, "data.frame")) {
+    cli_warn("{.code x} is a dataframe, {.code pmap}-like behavior may occour")
+  }
+  
+  f_safe <- if (safe) safely_modify(f) else f
+  
+  if (parallel) {
+    on.exit(mirai$daemons(0), add = TRUE)
+    
+    cat("Setting up infrastructure:\n")
+    t1 <- Sys.time()
+    
+    n <- length(x)
+    seqs <- round(seq(0, n, length.out = workers + 1))
+    idxs <- sample(n, n)
+    w_idxs <- lapply(seq_len(workers), \(w) idxs[(seqs[w] + 1):seqs[w + 1]])
+    
+    #fn_fmls(f_safe) <- c(fn_fmls(f_safe), setup_data[])
+    setup_expr <- call2(`{`,
+      !!!imap(setup_packages, ~ expr(library(!!.x, character.only = TRUE)))
+    )
+    setup_divide <- names(setup_data)[map_lgl(setup_data, ~ length(.x) == length(x))]
+    for (w in seq_len(workers)) {
+      mirai$daemons(1, cleanup = cleanup, dispatcher = FALSE, .compute = paste0("w", w))
+      w_data <- imap(setup_data, \(data, name) {
+        if (name %in% setup_divide) data[w_idxs[[w]]] else data
+      })
+      do.call(mirai$everywhere, c(.expr = setup_expr, w_data[], .compute = paste0("w", w)))
+    }
+    cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = "")
+
+    
+    cat("Starting map:\n")
+    t1 <- Sys.time()
+    promises <- vector("list", workers)
+    for (w in seq_len(workers)) {
+      w_x <- x[w_idxs[[w]]]
+      promises[[w]] <- lapply(w_x, \(elem){
+        mirai$mirai(
+          .expr = f(x),
+          .args = list(f = f_safe, x = elem, .mirai_within_map = TRUE),
+          .compute = paste0("w", w)
+        )
+      }) |>
+        `names<-`(names(w_x))
+    }
+    promise <- list_flatten(promises) |> `class<-`("mirai_map")
+    cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = "")
+    
+    cat("Collecting map:\n")
+    t1 <- Sys.time()
+    results <- mirai$collect_mirai(promise, options = c(".progress"))
+    
+    results <- map(list_flatten(results), \(x) {
+      if (inherits_any(x, "try-error")) list(result = NULL, error = x) else x
+    }) # Connection resets happen before safely can catch them
+    cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = "")
+  } else {
+    fn_env(f_safe) <- new_environment(setup_data, fn_env(f_safe))
+    results <- lapply(x, f_safe) # TODO: add profress
+  }
+  
+  results
+}
+
+
+map_parallel3 <- function(
+    x, f,
+    parallel, safe, workers = 7, cleanup = FALSE,
+    setup_packages = NULL, setup_data = list()
+) {
+  if (inherits_any(x, "data.frame")) {
+    cli_warn("{.code x} is a dataframe, {.code pmap}-like behavior may occour")
+  }
+  
+  f_safe <- if (safe) safely_modify(f) else f
+  
+  if (parallel) {
+    on.exit(mirai$daemons(0), add = TRUE)
+    
+    cat("Setting up infrastructure:\n")
+    t1 <- Sys.time()
+    #fn_fmls(f_safe) <- c(fn_fmls(f_safe), setup_data[])
+    setup_expr <- call2(`{`,
+      !!!imap(setup_packages, ~ expr(library(!!.x, character.only = TRUE)))
+    )
+    mirai$daemons(workers, cleanup = cleanup)
+    do.call(mirai$everywhere, c(.expr = setup_expr, setup_data[]))
+    cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = "")
+    
+    cat("Starting map:\n")
+    t1 <- Sys.time()
+    promise <- lapply(x, \(elem){
+      mirai$mirai(
+        .expr = f(x),
+        .args = list(f = f_safe, x = elem, .mirai_within_map = TRUE)
+      )
+    }) |>
+      `names<-`(names(x)) |>
+      `class<-`("mirai_map")
+    cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = "")
+
+    cat("Collecting map:\n")
+    t1 <- Sys.time()
+    results <- mirai$collect_mirai(promise, options = c(".progress"))
+    
+    results <- map(results, \(x) {
+      if (inherits_any(x, "try-error")) list(result = NULL, error = x) else x
+    }) # Connection resets happen before safely can catch them
+    cat("- duration: ", round(Sys.time() - t1, 1), "s\n", sep = "")
+  } else {
+    fn_env(f_safe) <- new_environment(setup_data, fn_env(f_safe))
+    results <- lapply(x, f_safe) # TODO: add profress
+  }
+  
+  results
+}
+
+
+
+# models 2 ----------------------------------------------------------------
+
+box::use(
+  src/utils[...],
+  src/creators/models,
+  bench[mark],
+  mirai
+)
+
+run_mirai <- function(
+  x, f,
+  parallel, safe, workers = 7, cleanup = FALSE,
+  setup_packages = NULL, setup_data = list()
+) {
+  on.exit(mirai$daemons(0), add = TRUE)
+  
+  f_safe <- safely_modify(f)
+  setup_expr <- call2(`{`,
+    !!!imap(setup_packages, ~ expr(library(!!.x, character.only = TRUE)))
+  )
+  
+  mirai$daemons(workers, cleanup = cleanup)
+  do.call(mirai$everywhere, c(.expr = setup_expr, setup_data[]))
+  
+  promise <- mirai$mirai_map(x, f)
+  results <- mirai$collect_mirai(promise, options = c(".progress"))
+  
+  results
+}
+
+estimate_models <- function(input) {
+  data <- data_lags(data.frame(y = input$y), n_l = n_l_max)
+  
+  results <- vector("list", n_m)
+  names(results) <- names(mods)
+  
+  for (mod_name in names(mods)) {
+    results[[mod_name]] <- mods[[mod_name]](data, n_t, n_b, n_h, rn_par = input$rn_par)
+  }
+  
+  results
+}
+
+est_models <- list(
+  nors = models$nors(n_r = 1),
+  sb = models$sb(n_r = 2),
+  ms = models$ms(n_r = 2),
+  set= models$set(n_r = 2),
+  st = models$st(n_r = 2),
+  km = models$km(n_r = 2),
+  rf = models$rf()
+)
+
+simulations <- read_rds("data/simulations.rds") |> map("result")
+est_inputs <- map2(
+  simulations,
+  get_varying_param(names(simulations)),
+  \(sim, rn_par) list(y = sim$y, rn_par = rn_par)
+)
+est_inputs <- est_inputs %>% .[str_split_i(names(.), "-", 3) %in% 1]
+
+data_lags(data.frame(y = est_inputs[[1]]$y), n_l = 4)
+
+b1 <- mark(
+  data = run_mirai(
+    est_inputs, estimate_models,
+    setup_packages = c("tsDyn", "MSwM", "stats", "randomForest"),
+    setup_data = list(
+      mods = est_models, data_lags = data_lags,
+      n_b = n_b, n_h = n_h, n_t = n_t, n_l_max = 4, n_m = n_m
+    )
+  ),
+  min_iterations = 2
+)
+
+saveRDS(r1)
+b1
+
+
+# Models -----------------------------------------------------------------------
+
+box::use()
+input <- read_rds("data/simulations.rds")[[1]]$result
+
+
+profvis::profvis(run_model(models$st, n_r = 2))
+run_model(models$nors, n_r = 1)
+
+b1 <- mark(
+  check = FALSE,
+
+)
+b1
+
+
+
+
+# data_lags ---------------------------------------------------------------
+
+y <- 1:100
+n <- length(y)
+
+mark(
+  check = FALSE,
+  c(list(y), lapply(1:4, \(x) double(n))) |> as.data.frame(),
+  data.frame(y, lapply(1:4, \(x) double(n))),
+  cbind(y, vapply(1:4, \(x) double(n), double(n))) |> as.data.frame()
+)
+
+mark(
+  sapply(1:4, \(x) double(n)),
+  vapply(1:4, \(x) double(n), double(n))
+)
+
+
+a <- function(y, n_l) {
+  n <- length(y)
+  ls <- seq_len(n_l)
+  
+  cbind(y, vapply(ls, \(l) lag(y, l), double(n))) |>
+    as.data.frame() |>
+    `colnames<-`(c("y", paste0("y_l", ls)))
+}
+
+b <- function(y, n_l) {
+  res <- vector("list", n_l + 1) |>
+    `names<-`(c("y", paste0("y_l", 1:n_l)))
+  res$y <- y
+  for (n in seq_len(n_l)) {
+    res[[paste0("y_l", n)]] <- lag(y, n = n)
+  }
+  as.data.frame(res)
+}
+
+mark(
+  check = FALSE,
+  a(1:100, 4),
+  b(1:100, 4),
+  data_lags(data.frame(y = 1:100), 4)
+)
+
+
+mark(
+  check = FALSE,
+  {results <- vector("list", 4)
+  names(results) <- letters[1:4]},
+  {results <- vector("list", 4) |> `names<-`(letters[1:4])},
+  {results <- vector("list", 4) |> setNames(letters[1:4])},
+  results <- structure(vector("list", 4), names = letters[1:4])
 )
 
 
