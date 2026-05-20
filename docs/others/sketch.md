@@ -24,6 +24,7 @@ csl: ../abnt.csl
 
 number-sections: true
 fig-cap-location: top
+tab-cap-location: top
 
 format:
     pdf: 
@@ -37,23 +38,26 @@ format:
         linkcolor: orange
         urlcolor: lightblue
         include-in-header:  
-            - text: |
+            text: |
                 \usepackage[a4paper, left=2cm, right=2cm, top=2.5cm, bottom=2.5cm]{geometry}
                 \input{../main/configs/rspalette.tex}
-                \setlength{\parindent}{1.5em}             
+
                 \usepackage{amsmath}
                 \usepackage{mathtools}
-                \usepackage{tikz}
-                \usetikzlibrary{positioning}
-                \usetikzlibrary{decorations.pathreplacing}
-                \usepackage{algorithm}
-                \usepackage{algpseudocode}
                 \usepackage{float}
                 \usepackage{multirow}
                 \usepackage{multicol}
                 \usepackage{booktabs}
                 \usepackage{pdflscape}
                 \usepackage{graphicx}
+
+                \usepackage{tikz}
+                \usetikzlibrary{positioning}
+                \usetikzlibrary{decorations.pathreplacing}
+                \usepackage{algorithm}
+                \usepackage{algpseudocode}
+
+                \setlength{\parindent}{1.5em}         
                 \DeclareMathOperator*{\argmax}{arg\,max}
                 \DeclareMathOperator*{\argmin}{arg\,min}
                 \setcounter{tocdepth}{2}
@@ -578,7 +582,7 @@ Following @sec-sim-hyper, the chosen hyperparameters are as below. Some values a
 - Forecast horizon: $H = 10$ predictions of $1$-step ahead values.
 - Total number of observations: $T = 100$.
 - Burn-in period: $B = 4$.
-- As described above, there are $6$ RNs, $7$ RGPs, and $4$ models.
+- As described above, there are $6$ RNs, $7$ RGPs, and $5$ models.
 
 I generate the error sequences in parallel, using [`rTRNG::rnorm_trng`](https://github.com/cran/rTRNG). I estimate the models with [`stats::lm`](https://github.com/SurajGupta/r-source/tree/master/src/library/stats), [`mbreaks::dofix`](https://github.com/cran/mbreaks), [`tsDyn::setar`](https://github.com/cran/tsDyn), [`tsDyn::lstar`](https://github.com/cran/tsDyn), [`MSwM::msmFit`](https://github.com/cran/MSwM), and [`randomforest::randomForest`](https://github.com/cran/randomforest).
 
