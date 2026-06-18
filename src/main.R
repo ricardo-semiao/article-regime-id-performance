@@ -137,6 +137,7 @@ simulations_meta <- params$sgps[unique(menu$dgps$sgp)] |>
   full_join(select(menu$dgps, sgp, rgp), by = "sgp") |>
   relocate(sgp, rgp, meta) |>
   arrange(sgp, rgp)
+# ! No-RS should have only one line of coefficients
 
 simulations_data <- simulations |>
   imap_dfr(~ c(sim_name = .y, .x[])) |>

@@ -4,6 +4,7 @@
 %
 \documentclass[
   ignorenonframetext,
+  brazilian,
 ]{beamer}
 \usepackage{pgfpages}
 \setbeamertemplate{caption}[numbered]
@@ -137,36 +138,36 @@
 \@ifpackageloaded{caption}{}{\usepackage{caption}}
 \AtBeginDocument{%
 \ifdefined\contentsname
-  \renewcommand*\contentsname{Table of contents}
+  \renewcommand*\contentsname{Índice}
 \else
-  \newcommand\contentsname{Table of contents}
+  \newcommand\contentsname{Índice}
 \fi
 \ifdefined\listfigurename
-  \renewcommand*\listfigurename{List of Figures}
+  \renewcommand*\listfigurename{Lista de Figuras}
 \else
-  \newcommand\listfigurename{List of Figures}
+  \newcommand\listfigurename{Lista de Figuras}
 \fi
 \ifdefined\listtablename
-  \renewcommand*\listtablename{List of Tables}
+  \renewcommand*\listtablename{Lista de Tabelas}
 \else
-  \newcommand\listtablename{List of Tables}
+  \newcommand\listtablename{Lista de Tabelas}
 \fi
 \ifdefined\figurename
-  \renewcommand*\figurename{Figure}
+  \renewcommand*\figurename{Figura}
 \else
-  \newcommand\figurename{Figure}
+  \newcommand\figurename{Figura}
 \fi
 \ifdefined\tablename
-  \renewcommand*\tablename{Table}
+  \renewcommand*\tablename{Tabela}
 \else
-  \newcommand\tablename{Table}
+  \newcommand\tablename{Tabela}
 \fi
 }
 \@ifpackageloaded{float}{}{\usepackage{float}}
 \floatstyle{ruled}
 \@ifundefined{c@chapter}{\newfloat{codelisting}{h}{lop}}{\newfloat{codelisting}{h}{lop}[chapter]}
-\floatname{codelisting}{Listing}
-\newcommand*\listoflistings{\listof{codelisting}{List of Listings}}
+\floatname{codelisting}{Listagem}
+\newcommand*\listoflistings{\listof{codelisting}{Lista de Listagens}}
 \makeatother
 \makeatletter
 \makeatother
@@ -175,13 +176,23 @@
 \@ifpackageloaded{subcaption}{}{\usepackage{subcaption}}
 \makeatother
 
+\ifLuaTeX
+\usepackage[bidi=basic]{babel}
+\else
+\usepackage[bidi=default]{babel}
+\fi
+\babelprovide[main,import]{brazilian}
+% get rid of language-specific shorthands (see #6817):
+\let\LanguageShortHands\languageshorthands
+\def\languageshorthands#1{}
 \usepackage{bookmark}
 
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \urlstyle{same} % disable monospaced font for URLs
 \hypersetup{
-  pdftitle={Semião 2026},
+  pdftitle={Semião 2026 - Apresentação},
   pdfauthor={Ricardo Semião e Castro},
+  pdflang={pt-BR},
   pdfsubject={Master's Thesis in Economics at FGV-EESP},
   pdfkeywords={Time series, Regime Switching},
   hidelinks,
@@ -192,7 +203,7 @@
 \subtitle{FGV-EESP Masters' Thesis}
 \author{Ricardo Semião e Castro\\
 Orientador: Marcelo Fernandes}
-\date{19 May 2026}
+\date{20 mai 2026}
 
 \begin{document}
 \frame{\titlepage}
@@ -202,26 +213,27 @@ Orientador: Marcelo Fernandes}
 
 \begin{frame}{Objetivo}
 \phantomsection\label{objetivo}
-Pergunta de pesquisa:
+\textbf{Pergunta de pesquisa:}
 
 \begin{itemize}
 \tightlist
 \item
-  Como modelos de RS performam em diferentes DGPs?
+  Como modelos de mudança de regimes (RS) desempenham em diferentes
+  processos geradores de dados (DGPs)?
 \item
-  Como essa performance se relaciona com características das
+  Como esse desempenho se relaciona com características das
   distribuições dos regimes?
 \end{itemize}
 
 \pause
 
-Mudança de regime (RS): comportamento que alterna entre dois ou mais
-padrões; DGP alterna entre conjuntos de parâmetros.
+Mudança de regime: comportamento alterna entre dois ou mais padrões; DGP
+alterna entre conjuntos de parâmetros.
 
 \pause
 
 Comportamento observável nos dados, e útil para modelar
-não-linearidades, outliers, etc.
+não-linearidades, outliers, entre outros.
 \end{frame}
 
 \begin{frame}{Exemplos de mudanças de regime}
@@ -238,7 +250,7 @@ não-linearidades, outliers, etc.
 
 \end{figure}%
 
-\small Lima et al.~(2007) ``Monetary policy regimes in Brazil''
+\small Fonte: Lima et al.~(2007) ``Monetary policy regimes in Brazil''
 (\href{http://repositorio.ipea.gov.br/handle/11058/1884}{link}).
 \normalsize
 \end{frame}
@@ -247,7 +259,7 @@ não-linearidades, outliers, etc.
 \phantomsection\label{exemplos-de-mudanuxe7as-de-regime-1}
 \begin{figure}
 
-\caption{\label{fig-ws_forecast}Produção de energia no noroeste dos EUA}
+\caption{\label{fig-ws_forecast}Vento no noroeste dos EUA}
 
 \centering{
 
@@ -257,22 +269,24 @@ não-linearidades, outliers, etc.
 
 \end{figure}%
 
-\small Fonte: Fonte: Gneiting et al.~(2012) ``Calibrated Probabilistic
+\small Fonte: Gneiting et al.~(2012) ``Calibrated Probabilistic
 Forecasting at the Stateline Wind Energy Center''
 (\href{https://doi.org/10.1198/016214506000000456}{link}). \normalsize
 \end{frame}
 
 \begin{frame}{Características dos regimes}
 \phantomsection\label{caracteruxedsticas-dos-regimes}
-Estudar a performance desses modelos é importante, e as características
+Estudar o desempenho desses modelos é importante, e as características
 (métricas) dos regimes são relevantes.
 
 \pause
 
+\vspace{0.5cm}
+
 \begin{figure}
 
-\caption{\label{fig-ws_boxplots}Produção de energia no noroeste dos EUA
-- Distribuições}
+\caption{\label{fig-ws_boxplots}Vento no noroeste dos EUA -
+Distribuições}
 
 \centering{
 
@@ -287,20 +301,14 @@ Estudar a performance desses modelos é importante, e as características
 
 \begin{frame}{Resumo da metodologia}
 \phantomsection\label{resumo-da-metodologia}
-\begin{itemize}
-\tightlist
+\begin{enumerate}
 \item
-  Definir a estrutura dos DGPs, modelos, e métricas dos regimes.
+  Definir uma estrutura geral dos DGPs, modelos, e métricas dos regimes.
 \item
   Gerar séries, previsões, e métricas via simulação de Monte Carlo.
 \item
   Estudar os DGPs e performance dos modelos.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Sumário}
-\phantomsection\label{sumuxe1rio}
-\tableofcontents
+\end{enumerate}
 \end{frame}
 
 \begin{frame}{Literatura relacionada}
@@ -326,10 +334,11 @@ Literatura de RS:
 \item
   Processos determinísticos vs.~estocásticos.
 \item
-  \emph{Markov Switching}, \emph{Self-Exciting Threshold}, \emph{Smooth
-  Transition}.
+  \emph{Markov Switching} (MS), \emph{Self-Exciting Threshold} (SET),
+  \emph{Smooth Transition} (ST).
 \item
-  Modelos `agnósticos': K-means e Random Forest.
+  Modelos `agnósticos': K-means (KM), Random Forest (RF), Neural
+  Network.
 \end{itemize}
 \end{frame}
 
@@ -422,11 +431,9 @@ Exemplos:
 \item
   Sem RS: sempre no regime 1.
 \item
-  SET: determinístico, baseado em \(y_{t-1}\), transição abrupta.
+  SET e ST: baseados em \(y_{t-1}\).
 \item
-  ST: determinístico, baseado em \(y_{t-1}\), transição suave.
-\item
-  MS: estocástico, transição abrupta.
+  MS: distribuição geométrica.
 \item
   Todos com \(S = 2\) regimes, uma versão simétrica (\(\approx\) 50-50),
   e outra assimétrica (\(\approx\) 75-25).
@@ -443,8 +450,8 @@ Exemplos:
 \item
   MS, SET, e ST.
 \item
-  K-means não supervisionado e Random Forest. Com 4 lags de \(y\),
-  média, desvio-padrão, e \(ACF(1)\) móveis.
+  K-means e Random Forest, com 4 lags de \(y\), média, desvio-padrão, e
+  \(ACF(1)\) móveis.
 \item
   Todos os parâmetros mudam; assume-se 2 regimes.
 \end{itemize}
@@ -454,17 +461,17 @@ Exemplos:
 \phantomsection\label{muxe9tricas-dos-regimes}
 Métrica condicional nos regimes: \((y, r) \mapsto \mathbb{R}^{S}\).
 
+Diferença entre os regimes:
+\((y, r) \mapsto \mathbb{R}^{S} \mapsto \mathbb{R}\).
+
 \pause
 
-\textbf{Métricas consideradas:}
+\textbf{Métricas:}
 
 \begin{itemize}
 \tightlist
 \item
   Média, desvio-padrão, e \(ACF(1)\).
-\item
-  Condensadas pela distância média:
-  \((y, r) \mapsto \mathbb{R}^{S} \mapsto \mathbb{R}\).
 \item
   Outras métricas: RMSE, \(R^{2}\), e ajuste do regime.
 \end{itemize}
@@ -523,7 +530,8 @@ Hiperparâmetros:
 \item
   Tamanho da série: 100, +4 descartes e +10 previsões.
 \item
-  Previsões com janela fixa: \(E_{1:t}[y_{t+h} | y_{1:(t + h - 1)}]\).
+  Previsões com janela fixa:
+  \(E_{1:T}[y_{T+h} \mid y_{1:(T + h - 1)}]\).
 \end{itemize}
 
 Implementação em R
@@ -548,44 +556,12 @@ paralelizado, reproduzível e expansível.
 
 \end{table}%
 
-Outros: aleatoriedade dos erros; comparação verdadeiro vs.~estimado de
+Outros: aleatoriedade dos erros; comparação `verdadeiro vs.~estimado' de
 parâmetros e métricas; independência do índice de simulação.
-\end{frame}
-
-\begin{frame}{Proporções dos regimes}
-\phantomsection\label{proporuxe7uxf5es-dos-regimes}
-\begin{figure}
-
-\caption{\label{fig-regimes_est}Proporções dos regimes}
-
-\centering{
-
-\includegraphics[width=\linewidth,height=0.75\textheight,keepaspectratio]{../../outputs/diagnostics/regimes_est.pdf}
-
-}
-
-\end{figure}%
 \end{frame}
 
 \section{Distribuições dos
 regimes}\label{distribuiuxe7uxf5es-dos-regimes}
-
-\begin{frame}{Visão geral}
-\phantomsection\label{visuxe3o-geral}
-Estudar, sobre cada DGP:
-
-\begin{itemize}
-\tightlist
-\item
-  Como são as distribuições dos regimes?
-\item
-  Elas são diferentes em termos de cada métrica?
-\item
-  Como a intensidade dessas diferenças se relacionam com \(T\)?
-\item
-  Os modelos conseguem capturar essas diferenças?
-\end{itemize}
-\end{frame}
 
 \begin{frame}{Diferenças entre os regimes}
 \phantomsection\label{diferenuxe7as-entre-os-regimes}
@@ -602,21 +578,6 @@ Estudar, sobre cada DGP:
 }
 
 \end{table}%
-\end{frame}
-
-\begin{frame}{Diferenças entre os regimes}
-\phantomsection\label{diferenuxe7as-entre-os-regimes-1}
-\begin{figure}
-
-\caption{\label{fig-rs-ms}Separação dos regimes variando \(T\) - MS}
-
-\centering{
-
-\includegraphics[width=\linewidth,height=0.75\textheight,keepaspectratio]{../../outputs/exploratory/metrics_sep_ms.pdf}
-
-}
-
-\end{figure}%
 \end{frame}
 
 \begin{frame}{Separação estimada}
@@ -654,9 +615,9 @@ Estudar, sobre cada DGP:
 \end{table}%
 \end{frame}
 
-\begin{frame}{Má-especificação e performance}
-\phantomsection\label{muxe1-especificauxe7uxe3o-e-performance}
-Má especificação da família do RGP diminui a performance:
+\begin{frame}{Má-especificação e desempenho}
+\phantomsection\label{muxe1-especificauxe7uxe3o-e-desempenho}
+Má especificação da família do RGP diminui o desempenho:
 
 \begin{itemize}
 \tightlist
@@ -682,7 +643,7 @@ Má especificação da família do RGP diminui a performance:
 \begin{table}[!htbp]
 
 \caption{\label{tbl-mis_metrics_sim}Modelos e `perfis' de métricas
-condicionais}
+condicionais veradeiras}
 
 \centering{
 
@@ -695,11 +656,12 @@ condicionais}
 
 \end{table}%
 
-Com as métricas estimadas, os resultados mudam, e variam entre RNs.
+\emph{Porém:} com as métricas estimadas, os resultados mudam, e variam
+entre RNs.
 \end{frame}
 
-\begin{frame}{Identificação e performance}
-\phantomsection\label{identificauxe7uxe3o-e-performance}
+\begin{frame}{Identificação e desempenho}
+\phantomsection\label{identificauxe7uxe3o-e-desempenho}
 \begin{table}[!htbp]
 
 \caption{\label{tbl-match_r2}RMSE e identificação do fit e \(r\)}
@@ -716,8 +678,8 @@ Com as métricas estimadas, os resultados mudam, e variam entre RNs.
 \end{table}%
 \end{frame}
 
-\begin{frame}{Identificação e performance}
-\phantomsection\label{identificauxe7uxe3o-e-performance-1}
+\begin{frame}{Identificação e desempenho}
+\phantomsection\label{identificauxe7uxe3o-e-desempenho-1}
 \begin{table}[!htbp]
 
 \caption{\label{tbl-match_metrics}RMSE e identificação das métricas
@@ -759,10 +721,10 @@ condicionais}
 \phantomsection\label{conclusuxe3o-1}
 \begin{itemize}
 \item
-  Objetivo: estudar os processos e modelos de RS, através das
-  características das distribuições de seus regimes.
+  Estudei os processos e modelos de RS, através das características das
+  distribuições de seus regimes.
 \item
-  Defini uma estrutura teórica e de Simulações de Monte Carlo, geral e
+  Defini uma estrutura teórica e de simulações de Monte Carlo, geral e
   expansível, mas foquei em objetos e exercícios específicos.
 \end{itemize}
 
@@ -773,10 +735,11 @@ Resultados gerais:
 \begin{itemize}
 \tightlist
 \item
-  RGPs e RNs interagem significantemente, e as métricas condicionais
+  RGPs e RNs interagem significativamente, e as métricas condicionais
   recuperam algumas relações.
 \item
-  Modelos erram as métricas condicionais, a depender do modelo e RN.
+  Modelos erram as métricas condicionais, a depender do modelo e RN;
+  previsões ruins sob \(r\) impreciso.
 \item
   Subestimar \(S\) é menos danoso com regimes similares, e superestimar
   \(S\) é menos danoso com regimes diferentes.
@@ -791,22 +754,23 @@ Resultados dos modelos:
 \tightlist
 \item
   K-means é um bom aproximador: melhor desempenho, consistente em
-  diferentes DGPs, e boas previsões mesmo com \(r\)s imprecisos.
+  diferentes DGPs, e boas previsões mesmo com \(r\) imprecisos.
 \item
   Modelos de \emph{threshold} são similares, `gostam' de mudanças na
   média.
 \item
   ST captura mudanças pequenas, é sensível às séries sem-RS, a mudanças
-  em \(\rho\), e erra a volatilidade condicional.
+  em \(\rho\), e errar a volatilidade condicional.
 \item
   MS lida com regimes assimétricos, sofre com má-especificações do RGP e
-  erra métricas condicionais.
+  errar métricas condicionais.
 \end{itemize}
 
 \pause
 
-Resultados apresentam fatos úteis para entender processos e modelos. A
-análise de modelos e métricas tem potencial para recomendações práticas.
+\textbf{Resultados apresentam fatos úteis para entender os processos e
+modelos. A análise de modelos \(\times\) métricas tem potencial para
+recomendações práticas.}
 \end{frame}
 
 \begin{frame}{Limitações}
@@ -818,9 +782,9 @@ Melhoria: adicionar MS-ST, MS+T, outras distribuições para MS, e
 transformações da variável de \emph{threshold}.
 
 \textbf{Conjunto de métricas:} insuficiente para descrever interações
-entre todos RGPs e RNs; e difícil para os modelos estimarem.
+entre todos RGPs e RNs; de difícil estimação pelos modelos.
 
-Melhoria: mais métricas (ex. outros momentos), mais medidas de
+Melhoria: mais métricas (ex.: outros momentos), mais medidas de
 dispersão, e versões ponderadas das métricas.
 \end{frame}
 

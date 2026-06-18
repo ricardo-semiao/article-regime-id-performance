@@ -41,18 +41,6 @@ disp_mpe <- function(x, k, n = length(x), ...) {
 }
 fn_env(disp_mpe) <- pkg_env("base")
 
-#' Metrics - dispersion: Difference raised to power
-#'
-#' @param x [`double()`] Input vector of length 2.
-#' @param k [`integer(1)`] Power to raise the difference.
-#'
-#' @returns [`double(1)`] Difference raised to the power `k`.
-#' @export
-diff_k_2 <- function(x, k = 1) {
-  abs(x[1] - x[2])^k
-}
-fn_env(diff_k_2) <- pkg_env("base")
-
 # Others: simply `sd()`
 
 
